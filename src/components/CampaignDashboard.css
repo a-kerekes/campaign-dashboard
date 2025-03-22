@@ -1,0 +1,82 @@
+.dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+  }
+  
+  .dashboard-title {
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333;
+  }
+  
+  .tab-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+  }
+  
+  .tab-button {
+    padding: 10px 15px;
+    margin: 0 5px 10px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+  }
+  
+  .tab-button.active {
+    background-color: #3182CE;
+    color: white;
+    border-color: #3182CE;
+  }
+  
+  .chart-container {
+    width: 100%;
+    height: 400px;
+    margin-bottom: 40px;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  .insights-container {
+    margin-top: 30px;
+  }
+  
+  .insights-section, .recommendations-section {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .insights-title, .recommendations-title {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #333;
+    border-bottom: 1px solid #eaeaea;
+    padding-bottom: 10px;
+  }
+  
+  .insights-list, .recommendations-list {
+    list-style-type: disc;
+    padding-left: 20px;
+  }
+  
+  .insights-list li, .recommendations-list li {
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  
+  .recommendations-section {
+    background-color: #f0f7ff;
+    border-left: 4px solid #3182CE;
+  }
+  
