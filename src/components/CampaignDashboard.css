@@ -1,82 +1,101 @@
+/* CampaignDashboard.css */
 .dashboard-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family: Arial, sans-serif;
-  }
-  
-  .dashboard-title {
-    font-size: 28px;
-    text-align: center;
-    margin-bottom: 30px;
-    color: #333;
-  }
-  
-  .tab-container {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 30px;
-    flex-wrap: wrap;
-  }
-  
-  .tab-button {
-    padding: 10px 15px;
-    margin: 0 5px 10px;
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.3s ease;
-  }
-  
-  .tab-button.active {
-    background-color: #3182CE;
-    color: white;
-    border-color: #3182CE;
-  }
-  
-  .chart-container {
-    width: 100%;
-    height: 400px;
-    margin-bottom: 40px;
-    border: 1px solid #eaeaea;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  }
-  
-  .insights-container {
-    margin-top: 30px;
-  }
-  
-  .insights-section, .recommendations-section {
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  
-  .insights-title, .recommendations-title {
-    font-size: 18px;
-    margin-bottom: 15px;
-    color: #333;
-    border-bottom: 1px solid #eaeaea;
-    padding-bottom: 10px;
-  }
-  
-  .insights-list, .recommendations-list {
-    list-style-type: disc;
-    padding-left: 20px;
-  }
-  
-  .insights-list li, .recommendations-list li {
-    margin-bottom: 12px;
-    line-height: 1.5;
-  }
-  
-  .recommendations-section {
-    background-color: #f0f7ff;
-    border-left: 4px solid #3182CE;
-  }
-  
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+}
+
+.dashboard-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #2d3748;
+}
+
+.tab-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab-button {
+  padding: 8px 16px;
+  border: none;
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #4a5568;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.tab-button:hover {
+  background-color: #cbd5e0;
+}
+
+.tab-button.active {
+  background-color: #4299e1;
+  color: white;
+}
+
+.chart-container {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  height: 450px; /* Explicit height for the chart container */
+}
+
+.insights-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.insights-section, 
+.recommendations-section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.insights-title,
+.recommendations-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #2d3748;
+}
+
+.insights-list,
+.recommendations-list {
+  list-style-type: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insights-list li,
+.recommendations-list li {
+  position: relative;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+.insights-list li:before,
+.recommendations-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #4299e1;
+  font-weight: bold;
+}
+
+.recommendations-list li strong {
+  color: #3182ce;
+}

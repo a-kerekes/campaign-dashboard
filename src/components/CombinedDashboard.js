@@ -1,5 +1,4 @@
 // src/components/CombinedDashboard.js
-// src/components/CombinedDashboard.js
 
 import React, { useState } from 'react';
 import { 
@@ -128,7 +127,7 @@ const CombinedDashboard = () => {
     {
       period: "Immediate (0-2 weeks)",
       allocations: [
-        { landingPage: "Sales Campaign", min: 40, max: 60, value: 50 },
+        { landingPage: "BFCM Sale", min: 40, max: 60, value: 50 },
         { landingPage: "Real Talk", min: 25, max: 30, value: 27.5 },
         { landingPage: "Others", min: 10, max: 35, value: 22.5 }
       ]
@@ -271,7 +270,7 @@ const CombinedDashboard = () => {
                     label={{ value: 'Weeks After Campaign Spend', position: 'insideBottom', offset: -15 }} 
                   />
                   <YAxis domain={[-0.5, 0.5]} />
-                  <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                  <Tooltip formatter={(value) => [value.toFixed(2), 'Correlation Coefficient']} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#000" />
                   <Line type="monotone" dataKey="leads" name="Leads Campaigns" stroke="#3182CE" strokeWidth={2} dot={{ r: 3 }} />
@@ -290,7 +289,7 @@ const CombinedDashboard = () => {
                     label={{ value: 'Weeks After Landing Page Spend', position: 'insideBottom', offset: -15 }} 
                   />
                   <YAxis domain={[-0.5, 0.5]} />
-                  <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                  <Tooltip formatter={(value) => [value.toFixed(2), 'Correlation Coefficient']} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#000" />
                   <Line type="monotone" dataKey="realTalk" name="Real Talk" stroke="#3182CE" strokeWidth={2} dot={{ r: 3 }} />
@@ -313,7 +312,7 @@ const CombinedDashboard = () => {
                     label={{ value: 'Weeks After Campaign Spend', position: 'insideBottom', offset: -15 }} 
                   />
                   <YAxis domain={[-0.5, 0.5]} />
-                  <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                  <Tooltip formatter={(value) => [value.toFixed(2), 'Correlation Coefficient']} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#000" />
                   <Line type="monotone" dataKey="leads" name="Leads Campaigns" stroke="#3182CE" strokeWidth={2} dot={{ r: 3 }} />
@@ -332,7 +331,7 @@ const CombinedDashboard = () => {
                     label={{ value: 'Weeks After Campaign Spend', position: 'insideBottom', offset: -15 }} 
                   />
                   <YAxis domain={[-0.5, 0.5]} />
-                  <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                  <Tooltip formatter={(value) => [value.toFixed(2), 'Correlation Coefficient']} />
                   <Legend />
                   <ReferenceLine y={0} stroke="#000" />
                   <Line type="monotone" dataKey="leads" name="Leads Campaigns" stroke="#3182CE" strokeWidth={2} dot={{ r: 3 }} />
@@ -348,7 +347,7 @@ const CombinedDashboard = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="quarter" />
                   <YAxis domain={[0, 0.5]} />
-                  <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                  <Tooltip formatter={(value) => [value.toFixed(2), 'Correlation Coefficient']} />
                   <Legend />
                   <Line type="monotone" dataKey="realTalk" name="Real Talk" stroke="#3182CE" strokeWidth={2} dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="professionalVisuals" name="Professional Visuals" stroke="#38A169" strokeWidth={2} dot={{ r: 3 }} />
@@ -402,9 +401,9 @@ const CombinedDashboard = () => {
             <div className="recommendations-section">
               <h3 className="recommendations-title">Strategic Landing Page Recommendations</h3>
               <ul className="recommendations-list">
-                <li><strong>Landing Page Rotation Strategy:</strong> Maintain Real Talk as foundation (25-30% of budget) with quarterly sales campaigns (30-40%) every 3-4 months throughout the year.</li>
-                <li><strong>Timing Optimization:</strong> Launch Professional Visuals 8 weeks before expected peaks, reserve BFCM Sale for November-December only, and deploy Social Expert 8-10 weeks ahead of seasonal lulls.</li>
-                <li><strong>Audience Segmentation:</strong> Use Loan Officer and OverView for acquisition, Real Talk for general conversion, Social Expert for relationship building, and implement regular sales landing pages quarterly for time-sensitive promotions.</li>
+                <li><strong>Landing Page Rotation Strategy:</strong> Maintain Real Talk as foundation (25-30% of budget) with seasonal offerings like BFCM Sale (30-40%) during promotional periods.</li>
+                <li><strong>Timing Optimization:</strong> Launch Professional Visuals 8 weeks before expected peaks, BFCM Sale 1-2 weeks before promotions, and Social Expert 8-10 weeks ahead of seasonal lulls.</li>
+                <li><strong>Audience Segmentation:</strong> Use Loan Officer and OverView for acquisition, Real Talk for general conversion, Social Expert for relationship building, and BFCM Sale for time-sensitive promotions.</li>
                 <li><strong>Budget Allocation Cadence:</strong> Implement 90-day landing page cycles with gradual transitions, shifting no more than 15-20% of budget between landing pages in a single week.</li>
               </ul>
             </div>
@@ -460,22 +459,20 @@ const CombinedDashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis domain={[-0.2, 0.7]} tickFormatter={(value) => value.toFixed(2)} />
-                    <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                    <Tooltip formatter={(value) => value.toFixed(2)} />
                     <Legend />
-                    <ReferenceLine y={0} stroke="#000000" strokeDasharray="3 3" />
-                    {extendedCorrelationData && extendedCorrelationData.length > 0 ? extendedCorrelationData.map(function(item) {
-                      return (
-                        <Line
-                          key={item.landingPage}
-                          type="monotone" 
-                          dataKey={item.landingPage}
-                          stroke={colors[item.landingPage]}
-                          strokeWidth={2}
-                          dot={{ r: 4 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      );
-                    }) : null}
+                    <ReferenceLine y={0} stroke="#000" strokeDasharray="3 3" />
+                    {extendedCorrelationData.map(page => (
+                      <Line
+                        key={page.landingPage}
+                        type="monotone"
+                        dataKey={page.landingPage}
+                        stroke={colors[page.landingPage]}
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -509,7 +506,7 @@ const CombinedDashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
                     <YAxis type="category" dataKey="name" width={100} />
-                    <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                    <Tooltip formatter={(value) => `${value}%`} />
                     <Legend />
                     <Bar dataKey="min" name="Minimum %" stackId="a" fill="#8884d8" />
                     <Bar dataKey="range" name="Optimal Range" stackId="a" fill="#82ca9d" />
@@ -547,7 +544,7 @@ const CombinedDashboard = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="landingPage" />
                           <YAxis domain={[0, 60]} tickFormatter={(value) => `${value}%`} />
-                          <Tooltip formatter={(value, name) => [value.toFixed(2), `${name}`]} />
+                          <Tooltip formatter={(value) => `${value}%`} />
                           <Bar dataKey="value" name="Recommended %" fill="#8884d8" />
                         </BarChart>
                       </ResponsiveContainer>
@@ -632,7 +629,7 @@ const CombinedDashboard = () => {
                       <li>Maintain Loan Officer at 20-40% allocation for weeks 16-36</li>
                       <li>Allocate 20-30% to Real Talk throughout, increasing at weeks 4, 20, and 36</li>
                       <li>Reserve 15-20% for OverView to provide consistent long-term pipeline</li>
-                      <li>Reserve BFCM Sale exclusively for November-December, and implement regular quarterly sales campaigns in other months</li>
+                      <li>Phase out BFCM Sale completely after week 8</li>
                     </ul>
                   </div>
                   
@@ -661,7 +658,7 @@ const CombinedDashboard = () => {
                     <ul className="strategy-list">
                       <li>Summer Months: Increase Professional Visuals allocation</li>
                       <li>Q1 (Jan-Mar): Boost Social Expert allocation</li>
-                      <li>Holiday/Promotional Periods: Use BFCM Sale exclusively in Nov-Dec, and implement regular sales campaigns quarterly (every 3-4 months) throughout the year</li>
+                      <li>Holiday/Promotional Periods: Only use BFCM Sale for immediate impact</li>
                       <li>Year-Round: Maintain Real Talk as foundation at 25-35%</li>
                     </ul>
                   </div>
