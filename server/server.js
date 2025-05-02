@@ -4,12 +4,10 @@ const axios = require('axios');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
+// Load environment variables from .env file
 dotenv.config();
 
-// Add this line for testing - REMOVE THIS BEFORE COMMITTING YOUR CODE
-process.env.ANTHROPIC_API_KEY = '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';
-
-// Debug API key
+// Debug API key status (without revealing the key)
 const apiKey = process.env.ANTHROPIC_API_KEY;
 console.log('API Key status:', apiKey ? 'API key is set' : 'API key is missing');
 if (!apiKey) {
