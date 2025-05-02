@@ -2,7 +2,7 @@
   "name": "campaign-dashboard",
   "version": "0.1.0",
   "private": true,
-  "homepage": "/a-kerekes/campaign-dashboard",
+  "homepage": "/",
   "dependencies": {
     "@babel/standalone": "^7.27.0",
     "@emotion/react": "^11.14.0",
