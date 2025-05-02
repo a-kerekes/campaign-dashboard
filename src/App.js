@@ -46,7 +46,7 @@ const DirectAdminTest = () => {
 };
 
 // Fix the router base with the correct spelling
-const routerBase = process.env.REACT_APP_ROUTER_BASE || '/a-kerekes/campaign-dashboard';
+const routerBase = process.env.REACT_APP_ROUTER_BASE || '/';
 
 // Debug for troubleshooting
 console.log('Router base path:', routerBase);
