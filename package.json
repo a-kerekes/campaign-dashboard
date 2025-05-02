@@ -2,19 +2,26 @@
   "name": "campaign-dashboard",
   "version": "0.1.0",
   "private": true,
+  "homepage": "/a-kerekes/campaign-dashboard",
   "dependencies": {
+    "@babel/standalone": "^7.27.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^7.0.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.8.4",
     "firebase": "^11.5.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "firebase-admin": "^13.2.0",
+    "lodash": "^4.17.21",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-firebase-hooks": "^5.1.1",
-    "react-router-dom": "^7.4.0",
+    "react-router-dom": "^6.18.0",
     "react-scripts": "5.0.1",
-    "recharts": "^2.15.1",
+    "recharts": "^2.15.2",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -40,5 +47,17 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-kerekes/campaign-dashboard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/a-kerekes/campaign-dashboard/issues"
   }
 }

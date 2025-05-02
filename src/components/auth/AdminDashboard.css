@@ -1,0 +1,135 @@
+/* src/components/auth/AdminDashboard.css */
+.admin-container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .admin-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .tab-button {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    position: relative;
+  }
+  
+  .tab-button.active {
+    color: #4F46E5;
+    font-weight: 500;
+  }
+  
+  .tab-button.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #4F46E5;
+  }
+  
+  .user-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .user-table th,
+  .user-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .user-table th {
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  .tenant-manage-btn {
+    background-color: #4F46E5;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .delete-btn {
+    background-color: #EF4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .modal-content {
+    background-color: white;
+    padding: 24px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .tenant-list {
+    margin: 16px 0;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .tenant-item {
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+  }
+  
+  .tenant-item input {
+    margin-right: 8px;
+  }
+  
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  
+  .cancel-btn {
+    padding: 8px 16px;
+    background-color: #e5e7eb;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .save-btn {
+    padding: 8px 16px;
+    background-color: #4F46E5;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }

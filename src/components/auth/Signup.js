@@ -28,11 +28,12 @@ function Signup() {
       // Create the user in Firebase Authentication
       const userCredential = await signup(email, password);
       
-      // Create a user document in Firestore
+      // Create a user document in Firestore with empty tenants array
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: email,
         role: 'user', // Default role
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        tenants: [] // Initialize with empty array for multi-tenant support
       });
       
       // Redirect to dashboard

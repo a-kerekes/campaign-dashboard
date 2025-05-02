@@ -1,6 +1,8 @@
 // src/components/CombinedDashboard.js
 
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { 
   LineChart, 
   Line, 
@@ -16,10 +18,18 @@ import {
 } from 'recharts';
 import './CombinedDashboard.css';
 
+// Import CreativeAnalyticsDashboard component
+import CreativeAnalyticsDashboard from './meta/CreativeAnalyticsDashboard';
+// Import VisualizationDashboard component
+import VisualizationDashboard from './VisualizationDashboard';
+
 const CombinedDashboard = () => {
   const [activeMainTab, setActiveMainTab] = useState('correlation');
   const [activeCorrelationTab, setActiveCorrelationTab] = useState('fullTimeline');
   const [activeLandingPageTab, setActiveLandingPageTab] = useState('correlation');
+  
+  // Get navigate function for programmatic navigation
+  const navigate = useNavigate();
   
   // Full correlation data for all time periods
   const fullCorrelationData = [
@@ -68,6 +78,9 @@ const CombinedDashboard = () => {
   const q1Data = fullCorrelationData.slice(0, 13);  // 0-12 weeks
   const q2Data = fullCorrelationData.slice(13, 25); // 13-24 weeks
   
+  // In your component's render function, add:
+  const { isAdmin } = useAuth();
+
   // Landing page data by quarter
   const landingPagePerformance = [
     {
@@ -201,9 +214,19 @@ const CombinedDashboard = () => {
     }));
   };
 
+  // Handle clicking on admin button
+  const handleAdminClick = () => {
+    navigate('/admin');
+  };
+
+  // Handle clicking on admin-test button
+  const handleAdminTestClick = () => {
+    navigate('/admin-panel');
+  };
+
   return (
     <div className="dashboard-container">
-      {/* Main Navigation Tabs */}
+      {/* Main Navigation Tabs - Added 'visualizations' tab */}
       <div className="main-tabs">
         <button 
           className={`main-tab ${activeMainTab === 'correlation' ? 'active' : ''}`}
@@ -217,8 +240,58 @@ const CombinedDashboard = () => {
         >
           36-Week Landing Page Analysis
         </button>
+        <button 
+          className={`main-tab ${activeMainTab === 'creative' ? 'active' : ''}`}
+          onClick={() => setActiveMainTab('creative')}
+        >
+          Creative Performance
+        </button>
+        <button 
+          className={`main-tab ${activeMainTab === 'visualizations' ? 'active' : ''}`}
+          onClick={() => setActiveMainTab('visualizations')}
+        >
+          Custom Visualizations
+        </button>
       </div>
       
+      {/* Admin Buttons - Using onClick for proper routing */}
+      {isAdmin && (
+        <div style={{ marginBottom: '15px' }}>
+          <button 
+            onClick={handleAdminClick}
+            style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              backgroundColor: '#f44336',
+              color: 'white',
+              border: 'none',
+              textDecoration: 'none',
+              borderRadius: '4px',
+              marginLeft: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            Admin
+          </button>
+          <button 
+            onClick={handleAdminTestClick}
+            style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              backgroundColor: '#9C27B0',
+              color: 'white',
+              border: 'none',
+              textDecoration: 'none',
+              borderRadius: '4px',
+              marginLeft: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            Admin Panel
+          </button>
+        </div>
+      )}
+
       {/* Campaign Correlation Dashboard */}
       {activeMainTab === 'correlation' && (
         <div className="correlation-dashboard">
@@ -437,7 +510,7 @@ const CombinedDashboard = () => {
               Long-Term Allocations
             </button>
             <button 
-              className={`tab-button ${activeLandingPageTab === 'table' ? 'active' : ''}`}
+              className={`tab-button ${activeLandingPageTab === 'table'? 'active' : ''}`}
               onClick={() => setActiveLandingPageTab('table')}
             >
               Data Table
@@ -666,6 +739,70 @@ const CombinedDashboard = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Creative Performance Dashboard */}
+      {activeMainTab === 'creative' && (
+        <div className="creative-dashboard">
+          <h1 className="dashboard-title">Creative Performance Dashboard</h1>
+          <CreativeAnalyticsDashboard />
+        </div>
+      )}
+
+      {/* Custom Visualizations Dashboard - NEW SECTION */}
+      {activeMainTab === 'visualizations' && (
+        <div className="visualizations-dashboard">
+          <h1 className="dashboard-title">Custom Visualizations Dashboard</h1>
+          <VisualizationDashboard />
+        </div>
+      )}
+
+      {/* Admin Access Panel at Bottom of Dashboard for Debugging */}
+      {isAdmin && (
+        <div style={{
+          margin: '50px auto 20px auto',
+          padding: '15px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '8px',
+          textAlign: 'center',
+          maxWidth: '600px',
+          border: '1px solid #dee2e6'
+        }}>
+          <h3 style={{ marginBottom: '10px' }}>Admin Access</h3>
+          <p>If the admin buttons above aren't working, try these direct links:</p>
+          <button 
+            onClick={() => navigate('/admin')}
+            style={{
+              display: 'inline-block',
+              margin: '10px',
+              padding: '10px 20px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            Direct Admin Access
+          </button>
+          <button 
+            onClick={() => navigate('/admin-panel')}
+            style={{
+              display: 'inline-block',
+              margin: '10px',
+              padding: '10px 20px',
+              backgroundColor: '#6610f2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            Alternative Admin Panel
+          </button>
         </div>
       )}
     </div>

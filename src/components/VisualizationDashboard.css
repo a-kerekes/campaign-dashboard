@@ -1,0 +1,111 @@
+/* src/components/VisualizationDashboard.css */
+
+.visualization-dashboard {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+  }
+  
+  .visualization-tabs {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+  }
+  
+  .visualization-tab {
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    color: #4a5568;
+    transition: all 0.2s ease;
+  }
+  
+  .visualization-tab:hover {
+    color: #2b6cb0;
+  }
+  
+  .visualization-tab.active {
+    color: #2b6cb0;
+    border-bottom: 2px solid #2b6cb0;
+  }
+  
+  .visualization-content {
+    min-height: 500px;
+  }
+  
+  /* Help section styling */
+  .help-section {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .help-section h2 {
+    font-size: 22px;
+    margin-bottom: 20px;
+    color: #2d3748;
+    text-align: center;
+  }
+  
+  .help-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .help-card h3 {
+    font-size: 18px;
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2b6cb0;
+  }
+  
+  .help-card p {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #4a5568;
+    margin-bottom: 10px;
+  }
+  
+  .example {
+    background-color: #ebf8ff;
+    padding: 15px;
+    border-radius: 6px;
+    margin-top: 10px;
+  }
+  
+  .example h4 {
+    font-size: 15px;
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #2c5282;
+  }
+  
+  .help-tip {
+    background-color: #fffaf0;
+    padding: 12px;
+    border-left: 4px solid #ed8936;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+  
+  .help-limitations {
+    background-color: #fff5f5;
+    border-left: 4px solid #e53e3e;
+  }
+  
+  .help-card ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+  }
+  
+  .help-card li {
+    margin-bottom: 8px;
+    color: #4a5568;
+  }
+  
