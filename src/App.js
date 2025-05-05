@@ -67,6 +67,45 @@ function App() {
     return () => window.removeEventListener('error', handleError);
   }, []);
 
+  // Add favicon links in the document
+  useEffect(() => {
+    // Create link elements for favicons
+    const appleTouchIcon = document.createElement('link');
+    appleTouchIcon.rel = 'apple-touch-icon';
+    appleTouchIcon.sizes = '180x180';
+    appleTouchIcon.href = '/apple-touch-icon.png';
+    
+    const favicon32 = document.createElement('link');
+    favicon32.rel = 'icon';
+    favicon32.type = 'image/png';
+    favicon32.sizes = '32x32';
+    favicon32.href = '/favicon-32x32.png';
+    
+    const favicon16 = document.createElement('link');
+    favicon16.rel = 'icon';
+    favicon16.type = 'image/png';
+    favicon16.sizes = '16x16';
+    favicon16.href = '/favicon-16x16.png';
+    
+    const manifest = document.createElement('link');
+    manifest.rel = 'manifest';
+    manifest.href = '/site.webmanifest';
+    
+    // Append to document head
+    document.head.appendChild(appleTouchIcon);
+    document.head.appendChild(favicon32);
+    document.head.appendChild(favicon16);
+    document.head.appendChild(manifest);
+    
+    // Cleanup on component unmount (optional)
+    return () => {
+      document.head.removeChild(appleTouchIcon);
+      document.head.removeChild(favicon32);
+      document.head.removeChild(favicon16);
+      document.head.removeChild(manifest);
+    };
+  }, []);
+
   // Simple error display if something goes wrong
   if (appError) {
     return (

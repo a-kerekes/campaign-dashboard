@@ -6,7 +6,7 @@ import axios from 'axios';
 // Meta API configuration 
 // Note: In production, you should use environment variables for sensitive values
 const META_ACCESS_TOKEN = process.env.REACT_APP_META_ACCESS_TOKEN || ''; 
-const META_API_VERSION = 'v19.0';
+const META_API_VERSION = 'v22.0';
 const META_API_BASE_URL = 'https://graph.facebook.com';
 
 // ======== Facebook SDK Initialization and Auth Functions ========
@@ -44,7 +44,7 @@ export const login = () => {
       } else {
         reject(new Error('User cancelled login or did not fully authorize.'));
       }
-    }, { scope: 'ads_management,ads_read' });
+    }, { scope: 'ads_management,ads_read,business_management,pages_show_list' });
   });
 };
 
