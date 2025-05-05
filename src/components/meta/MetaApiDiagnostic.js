@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// Meta API version constant
+const META_API_VERSION = 'v22.0';
+
 // Implement the essential functions directly to avoid import issues
 const initFacebookSDK = () => {
   return new Promise((resolve) => {
@@ -10,7 +13,7 @@ const initFacebookSDK = () => {
         appId: process.env.REACT_APP_FACEBOOK_APP_ID || '997685078957756',
         cookie: true,
         xfbml: true,
-        version: 'v18.0'
+        version: META_API_VERSION
       });
       resolve(window.FB);
     };
@@ -19,7 +22,7 @@ const initFacebookSDK = () => {
     if (!document.getElementById('facebook-jssdk')) {
       const js = document.createElement('script');
       js.id = 'facebook-jssdk';
-      js.src = "https://connect.facebook.net/en_US/sdk.js";
+      js.src = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
       document.getElementsByTagName('head')[0].appendChild(js);
     } else if (window.FB) {
       resolve(window.FB);
@@ -36,7 +39,7 @@ const login = () => {
       } else {
         reject(new Error('User cancelled login or did not fully authorize.'));
       }
-    }, { scope: 'ads_management,ads_read,read_insights' });
+    }, { scope: 'ads_management,ads_read,read_insights,business_management,pages_show_list' });
   });
 };
 
@@ -67,7 +70,7 @@ const MetaApiDiagnostic = () => {
       try {
         await initFacebookSDK();
         setIsFbInitialized(true);
-        console.log('Facebook SDK initialized successfully');
+        console.log(`Facebook SDK initialized successfully with version: ${META_API_VERSION}`);
       } catch (error) {
         console.error('Failed to initialize Facebook SDK:', error);
       }
@@ -122,7 +125,7 @@ const MetaApiDiagnostic = () => {
       };
       setTestResults(results);
       
-      const meResponse = await axios.get(`https://graph.facebook.com/v22.0/me`, {
+      const meResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me`, {
         params: { access_token: accessToken }
       });
 
@@ -148,7 +151,7 @@ const MetaApiDiagnostic = () => {
       results.permissionsTest = { status: 'pending', message: 'Checking token permissions...' };
       setTestResults({...results});
       
-      const permissionsResponse = await axios.get(`https://graph.facebook.com/v18.0/me/permissions`, {
+      const permissionsResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me/permissions`, {
         params: { access_token: accessToken }
       });
       
@@ -161,10 +164,10 @@ const MetaApiDiagnostic = () => {
         setTestResults({...results});
       } else {
         const adPermissions = permissionsResponse.data.data.filter(p => 
-          ['ads_management', 'ads_read', 'read_insights'].includes(p.permission)
+          ['ads_management', 'ads_read', 'read_insights', 'business_management', 'pages_show_list'].includes(p.permission)
         );
         
-        const missingPermissions = ['ads_management', 'ads_read', 'read_insights'].filter(
+        const missingPermissions = ['ads_management', 'ads_read', 'read_insights', 'business_management', 'pages_show_list'].filter(
           p => !adPermissions.some(granted => granted.permission === p && granted.status === 'granted')
         );
         
@@ -188,7 +191,7 @@ const MetaApiDiagnostic = () => {
       results.accountsTest = { status: 'pending', message: 'Fetching ad accounts...' };
       setTestResults({...results});
       
-      const accountsResponse = await axios.get(`https://graph.facebook.com/v18.0/me/adaccounts`, {
+      const accountsResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`, {
         params: {
           access_token: accessToken,
           fields: 'name,account_id,account_status',
@@ -264,7 +267,7 @@ const MetaApiDiagnostic = () => {
       const until = today.toISOString().split('T')[0];
       
       const insightsResponse = await axios.get(
-        `https://graph.facebook.com/v18.0/act_${accountId}/insights`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/insights`,
         {
           params: {
             access_token: accessToken,
@@ -324,7 +327,7 @@ const MetaApiDiagnostic = () => {
       
       // Attempt to fetch campaigns
       const campaignsResponse = await axios.get(
-        `https://graph.facebook.com/v18.0/act_${accountId}/campaigns`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/campaigns`,
         {
           params: {
             access_token: accessToken,
@@ -380,7 +383,7 @@ const MetaApiDiagnostic = () => {
       
       // Attempt to fetch ad creatives
       const adsResponse = await axios.get(
-        `https://graph.facebook.com/v18.0/act_${accountId}/ads`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/ads`,
         {
           params: {
             access_token: accessToken,
