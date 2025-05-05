@@ -13,6 +13,8 @@ const META_API_BASE_URL = 'https://graph.facebook.com';
 
 // Facebook SDK initialization
 export const initFacebookSDK = () => {
+  console.log('META_API_VERSION loaded as:', META_API_VERSION);
+  
   return new Promise((resolve) => {
     window.fbAsyncInit = function() {
       window.FB.init({
@@ -21,6 +23,7 @@ export const initFacebookSDK = () => {
         xfbml: true,
         version: META_API_VERSION
       });
+      console.log('Facebook SDK initialized with version:', META_API_VERSION);
       resolve(window.FB);
     };
 
@@ -30,15 +33,32 @@ export const initFacebookSDK = () => {
       if (d.getElementById(id)) return;
       js = d.createElement(s); js.id = id;
       // Include the version number directly in the SDK URL
-      js.src = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
+      const sdkUrl = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
+      js.src = sdkUrl;
+      console.log('Loading FB SDK with URL:', sdkUrl);
       fjs.parentNode.insertBefore(js, fjs);
     }(document, 'script', 'facebook-jssdk'));
   });
 };
 
-// Authentication function
+// Authentication function with domain-specific redirect URI
 export const login = () => {
   return new Promise((resolve, reject) => {
+    // Determine which domain we're on to use the correct redirect URI
+    const currentDomain = window.location.hostname;
+    let redirectUri;
+    
+    if (currentDomain.includes('myaiadsmanager.com')) {
+      redirectUri = 'https://myaiadsmanager.com/api/auth/callback/facebook';
+    } else if (currentDomain.includes('campaign-dashboard-attilas-projects')) {
+      redirectUri = 'https://campaign-dashboard-attilas-projects-ea2ebf76.vercel.app/api/auth/callback/facebook';
+    } else {
+      // Default to the topaz domain
+      redirectUri = 'https://campaign-dashboard-topaz.vercel.app/api/auth/callback/facebook';
+    }
+    
+    console.log('Using redirect URI:', redirectUri);
+    
     window.FB.login(function(response) {
       if (response.authResponse) {
         console.log('Login successful, auth response:', response.authResponse);
@@ -50,7 +70,8 @@ export const login = () => {
     }, { 
       scope: 'ads_management,ads_read,business_management,pages_show_list',
       return_scopes: true,
-      auth_type: 'rerequest'
+      auth_type: 'rerequest',
+      redirect_uri: redirectUri
     });
   });
 };
@@ -894,8 +915,7 @@ export function fetchBreakdownMetrics(dimension, dateRange, adAccountId = null) 
   }
 }
 
-// Export both named functions and default export
-export default {
+const metaAPI = {
   getMetaMetricsByTenant,
   getMetaAdDataByTenant,
   getMetaAdAccountsByTenant,
@@ -909,3 +929,6 @@ export default {
   logout,
   fbLogout
 };
+
+// Export both named functions and default export
+export default metaAPI;
