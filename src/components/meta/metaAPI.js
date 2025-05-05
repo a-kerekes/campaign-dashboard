@@ -24,12 +24,13 @@ export const initFacebookSDK = () => {
       resolve(window.FB);
     };
 
-    // Load the SDK asynchronously
+    // Load the SDK asynchronously with correct version
     (function(d, s, id) {
       var js, fjs = d.getElementsByTagName(s)[0];
       if (d.getElementById(id)) return;
       js = d.createElement(s); js.id = id;
-      js.src = "https://connect.facebook.net/en_US/sdk.js";
+      // Include the version number directly in the SDK URL
+      js.src = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
       fjs.parentNode.insertBefore(js, fjs);
     }(document, 'script', 'facebook-jssdk'));
   });
@@ -40,11 +41,17 @@ export const login = () => {
   return new Promise((resolve, reject) => {
     window.FB.login(function(response) {
       if (response.authResponse) {
+        console.log('Login successful, auth response:', response.authResponse);
         resolve(response.authResponse.accessToken);
       } else {
+        console.error('Login failed or cancelled by user');
         reject(new Error('User cancelled login or did not fully authorize.'));
       }
-    }, { scope: 'ads_management,ads_read,business_management,pages_show_list' });
+    }, { 
+      scope: 'ads_management,ads_read,business_management,pages_show_list',
+      return_scopes: true,
+      auth_type: 'rerequest'
+    });
   });
 };
 
