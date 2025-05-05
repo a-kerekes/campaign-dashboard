@@ -122,7 +122,7 @@ const MetaApiDiagnostic = () => {
       };
       setTestResults(results);
       
-      const meResponse = await axios.get(`https://graph.facebook.com/v18.0/me`, {
+      const meResponse = await axios.get(`https://graph.facebook.com/v22.0/me`, {
         params: { access_token: accessToken }
       });
 
