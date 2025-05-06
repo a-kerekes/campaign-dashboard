@@ -12,9 +12,11 @@ const MetaAuthButton = ({ onAuthSuccess }) => {
   useEffect(() => {
     const loadSdk = async () => {
       try {
+        console.log("MetaAuthButton: Starting Facebook SDK initialization");
+        console.log("App ID:", process.env.REACT_APP_FACEBOOK_APP_ID || 'Not found in env');
         await initFacebookSDK();
         setSdkLoaded(true);
-        console.log("Facebook SDK initialized successfully");
+        console.log("MetaAuthButton: Facebook SDK initialized successfully");
       } catch (err) {
         console.error('Failed to load Facebook SDK:', err);
         setError('Could not initialize Facebook SDK. ' + err.message);
@@ -30,7 +32,13 @@ const MetaAuthButton = ({ onAuthSuccess }) => {
     setError(null);
     
     try {
-      console.log("Starting authentication process");
+      console.log("Starting authentication process, SDK loaded:", sdkLoaded);
+      console.log("Window.FB available:", !!window.FB);
+      
+      if (!window.FB) {
+        throw new Error("Facebook SDK not properly initialized. Try refreshing the page.");
+      }
+      
       const accessToken = await login();
       console.log("Authentication successful, token received");
       
@@ -53,7 +61,7 @@ const MetaAuthButton = ({ onAuthSuccess }) => {
         variant="contained"
         color="primary"
         onClick={handleLogin}
-        disabled={loading}
+        disabled={loading || !sdkLoaded}
         sx={{ 
           backgroundColor: '#0866FF',
           padding: '10px 20px',
@@ -106,9 +114,3 @@ const MetaAuthButton = ({ onAuthSuccess }) => {
 };
 
 export default MetaAuthButton;
-
-
-
-
-
-

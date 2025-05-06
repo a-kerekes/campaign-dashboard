@@ -8,6 +8,33 @@ const META_API_VERSION = 'v22.0';
 export const initFacebookSDK = () => {
   console.log('Initializing Facebook SDK with version:', META_API_VERSION);
   
+  // Create a backup of ethereum property before anything else happens
+  try {
+    if (window.ethereum) {
+      console.log('Ethereum property exists, backing up before SDK initialization');
+      // Save the original ethereum object
+      window._originalEthereum = window.ethereum;
+      
+      // Delete the property and replace it with a getter/setter
+      delete window.ethereum;
+      
+      // Define a completely new property descriptor
+      Object.defineProperty(window, 'ethereum', {
+        configurable: true,
+        get: function() {
+          console.log('Getting ethereum property');
+          return window._originalEthereum;
+        },
+        set: function(val) {
+          console.log('Attempt to set ethereum property blocked');
+          // Silently ignore attempts to set this property
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error protecting ethereum property:', error);
+  }
+  
   return new Promise((resolve) => {
     window.fbAsyncInit = function() {
       window.FB.init({

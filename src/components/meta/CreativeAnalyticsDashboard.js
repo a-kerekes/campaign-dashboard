@@ -5,6 +5,7 @@ import AdMetricsChart from './AdMetricsChart';
 import AiAdvisor from './AiAdvisor';
 import BreakdownChart from './BreakdownChart';
 import metaAPI from './metaAPI';
+import MetaAuthButton from './MetaAuthButton';
 
 // Meta API version constant
 const META_API_VERSION = 'v22.0';
@@ -50,44 +51,10 @@ const CreativeAnalyticsDashboard = () => {
   const [diagnosticSelectedAccount, setDiagnosticSelectedAccount] = useState('');
 
   // Initialize Facebook SDK on component mount
-  useEffect(() => {
-    const initFacebookSDK = () => {
-      return new Promise((resolve) => {
-        window.fbAsyncInit = function() {
-          window.FB.init({
-            appId: process.env.REACT_APP_FACEBOOK_APP_ID || '997685078957756',
-            cookie: true,
-            xfbml: true,
-            version: META_API_VERSION
-          });
-          resolve(window.FB);
-        };
-
-        // Load the SDK asynchronously
-        if (!document.getElementById('facebook-jssdk')) {
-          const js = document.createElement('script');
-          js.id = 'facebook-jssdk';
-          js.src = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
-          document.getElementsByTagName('head')[0].appendChild(js);
-        } else if (window.FB) {
-          resolve(window.FB);
-        }
-      });
-    };
-
-    const initFb = async () => {
-      try {
-        await initFacebookSDK();
-        setIsFbInitialized(true);
-        console.log(`Facebook SDK initialized successfully with version: ${META_API_VERSION}`);
-      } catch (error) {
-        console.error('Failed to initialize Facebook SDK:', error);
-        setError('Failed to initialize Facebook SDK. Please refresh the page.');
-      }
-    };
-
-    initFb();
-  }, []);
+useEffect(() => {
+  // We don't need to initialize the SDK here since MetaAuthButton handles it
+  console.log("Using MetaAuthButton for SDK initialization");
+}, []);
 
   // Function to load performance data wrapped in useCallback
   const loadPerformanceData = useCallback(async () => {
@@ -361,63 +328,6 @@ const CreativeAnalyticsDashboard = () => {
       loadPerformanceData();
     }
   }, [isConnected, selectedAccountId, dateRange, accessToken, loadPerformanceData]);
-
-  const handleMetaConnect = async () => {
-    if (!window.FB) {
-      setError('Facebook SDK not initialized. Please refresh the page and try again.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Login with Facebook
-      const loginResult = await new Promise((resolve, reject) => {
-        window.FB.login(function(response) {
-          if (response.authResponse) {
-            resolve(response.authResponse.accessToken);
-          } else {
-            reject(new Error('User cancelled login or did not fully authorize.'));
-          }
-        }, { scope: 'ads_management,ads_read,read_insights,business_management,pages_show_list' });
-      });
-      
-      setAccessToken(loginResult);
-      console.log('Access Token:', loginResult);
-      
-      // Fetch accounts after successful login
-      const accountsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`,
-        {
-          params: {
-            access_token: loginResult,
-            fields: 'id,name,account_id,account_status',
-            limit: 50
-          }
-        }
-      );
-      
-      if (accountsResponse.data && accountsResponse.data.data && accountsResponse.data.data.length > 0) {
-        setAccounts(accountsResponse.data.data);
-        
-        // Select the first account by default
-        const firstAccount = accountsResponse.data.data[0];
-        setSelectedAccountId(firstAccount.id);
-        setIsConnected(true);
-        
-        // Automatically run diagnostics after login
-        runDiagnostics(loginResult);
-      } else {
-        setError('No ad accounts found for this user.');
-      }
-    } catch (error) {
-      console.error('Error during Meta connection:', error);
-      setError(error.message || 'Error connecting to Meta. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAccountChange = (e) => {
     const accountId = e.target.value;
@@ -1032,14 +942,40 @@ const CreativeAnalyticsDashboard = () => {
         {!isConnected ? (
           <div className="text-center py-8 bg-white rounded-lg shadow-md">
             <p className="mb-4">Connect to your Meta Ads account to analyze your creative performance.</p>
-            <button 
-              onClick={handleMetaConnect}
-              disabled={isLoading || !isFbInitialized}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded flex items-center mx-auto"
-            >
-              <span className="mr-2">f</span>
-              {isLoading ? 'Connecting...' : 'Connect with Meta'}
-            </button>
+            <MetaAuthButton 
+              onAuthSuccess={(token) => {
+                console.log("Auth success callback with token:", token);
+                setAccessToken(token);
+                
+                // Fetch accounts after successful login
+                axios.get(
+                  `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`,
+                  {
+                    params: {
+                      access_token: token,
+                      fields: 'id,name,account_id,account_status',
+                      limit: 50
+                    }
+                  }
+                )
+                .then(response => {
+                  if (response.data && response.data.data && response.data.data.length > 0) {
+                    setAccounts(response.data.data);
+                    setSelectedAccountId(response.data.data[0].id);
+                    setIsConnected(true);
+                    
+                    // Automatically run diagnostics after login
+                    runDiagnostics(token);
+                  } else {
+                    setError('No ad accounts found for this user.');
+                  }
+                })
+                .catch(error => {
+                  console.error('Error fetching accounts:', error);
+                  setError('Error fetching accounts: ' + error.message);
+                });
+              }} 
+            />
             
             {error && (
               <p className="text-red-500 mt-4">{error}</p>

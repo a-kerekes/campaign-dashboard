@@ -13,30 +13,28 @@ const META_API_BASE_URL = 'https://graph.facebook.com';
 
 // Facebook SDK initialization
 export const initFacebookSDK = () => {
-  console.log('META_API_VERSION loaded as:', META_API_VERSION);
+  console.log('Initializing Facebook SDK');
   
   return new Promise((resolve) => {
     window.fbAsyncInit = function() {
       window.FB.init({
-        appId: process.env.REACT_APP_FACEBOOK_APP_ID,
+        appId: '997685078957756', // Hardcoded for testing
         cookie: true,
         xfbml: true,
-        version: META_API_VERSION
+        version: 'v22.0'
       });
-      console.log('Facebook SDK initialized with version:', META_API_VERSION);
+      console.log('Facebook SDK initialized successfully');
       resolve(window.FB);
     };
 
-    // Load the SDK asynchronously with correct version
+    // Load the SDK asynchronously
     (function(d, s, id) {
       var js, fjs = d.getElementsByTagName(s)[0];
       if (d.getElementById(id)) return;
       js = d.createElement(s); js.id = id;
-      // Include the version number directly in the SDK URL
-      const sdkUrl = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
-      js.src = sdkUrl;
-      console.log('Loading FB SDK with URL:', sdkUrl);
+      js.src = "https://connect.facebook.net/en_US/sdk.js";
       fjs.parentNode.insertBefore(js, fjs);
+      console.log('Facebook SDK script tag added to document');
     }(document, 'script', 'facebook-jssdk'));
   });
 };
@@ -52,6 +50,8 @@ export const login = () => {
       redirectUri = 'https://myaiadsmanager.com/api/auth/callback/facebook';
     } else if (currentDomain.includes('campaign-dashboard-attilas-projects')) {
       redirectUri = 'https://campaign-dashboard-attilas-projects-ea2ebf76.vercel.app/api/auth/callback/facebook';
+    } else if (currentDomain === 'localhost') {
+      redirectUri = 'http://localhost:3000/api/auth/callback/facebook';
     } else {
       // Default to the topaz domain
       redirectUri = 'https://campaign-dashboard-topaz.vercel.app/api/auth/callback/facebook';
