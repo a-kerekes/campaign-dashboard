@@ -30,6 +30,7 @@ function Signup() {
       
       // Create a user document in Firestore with empty tenants array
       await setDoc(doc(db, 'users', userCredential.user.uid), {
+        uid: userCredential.user.uid, // Added the uid field
         email: email,
         role: 'user', // Default role
         createdAt: new Date().toISOString(),
