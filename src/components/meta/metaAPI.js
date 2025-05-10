@@ -1,5 +1,5 @@
 // src/components/meta/metaAPI.js
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import axios from 'axios';
 
@@ -8,8 +8,6 @@ import axios from 'axios';
 const META_ACCESS_TOKEN = process.env.REACT_APP_META_ACCESS_TOKEN || ''; 
 const META_API_VERSION = 'v22.0';
 const META_API_BASE_URL = 'https://graph.facebook.com';
-
-// ======== Facebook SDK Initialization and Auth Functions ========
 
 // Facebook SDK initialization
 export const initFacebookSDK = () => {
@@ -194,6 +192,144 @@ function getAccountStatusLabel(statusCode) {
   };
   
   return statusMap[statusCode] || 'UNKNOWN';
+}
+
+// Helper function to get number of days from date range
+function getDateRangeNumber(dateRange) {
+  switch(dateRange) {
+    case 'Last 7 Days': return 7;
+    case 'Last 30 Days': return 30;
+    case 'Last 60 Days': return 60;
+    case 'Last 90 Days': return 90;
+    default: return 30;
+  }
+}
+
+function generateMockTimeData(days) {
+  const data = [];
+  const today = new Date();
+  
+  // Start from yesterday
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  
+  // Base values with realistic funnel drop-off
+  const baseImpressions = 15000;
+  const clickRate = 0.08;
+  const pageViewRate = 0.75;
+  const addToCartRate = 0.25;
+  const purchaseRate = 0.35;
+  
+  // Small daily fluctuation
+  const fluctuation = () => {
+    return Math.random() * 0.4 - 0.2; // Random between -20% and +20%
+  };
+  
+  // Generate data starting from yesterday and going back 'days' days
+  for (let i = 0; i < days; i++) {
+    const date = new Date(yesterday);
+    date.setDate(yesterday.getDate() - i);
+    
+    // Create daily trend - higher on weekends, lower midweek
+    const dayOfWeek = date.getDay();
+    const weekendBoost = (dayOfWeek === 0 || dayOfWeek === 6) ? 1.4 : 1;
+    const midweekDip = (dayOfWeek === 3) ? 0.8 : 1;
+    const dayFactor = weekendBoost * midweekDip;
+    
+    // Add slight upward trend over time
+    const trendFactor = 1 + ((days - i) / days * 0.1);
+    
+    // Generate metrics with realistic funnel drop-off
+    const impressions = Math.round(baseImpressions * dayFactor * trendFactor * (1 + fluctuation()));
+    const clicks = Math.round(impressions * clickRate * (1 + fluctuation()));
+    const landingPageViews = Math.round(clicks * pageViewRate * (1 + fluctuation()));
+    const addToCarts = Math.round(landingPageViews * addToCartRate * (1 + fluctuation()));
+    const purchases = Math.round(addToCarts * purchaseRate * (1 + fluctuation()));
+    
+    data.push({
+      date: date.toISOString(),
+      impressions,
+      clicks,
+      landingPageViews,
+      addToCarts,
+      purchases
+    });
+  }
+  
+  // Sort the data by date (earliest first)
+  data.sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  return data;
+}
+
+function generateMockBreakdownData(dimension, dateRange) {
+  // Mock breakdown data by dimension (e.g., age, gender, placement)
+  const categories = {
+    age: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'],
+    gender: ['Male', 'Female', 'Unknown'],
+    placement: ['Facebook Feed', 'Instagram Feed', 'Instagram Stories', 'Audience Network', 'Facebook Right Column']
+  };
+  
+  const selectedCategories = categories[dimension] || ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  
+  return selectedCategories.map(category => {
+    // Generate random but reasonable values for each metric
+    const impressions = Math.round(5000 + Math.random() * 15000);
+    const clicks = Math.round(impressions * (0.05 + Math.random() * 0.07));
+    const ctr = (clicks / impressions * 100).toFixed(2);
+    const landingPageViews = Math.round(clicks * (0.7 + Math.random() * 0.2));
+    const addToCarts = Math.round(landingPageViews * (0.15 + Math.random() * 0.2));
+    const purchases = Math.round(addToCarts * (0.2 + Math.random() * 0.3));
+    const spend = (impressions * (0.00005 + Math.random() * 0.00003)).toFixed(2);
+    const cpc = (spend / clicks).toFixed(2);
+    const roas = (purchases * 40 / parseFloat(spend)).toFixed(2);
+    
+    return {
+      category,
+      impressions,
+      clicks,
+      ctr: parseFloat(ctr),
+      spend: parseFloat(spend),
+      cpc: parseFloat(cpc),
+      landingPageViews,
+      addToCarts,
+      purchases,
+      roas: parseFloat(roas)
+    };
+  });
+}
+
+function generateMockAdData(adAccountId, dateRange = 'Last 30 Days') {
+  // Generate mock ad data for this ad account
+  const adCount = 5 + Math.floor(Math.random() * 10); // Between 5 and 15 ads
+  const ads = [];
+  
+  // Get days count from dateRange to scale mock data appropriately
+  const days = getDateRangeNumber(dateRange);
+  const scaleFactor = days / 30; // Scale relative to 30 days
+  
+  for (let i = 0; i < adCount; i++) {
+    const impressions = Math.round((2000 + Math.random() * 8000) * scaleFactor);
+    const clicks = Math.round(impressions * (0.02 + Math.random() * 0.1));
+    const ctr = (clicks / impressions * 100).toFixed(2);
+    const spend = (impressions * (0.00005 + Math.random() * 0.00005)).toFixed(2);
+    const cpc = (spend / clicks).toFixed(2);
+    
+    ads.push({
+      id: `ad_${i}_${adAccountId.replace('act_', '')}`,
+      adAccountId,
+      name: `Ad ${i+1}`,
+      status: Math.random() > 0.3 ? 'ACTIVE' : 'PAUSED',
+      impressions,
+      clicks,
+      ctr: parseFloat(ctr),
+      spend: parseFloat(spend),
+      cpc: parseFloat(cpc),
+      createdAt: new Date(Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000).toISOString()
+    });
+  }
+  
+  return ads;
 }
 
 // ======== Tenant-Specific Meta API Functions ========
@@ -643,144 +779,214 @@ export async function fetchCreativeDetails(creativeId) {
   }
 }
 
-// ======== Original Mock Data Functions (for Fallback) ========
+// ======== Benchmark Management Functions ========
 
-// Helper function to get number of days from date range
-function getDateRangeNumber(dateRange) {
-  switch(dateRange) {
-    case 'Last 7 Days': return 7;
-    case 'Last 30 Days': return 30;
-    case 'Last 60 Days': return 60;
-    case 'Last 90 Days': return 90;
-    default: return 30;
+/**
+ * Fetch benchmark settings for a specific ad account
+ * @param {string} adAccountId - Meta ad account ID
+ * @returns {Promise<Object>} - Response containing benchmark data or error
+ */
+export async function fetchBenchmarks(adAccountId) {
+  if (!adAccountId) {
+    return { error: 'No ad account ID provided' };
+  }
+  
+  try {
+    // Remove "act_" prefix if it exists for consistency
+    const formattedAccountId = adAccountId.startsWith('act_') 
+      ? adAccountId.substring(4) 
+      : adAccountId;
+    
+    // First check if we already have benchmarks stored in our database
+    const benchmarkDocRef = doc(db, 'metaBenchmarks', `act_${formattedAccountId}`);
+    const benchmarkDoc = await getDoc(benchmarkDocRef);
+    
+    if (benchmarkDoc.exists()) {
+      return { data: benchmarkDoc.data().benchmarks };
+    } else {
+      // Initialize with default benchmarks
+      return {
+        data: {
+          ctr: { low: 0.01, medium: 0.02, high: null },
+          cpc: { low: 1.5, medium: 2.5, high: null },
+          cpm: { low: 20, medium: 30, high: null },
+          costPerPurchase: { low: 50, medium: 80, high: null },
+          conversionRate: { low: 0.02, medium: 0.04, high: null },
+          roas: { low: 1, medium: 2, high: null }
+        }
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching benchmarks:', error);
+    return { error: error.message };
   }
 }
 
-function generateMockTimeData(days) {
-  const data = [];
-  const today = new Date();
+/**
+ * Save benchmark settings for a specific ad account
+ * @param {string} adAccountId - Meta ad account ID
+ * @param {Object} benchmarkData - Benchmark configuration data
+ * @returns {Promise<Object>} - Success or error response
+ */
+export async function saveBenchmarks(adAccountId, benchmarkData) {
+  if (!adAccountId) {
+    return { error: 'No ad account ID provided' };
+  }
   
-  // Start from yesterday
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  
-  // Base values with realistic funnel drop-off
-  const baseImpressions = 15000;
-  const clickRate = 0.08;
-  const pageViewRate = 0.75;
-  const addToCartRate = 0.25;
-  const purchaseRate = 0.35;
-  
-  // Small daily fluctuation
-  const fluctuation = () => {
-    return Math.random() * 0.4 - 0.2; // Random between -20% and +20%
-  };
-  
-  // Generate data starting from yesterday and going back 'days' days
-  for (let i = 0; i < days; i++) {
-    const date = new Date(yesterday);
-    date.setDate(yesterday.getDate() - i);
+  try {
+    // Remove "act_" prefix if it exists for consistency
+    const formattedAccountId = adAccountId.startsWith('act_') 
+      ? adAccountId.substring(4) 
+      : adAccountId;
     
-    // Create daily trend - higher on weekends, lower midweek
-    const dayOfWeek = date.getDay();
-    const weekendBoost = (dayOfWeek === 0 || dayOfWeek === 6) ? 1.4 : 1;
-    const midweekDip = (dayOfWeek === 3) ? 0.8 : 1;
-    const dayFactor = weekendBoost * midweekDip;
+    // Store benchmarks in Firestore
+    const benchmarkDocRef = doc(db, 'metaBenchmarks', `act_${formattedAccountId}`);
     
-    // Add slight upward trend over time
-    const trendFactor = 1 + ((days - i) / days * 0.1);
-    
-    // Generate metrics with realistic funnel drop-off
-    const impressions = Math.round(baseImpressions * dayFactor * trendFactor * (1 + fluctuation()));
-    const clicks = Math.round(impressions * clickRate * (1 + fluctuation()));
-    const landingPageViews = Math.round(clicks * pageViewRate * (1 + fluctuation()));
-    const addToCarts = Math.round(landingPageViews * addToCartRate * (1 + fluctuation()));
-    const purchases = Math.round(addToCarts * purchaseRate * (1 + fluctuation()));
-    
-    data.push({
-      date: date.toISOString(),
-      impressions,
-      clicks,
-      landingPageViews,
-      addToCarts,
-      purchases
+    await setDoc(benchmarkDocRef, {
+      adAccountId: `act_${formattedAccountId}`,
+      benchmarks: benchmarkData,
+      updatedAt: new Date().toISOString()
     });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving benchmarks:', error);
+    return { error: error.message };
   }
-  
-  // Sort the data by date (earliest first)
-  data.sort((a, b) => new Date(a.date) - new Date(b.date));
-  
-  return data;
 }
 
-function generateMockBreakdownData(dimension, dateRange) {
-  // Mock breakdown data by dimension (e.g., age, gender, placement)
-  const categories = {
-    age: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'],
-    gender: ['Male', 'Female', 'Unknown'],
-    placement: ['Facebook Feed', 'Instagram Feed', 'Instagram Stories', 'Audience Network', 'Facebook Right Column']
-  };
+/**
+ * Apply benchmarks to creative performance data
+ * @param {Array} creativeData - Array of creative performance objects
+ * @param {Object} benchmarks - Benchmark settings
+ * @returns {Array} - Enhanced creative data with benchmark status
+ */
+export function applyBenchmarksToCreatives(creativeData, benchmarks) {
+  if (!creativeData || !benchmarks) return creativeData;
   
-  const selectedCategories = categories[dimension] || ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
-  
-  return selectedCategories.map(category => {
-    // Generate random but reasonable values for each metric
-    const impressions = Math.round(5000 + Math.random() * 15000);
-    const clicks = Math.round(impressions * (0.05 + Math.random() * 0.07));
-    const ctr = (clicks / impressions * 100).toFixed(2);
-    const landingPageViews = Math.round(clicks * (0.7 + Math.random() * 0.2));
-    const addToCarts = Math.round(landingPageViews * (0.15 + Math.random() * 0.2));
-    const purchases = Math.round(addToCarts * (0.2 + Math.random() * 0.3));
-    const spend = (impressions * (0.00005 + Math.random() * 0.00003)).toFixed(2);
-    const cpc = (spend / clicks).toFixed(2);
-    const roas = (purchases * 40 / parseFloat(spend)).toFixed(2);
+  return creativeData.map(creative => {
+    const benchmarkedCreative = { ...creative };
     
-    return {
-      category,
-      impressions,
-      clicks,
-      ctr: parseFloat(ctr),
-      spend: parseFloat(spend),
-      cpc: parseFloat(cpc),
-      landingPageViews,
-      addToCarts,
-      purchases,
-      roas: parseFloat(roas)
-    };
+    // Add benchmark status for key metrics
+    if (benchmarks.ctr) {
+      const { low, medium } = benchmarks.ctr;
+      const value = creative.ctr / 100; // Convert from percentage to decimal
+      
+      if (low !== null && value < low) {
+        benchmarkedCreative.ctrStatus = 'low';
+      } else if (medium !== null && value < medium) {
+        benchmarkedCreative.ctrStatus = 'medium';
+      } else {
+        benchmarkedCreative.ctrStatus = 'high';
+      }
+    }
+    
+    if (benchmarks.cpc) {
+      const { low, medium } = benchmarks.cpc;
+      const value = creative.cpc;
+      
+      if (low !== null && value < low) {
+        benchmarkedCreative.cpcStatus = 'high'; // Lower CPC is better
+      } else if (medium !== null && value < medium) {
+        benchmarkedCreative.cpcStatus = 'medium';
+      } else {
+        benchmarkedCreative.cpcStatus = 'low';
+      }
+    }
+    
+    if (benchmarks.roas) {
+      const { low, medium } = benchmarks.roas;
+      const value = creative.roas;
+      
+      if (low !== null && value < low) {
+        benchmarkedCreative.roasStatus = 'low';
+      } else if (medium !== null && value < medium) {
+        benchmarkedCreative.roasStatus = 'medium';
+      } else {
+        benchmarkedCreative.roasStatus = 'high';
+      }
+    }
+    
+    return benchmarkedCreative;
   });
 }
 
-function generateMockAdData(adAccountId, dateRange = 'Last 30 Days') {
-  // Generate mock ad data for this ad account
-  const adCount = 5 + Math.floor(Math.random() * 10); // Between 5 and 15 ads
-  const ads = [];
-  
-  // Get days count from dateRange to scale mock data appropriately
-  const days = getDateRangeNumber(dateRange);
-  const scaleFactor = days / 30; // Scale relative to 30 days
-  
-  for (let i = 0; i < adCount; i++) {
-    const impressions = Math.round((2000 + Math.random() * 8000) * scaleFactor);
-    const clicks = Math.round(impressions * (0.02 + Math.random() * 0.1));
-    const ctr = (clicks / impressions * 100).toFixed(2);
-    const spend = (impressions * (0.00005 + Math.random() * 0.00005)).toFixed(2);
-    const cpc = (spend / clicks).toFixed(2);
-    
-    ads.push({
-      id: `ad_${i}_${adAccountId.replace('act_', '')}`,
-      adAccountId,
-      name: `Ad ${i+1}`,
-      status: Math.random() > 0.3 ? 'ACTIVE' : 'PAUSED',
-      impressions,
-      clicks,
-      ctr: parseFloat(ctr),
-      spend: parseFloat(spend),
-      cpc: parseFloat(cpc),
-      createdAt: new Date(Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000).toISOString()
-    });
+/**
+ * Generate a performance report with benchmark comparisons
+ * @param {string} adAccountId - Meta ad account ID
+ * @param {Object} creativeData - Creative performance data
+ * @param {Object} benchmarks - Benchmark settings
+ * @param {string} format - Report format (pdf, csv)
+ * @returns {Promise<Blob>} - Report file as blob
+ */
+export async function generatePerformanceReport(adAccountId, creativeData, benchmarks, format = 'csv') {
+  if (!adAccountId || !creativeData) {
+    throw new Error('Missing required parameters');
   }
   
-  return ads;
+  try {
+    // Apply benchmarks to creative data
+    const benchmarkedData = applyBenchmarksToCreatives(creativeData, benchmarks);
+    
+    if (format === 'csv') {
+      // Generate CSV
+      const csvRows = [];
+      
+      // Add headers
+      csvRows.push([
+        'Creative',
+        'Ad Sets',
+        'Impressions',
+        'Clicks',
+        'CTR',
+        'CTR Benchmark',
+        'CPC',
+        'CPC Benchmark',
+        'CPM',
+        'CPM Benchmark',
+        'Purchases',
+        'Cost/Purchase',
+        'Spend',
+        'ROAS',
+        'ROAS Benchmark'
+      ].join(','));
+      
+      // Add data rows
+      benchmarkedData.forEach(creative => {
+        const row = [
+          `"${creative.adName || ''}"`,
+          creative.adsetCount || 0,
+          creative.impressions || 0,
+          creative.clicks || 0,
+          `${(creative.ctr || 0).toFixed(2)}%`,
+          creative.ctrStatus || 'N/A',
+          `${(creative.cpc || 0).toFixed(2)}`,
+          creative.cpcStatus || 'N/A',
+          `${(creative.cpm || 0).toFixed(2)}`,
+          creative.cpmStatus || 'N/A',
+          creative.purchases || 0,
+          `${(creative.costPerPurchase || 0).toFixed(2)}`,
+          `${(creative.spend || 0).toFixed(2)}`,
+          `${(creative.roas || 0).toFixed(2)}x`,
+          creative.roasStatus || 'N/A'
+        ];
+        
+        csvRows.push(row.join(','));
+      });
+      
+      // Create CSV blob
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      return blob;
+    } else {
+      // For now, we only support CSV format
+      throw new Error('Unsupported report format');
+    }
+  } catch (error) {
+    console.error('Error generating performance report:', error);
+    throw error;
+  }
 }
 
 // ======== Legacy Functions for Backward Compatibility ========
@@ -915,7 +1121,9 @@ export function fetchBreakdownMetrics(dimension, dateRange, adAccountId = null) 
   }
 }
 
+// Export all functions
 const metaAPI = {
+  // Existing functions
   getMetaMetricsByTenant,
   getMetaAdDataByTenant,
   getMetaAdAccountsByTenant,
@@ -927,7 +1135,13 @@ const metaAPI = {
   initFacebookSDK,
   login,
   logout,
-  fbLogout
+  fbLogout,
+  
+  // New benchmark functions
+  fetchBenchmarks,
+  saveBenchmarks,
+  applyBenchmarksToCreatives,
+  generatePerformanceReport
 };
 
 // Export both named functions and default export
