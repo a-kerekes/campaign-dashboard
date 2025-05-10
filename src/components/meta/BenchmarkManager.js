@@ -1,6 +1,6 @@
 // src/components/meta/BenchmarkManager.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit } from 'lucide-react'; // Only import the icon that is actually used
+import { Edit } from 'lucide-react';
 import metaAPI from './metaAPI';
 
 // Metrics configuration with formats and default values
@@ -63,8 +63,10 @@ const BenchmarkManager = ({ selectedAccountId, onClose, onSave }) => {
   useEffect(() => {
     if (selectedAccountId) {
       fetchBenchmarks();
+    } else {
+      initializeDefaultBenchmarks();
     }
-  }, [selectedAccountId, fetchBenchmarks]);
+  }, [selectedAccountId, fetchBenchmarks, initializeDefaultBenchmarks]);
 
   const handleBenchmarkChange = (metricId, level, value) => {
     const numericValue = value === '' ? null : parseFloat(value);
@@ -125,99 +127,16 @@ const BenchmarkManager = ({ selectedAccountId, onClose, onSave }) => {
         return value.toString();
     }
   };
-  
-  // Inline styles consistent with your existing code
-  const styles = {
-    container: {
-      backgroundColor: 'white',
-      borderRadius: '0.375rem',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-      padding: '1.5rem'
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '1.5rem'
-    },
-    title: {
-      fontSize: '1.5rem',
-      fontWeight: '600',
-      color: '#1a202c'
-    },
-    button: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      borderRadius: '0.375rem',
-      padding: '0.5rem 1rem',
-      fontWeight: '500',
-      backgroundColor: '#4299e1',
-      color: 'white',
-      transition: 'background-color 0.2s',
-      cursor: 'pointer',
-      border: 'none'
-    },
-    buttonSecondary: {
-      backgroundColor: '#edf2f7',
-      color: '#4a5568',
-      marginRight: '0.75rem'
-    },
-    table: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      marginTop: '1rem'
-    },
-    th: {
-      textAlign: 'left',
-      padding: '0.75rem 1rem',
-      backgroundColor: '#EBF5FF',
-      color: '#4A5568',
-      fontWeight: '600',
-      borderBottom: '1px solid #E2E8F0',
-      fontSize: '0.875rem'
-    },
-    td: {
-      padding: '0.75rem 1rem',
-      borderBottom: '1px solid #E2E8F0',
-      color: '#4A5568'
-    },
-    input: {
-      padding: '0.5rem',
-      border: '1px solid #E2E8F0',
-      borderRadius: '0.25rem',
-      width: '7rem'
-    },
-    alert: {
-      padding: '0.75rem',
-      borderRadius: '0.25rem',
-      marginBottom: '1rem'
-    },
-    alertError: {
-      backgroundColor: '#FEF2F2',
-      borderColor: '#F87171',
-      color: '#B91C1C'
-    },
-    alertSuccess: {
-      backgroundColor: '#F0FDF4',
-      borderColor: '#86EFAC',
-      color: '#166534'
-    },
-    description: {
-      marginBottom: '1rem',
-      fontSize: '0.875rem',
-      color: '#4A5568'
-    }
-  };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h2 style={styles.title}>Performance Benchmark Settings</h2>
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-800">Performance Benchmark Settings</h2>
         
         <div>
           {isEditing ? (
             <button
-              style={styles.button}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center"
               onClick={handleSaveBenchmarks}
               disabled={isSaving}
             >
@@ -225,10 +144,10 @@ const BenchmarkManager = ({ selectedAccountId, onClose, onSave }) => {
             </button>
           ) : (
             <button
-              style={{...styles.button, ...styles.buttonSecondary}}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded-md flex items-center"
               onClick={() => setIsEditing(true)}
             >
-              <Edit size={16} style={{ marginRight: '0.5rem' }} />
+              <Edit size={16} className="mr-2" />
               Edit Benchmarks
             </button>
           )}
@@ -236,81 +155,110 @@ const BenchmarkManager = ({ selectedAccountId, onClose, onSave }) => {
       </div>
       
       {error && (
-        <div style={{...styles.alert, ...styles.alertError}}>
+        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md">
           {error}
         </div>
       )}
       
       {success && (
-        <div style={{...styles.alert, ...styles.alertSuccess}}>
+        <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md">
           {success}
         </div>
       )}
       
-      <p style={styles.description}>
+      <p className="mb-4 text-sm text-gray-600">
         Set benchmark thresholds for each metric below. Performance will be color-coded in the dashboard based on these ranges.
       </p>
       
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Metric</th>
-            <th style={styles.th}>Low (Below)</th>
-            <th style={styles.th}>Medium (Between)</th>
-            <th style={styles.th}>High (Above)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {metricsConfig.map(metric => (
-            <tr key={metric.id}>
-              <td style={styles.td}>{metric.name}</td>
-              
-              <td style={styles.td}>
-                {isEditing ? (
-                  <input
-                    type="number"
-                    step={metric.format === 'percentage' ? '0.01' : '0.5'}
-                    style={styles.input}
-                    value={benchmarks[metric.id]?.low ?? ''}
-                    onChange={(e) => handleBenchmarkChange(metric.id, 'low', e.target.value)}
-                  />
-                ) : (
-                  formatValue(benchmarks[metric.id]?.low, metric.format)
-                )}
-              </td>
-              
-              <td style={styles.td}>
-                {isEditing ? (
-                  <input
-                    type="number"
-                    step={metric.format === 'percentage' ? '0.01' : '0.5'}
-                    style={styles.input}
-                    value={benchmarks[metric.id]?.medium ?? ''}
-                    onChange={(e) => handleBenchmarkChange(metric.id, 'medium', e.target.value)}
-                  />
-                ) : (
-                  formatValue(benchmarks[metric.id]?.medium, metric.format)
-                )}
-              </td>
-              
-              <td style={styles.td}>
-                {isEditing ? (
-                  <input
-                    type="number"
-                    step={metric.format === 'percentage' ? '0.01' : '0.5'}
-                    style={styles.input}
-                    value={benchmarks[metric.id]?.high ?? ''}
-                    onChange={(e) => handleBenchmarkChange(metric.id, 'high', e.target.value)}
-                    placeholder="No upper limit"
-                  />
-                ) : (
-                  formatValue(benchmarks[metric.id]?.high, metric.format)
-                )}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto">
+          <thead>
+            <tr className="bg-gray-50 border-b">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Low (Below)</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Medium (Between)</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">High (Above)</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {metricsConfig.map(metric => (
+              <tr key={metric.id} className="hover:bg-gray-50">
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {metric.name}
+                </td>
+                
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {isEditing ? (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step={metric.format === 'percentage' ? '0.01' : '0.5'}
+                        className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={benchmarks[metric.id]?.low ?? ''}
+                        onChange={(e) => handleBenchmarkChange(metric.id, 'low', e.target.value)}
+                      />
+                      <span className="absolute right-3 top-2 text-gray-400">
+                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    formatValue(benchmarks[metric.id]?.low, metric.format)
+                  )}
+                </td>
+                
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {isEditing ? (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step={metric.format === 'percentage' ? '0.01' : '0.5'}
+                        className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={benchmarks[metric.id]?.medium ?? ''}
+                        onChange={(e) => handleBenchmarkChange(metric.id, 'medium', e.target.value)}
+                      />
+                      <span className="absolute right-3 top-2 text-gray-400">
+                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    formatValue(benchmarks[metric.id]?.medium, metric.format)
+                  )}
+                </td>
+                
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {isEditing ? (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step={metric.format === 'percentage' ? '0.01' : '0.5'}
+                        className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={benchmarks[metric.id]?.high ?? ''}
+                        onChange={(e) => handleBenchmarkChange(metric.id, 'high', e.target.value)}
+                        placeholder="No upper limit"
+                      />
+                      <span className="absolute right-3 top-2 text-gray-400">
+                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    formatValue(benchmarks[metric.id]?.high, metric.format)
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* Help text */}
+      <div className="mt-6 p-4 bg-blue-50 text-blue-800 rounded-md text-sm">
+        <p><strong>Setting Tips:</strong></p>
+        <ul className="list-disc pl-5 mt-2 space-y-1">
+          <li>For <strong>CTR</strong> and <strong>ROAS</strong>, higher values are better. Set thresholds where low values indicate poor performance.</li>
+          <li>For <strong>CPC</strong>, <strong>CPM</strong> and <strong>Cost/Purchase</strong>, lower values are better. Set thresholds where high values indicate poor performance.</li>
+          <li>Benchmarks are automatically color-coded in the dashboard for easy visualization.</li>
+        </ul>
+      </div>
     </div>
   );
 };

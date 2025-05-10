@@ -1,7 +1,7 @@
 // src/components/meta/BenchmarkVisualization.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
-const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) => {
+const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr', onMetricChange }) => {
   const [processedData, setProcessedData] = useState([]);
   const [metricConfig, setMetricConfig] = useState({
     name: 'CTR',
@@ -59,43 +59,43 @@ const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) =>
       let value = creative[metric] || 0;
       
       // For percentages like CTR, convert from percentage to decimal for comparison
+      let comparisonValue = value;
       if (selectedMetric.format === 'percentage' && metric === 'ctr') {
-        value = value / 100;
+        comparisonValue = value / 100;
       }
       
       // Determine performance level
       let performanceLevel = 'high';
       let color = newMetricConfig.colorHigh;
       
-      if (thresholds.low !== null && selectedMetric.higherIsBetter && value < thresholds.low) {
+      if (thresholds.low !== null && selectedMetric.higherIsBetter && comparisonValue < thresholds.low) {
         performanceLevel = 'low';
         color = newMetricConfig.colorLow;
-      } else if (thresholds.medium !== null && selectedMetric.higherIsBetter && value < thresholds.medium) {
+      } else if (thresholds.medium !== null && selectedMetric.higherIsBetter && comparisonValue < thresholds.medium) {
         performanceLevel = 'medium';
         color = newMetricConfig.colorMedium;
-      } else if (thresholds.low !== null && !selectedMetric.higherIsBetter && value > thresholds.low) {
+      } else if (thresholds.low !== null && !selectedMetric.higherIsBetter && comparisonValue > thresholds.low) {
         performanceLevel = 'low'; // For metrics where lower is better (like CPC)
         color = newMetricConfig.colorLow;
-      } else if (thresholds.medium !== null && !selectedMetric.higherIsBetter && value > thresholds.medium) {
+      } else if (thresholds.medium !== null && !selectedMetric.higherIsBetter && comparisonValue > thresholds.medium) {
         performanceLevel = 'medium';
         color = newMetricConfig.colorMedium;
       }
       
-      // For CTR, convert back to percentage for display
-      const displayValue = selectedMetric.format === 'percentage' && metric === 'ctr' 
-        ? creative[metric] 
-        : value;
-      
       // Truncate creative name if needed
-      const shortName = creative.adName.length > 35 
-        ? creative.adName.substring(0, 32) + '...'
-        : creative.adName;
+      let shortName = creative.adName || "";
+      if (shortName.length > 35) {
+        shortName = shortName.substring(0, 32) + '...';
+      }
+      
+      // Clean up creative name for better display
+      shortName = shortName.replace(/\|/g, ' | ');
       
       return {
-        id: creative.creativeId,
+        id: creative.creativeId || creative.adId,
         name: shortName,
         fullName: creative.adName,
-        value: displayValue,
+        value: value,
         performanceLevel,
         color
       };
@@ -106,213 +106,33 @@ const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) =>
       selectedMetric.higherIsBetter ? b.value - a.value : a.value - b.value
     );
     
-    // Take top N items for display
-    setProcessedData(sortedData.slice(0, 10));
+    // Take top N items for display (limit to 8 for better visualization)
+    setProcessedData(sortedData.slice(0, 8));
     
   }, [creativeData, benchmarks, metric, metrics]);
 
-  // Get axis tick values
-  const getAxisValues = () => {
-    if (!processedData.length) return [];
-    
-    // Find min and max values
-    const values = processedData.map(item => item.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    
-    // For small ranges, generate 5 evenly spaced ticks
-    // For larger ranges, round to nice numbers
-    const range = max - min;
-    
-    if (range === 0) return [min];
-    
-    // Use 5 steps
-    const step = range / 4;
-    
-    return [
-      min,
-      min + step,
-      min + 2 * step,
-      min + 3 * step,
-      max
-    ];
-  };
-
-  // Find good width for axis labels
-  const getYAxisWidth = () => {
-    if (!processedData.length) return 50;
-    
-    const values = processedData.map(item => item.value);
-    const max = Math.max(...values);
-    
-    // Estimate width based on max value and format
-    if (metricConfig.format === 'currency') {
-      return max > 1000 ? 70 : 50;
-    } else if (metricConfig.format === 'percentage') {
-      return 50;
-    } else {
-      return max > 100 ? 60 : 40;
+  // Handle metric change
+  const handleMetricChange = useCallback((e) => {
+    const newMetric = e.target.value;
+    if (onMetricChange) {
+      onMetricChange(newMetric);
     }
-  };
+  }, [onMetricChange]);
 
   // Calculate chart dimensions
-  const chartWidth = 100; // Percentage width
-  const barHeight = 30;
-  const chartMargin = { top: 20, right: 20, bottom: 30, left: getYAxisWidth() };
+  const barHeight = 40;
+  const chartMargin = { top: 20, right: 100, bottom: 30, left: 250 };
   const chartHeight = processedData.length * (barHeight + 10) + chartMargin.top + chartMargin.bottom;
-  
-  // Get benchmark lines positions
-  const getBenchmarkLines = () => {
-    if (!benchmarks || !benchmarks[metric]) return [];
-    
-    const thresholds = benchmarks[metric];
-    const lines = [];
-    
-    // Only calculate if we have data to get the scale
-    if (processedData.length > 0) {
-      const values = processedData.map(item => item.value);
-      const min = Math.min(...values);
-      const max = Math.max(...values);
-      const chartWidth = 100 - chartMargin.left - chartMargin.right;
-      
-      // Calculate percentage positions
-      if (thresholds.low !== null) {
-        const lowValue = metricConfig.format === 'percentage' && metric === 'ctr' 
-          ? thresholds.low * 100 
-          : thresholds.low;
-        
-        // Check if within visible range
-        if (lowValue >= min && lowValue <= max) {
-          const position = ((lowValue - min) / (max - min)) * chartWidth + chartMargin.left;
-          lines.push({
-            position,
-            label: 'Low Threshold',
-            color: '#F87171' // Red
-          });
-        }
-      }
-      
-      if (thresholds.medium !== null) {
-        const mediumValue = metricConfig.format === 'percentage' && metric === 'ctr' 
-          ? thresholds.medium * 100 
-          : thresholds.medium;
-        
-        // Check if within visible range
-        if (mediumValue >= min && mediumValue <= max) {
-          const position = ((mediumValue - min) / (max - min)) * chartWidth + chartMargin.left;
-          lines.push({
-            position,
-            label: 'Medium Threshold',
-            color: '#FBBF24' // Yellow
-          });
-        }
-      }
-    }
-    
-    return lines;
-  };
-
-  // Styles for horizontal bar chart
-  const styles = {
-    container: {
-      backgroundColor: 'white',
-      borderRadius: '0.375rem',
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-      padding: '1.5rem',
-      marginBottom: '1.5rem'
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '1.5rem'
-    },
-    title: {
-      fontSize: '1.125rem',
-      fontWeight: '600',
-      color: '#1A202C'
-    },
-    select: {
-      padding: '0.5rem',
-      borderRadius: '0.25rem',
-      border: '1px solid #E2E8F0',
-      backgroundColor: 'white'
-    },
-    chart: {
-      width: `${chartWidth}%`,
-      height: `${chartHeight}px`,
-      position: 'relative'
-    },
-    bar: {
-      height: `${barHeight}px`,
-      borderRadius: '3px',
-      position: 'absolute',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      paddingRight: '0.75rem',
-      transition: 'width 0.3s ease'
-    },
-    barLabel: {
-      color: '#4A5568',
-      fontSize: '0.75rem',
-      whiteSpace: 'nowrap'
-    },
-    axisLabel: {
-      position: 'absolute',
-      fontSize: '0.75rem',
-      color: '#718096'
-    },
-    benchmarkLine: {
-      position: 'absolute',
-      width: '1px',
-      height: `${chartHeight - chartMargin.top - chartMargin.bottom}px`,
-      top: `${chartMargin.top}px`
-    },
-    benchmarkLabel: {
-      position: 'absolute',
-      fontSize: '0.75rem',
-      transform: 'translate(-50%, 0)',
-      top: '0'
-    },
-    legend: {
-      display: 'flex',
-      justifyContent: 'center',
-      marginTop: '1rem'
-    },
-    legendItem: {
-      display: 'flex',
-      alignItems: 'center',
-      marginRight: '1rem',
-      fontSize: '0.75rem'
-    },
-    legendBox: {
-      width: '1rem',
-      height: '1rem',
-      marginRight: '0.375rem',
-      borderRadius: '2px'
-    }
-  };
-
-  // Get benchmark lines
-  const benchmarkLines = getBenchmarkLines();
-  
-  // Get axis values
-  const axisValues = getAxisValues();
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h3 style={styles.title}>Performance Benchmarks Visualization</h3>
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-semibold text-gray-800">Performance Benchmarks Visualization</h3>
         
         <select 
           value={metric} 
-          onChange={(e) => {
-            // This would need to be controlled by the parent component
-            // Just adding for illustration
-            console.log('Metric changed to:', e.target.value);
-          }}
-          style={styles.select}
+          onChange={handleMetricChange}
+          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {metrics.map(m => (
             <option key={m.id} value={m.id}>{m.name}</option>
@@ -322,117 +142,140 @@ const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) =>
       
       {processedData.length > 0 ? (
         <>
-          <div style={styles.chart}>
-            {/* Y-axis (creative names) */}
+          <div style={{ position: 'relative', height: `${chartHeight}px` }} className="mb-4">
+            {/* Axis labels (Creative names) */}
             {processedData.map((item, index) => (
               <div
-                key={`axis-${item.id}`}
+                key={`name-${item.id || index}`}
                 style={{
-                  ...styles.axisLabel,
+                  position: 'absolute',
                   top: `${chartMargin.top + index * (barHeight + 10) + barHeight / 2}px`,
                   left: '0',
+                  width: `${chartMargin.left - 10}px`,
+                  transform: 'translateY(-50%)',
                   textAlign: 'right',
-                  width: `${chartMargin.left - 5}px`
+                  paddingRight: '10px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }}
+                className="text-sm text-gray-700"
+                title={item.fullName}
               >
                 {item.name}
               </div>
             ))}
             
-            {/* X-axis values */}
-            {axisValues.map((value, index) => {
-              // Calculate position based on min/max
-              const min = Math.min(...processedData.map(item => item.value));
-              const max = Math.max(...processedData.map(item => item.value));
-              const range = max - min;
-              const position = range === 0 ? 50 : ((value - min) / range) * (100 - chartMargin.left - chartMargin.right) + chartMargin.left;
-              
-              return (
-                <div
-                  key={`x-${index}`}
-                  style={{
-                    ...styles.axisLabel,
-                    top: `${chartHeight - chartMargin.bottom / 2}px`,
-                    left: `${position}%`,
-                    transform: 'translate(-50%, 0)'
-                  }}
-                >
-                  {formatValue(value, metricConfig.format)}
-                </div>
-              );
-            })}
-            
-            {/* Benchmark lines */}
-            {benchmarkLines.map((line, index) => (
-              <div key={`line-${index}`}>
-                <div 
-                  style={{
-                    ...styles.benchmarkLine,
-                    left: `${line.position}%`,
-                    backgroundColor: line.color,
-                    borderRight: `1px dashed ${line.color}`
-                  }}
-                />
-                <div
-                  style={{
-                    ...styles.benchmarkLabel,
-                    left: `${line.position}%`,
-                    color: line.color,
-                    top: '5px',
-                    fontSize: '0.7rem'
-                  }}
-                >
-                  {line.label}
-                </div>
-              </div>
-            ))}
-            
             {/* Bars */}
             {processedData.map((item, index) => {
-              // Calculate width based on min/max
-              const min = Math.min(...processedData.map(d => d.value));
-              const max = Math.max(...processedData.map(d => d.value));
-              const range = max - min;
-              const width = range === 0 ? 50 : ((item.value - min) / range) * (100 - chartMargin.left - chartMargin.right);
+              // Calculate max value for proper scaling
+              const maxValue = Math.max(...processedData.map(d => d.value)) * 1.1; // Add 10% margin
+              const percentage = (item.value / maxValue) * 100;
               
               return (
-                <div
-                  key={item.id}
-                  style={{
-                    ...styles.bar,
-                    width: `${width}%`,
-                    left: `${chartMargin.left}%`,
-                    top: `${chartMargin.top + index * (barHeight + 10)}px`,
-                    backgroundColor: item.color
-                  }}
-                  title={`${item.fullName}: ${formatValue(item.value, metricConfig.format)}`}
-                >
-                  <span style={styles.barLabel}>
+                <div key={`bar-${item.id || index}`} style={{ position: 'relative' }}>
+                  {/* Background bar for better visual */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: `${chartMargin.top + index * (barHeight + 10)}px`,
+                      left: `${chartMargin.left}px`,
+                      width: '100%',
+                      height: `${barHeight}px`,
+                      backgroundColor: '#f3f4f6',
+                      borderRadius: '4px'
+                    }}
+                  ></div>
+                  
+                  {/* Actual value bar */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: `${chartMargin.top + index * (barHeight + 10)}px`,
+                      left: `${chartMargin.left}px`,
+                      width: `${percentage}%`,
+                      height: `${barHeight}px`,
+                      backgroundColor: item.color,
+                      borderRadius: '4px',
+                      transition: 'width 0.5s ease'
+                    }}
+                    title={`${item.fullName}: ${formatValue(item.value, metricConfig.format)}`}
+                  ></div>
+                  
+                  {/* Value label */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: `${chartMargin.top + index * (barHeight + 10) + barHeight / 2}px`,
+                      left: `${chartMargin.left + percentage}%`,
+                      transform: 'translate(8px, -50%)',
+                      whiteSpace: 'nowrap'
+                    }}
+                    className="text-sm font-medium text-gray-800"
+                  >
                     {formatValue(item.value, metricConfig.format)}
-                  </span>
+                  </div>
                 </div>
               );
             })}
           </div>
           
           {/* Legend */}
-          <div style={styles.legend}>
-            <div style={styles.legendItem}>
-              <div style={{...styles.legendBox, backgroundColor: metricConfig.colorLow}}></div>
-              <span>Low Performance</span>
+          <div className="flex justify-center mt-4">
+            <div className="flex items-center mx-2">
+              <div 
+                className="w-4 h-4 mr-2 rounded" 
+                style={{ backgroundColor: metricConfig.colorLow }}
+              ></div>
+              <span className="text-sm text-gray-600">Low Performance</span>
             </div>
-            <div style={styles.legendItem}>
-              <div style={{...styles.legendBox, backgroundColor: metricConfig.colorMedium}}></div>
-              <span>Medium Performance</span>
+            <div className="flex items-center mx-2">
+              <div 
+                className="w-4 h-4 mr-2 rounded" 
+                style={{ backgroundColor: metricConfig.colorMedium }}
+              ></div>
+              <span className="text-sm text-gray-600">Medium Performance</span>
             </div>
-            <div style={styles.legendItem}>
-              <div style={{...styles.legendBox, backgroundColor: metricConfig.colorHigh}}></div>
-              <span>High Performance</span>
+            <div className="flex items-center mx-2">
+              <div 
+                className="w-4 h-4 mr-2 rounded" 
+                style={{ backgroundColor: metricConfig.colorHigh }}
+              ></div>
+              <span className="text-sm text-gray-600">High Performance</span>
             </div>
           </div>
+          
+          {/* Benchmark indicator */}
+          {(benchmarks[metric]?.low || benchmarks[metric]?.medium) && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Current Benchmarks:</span> {' '}
+                {benchmarks[metric]?.low && (
+                  <span>
+                    Low: {metricConfig.format === 'percentage' 
+                      ? `${(benchmarks[metric].low * 100).toFixed(2)}%` 
+                      : metricConfig.format === 'currency' 
+                        ? `$${benchmarks[metric].low.toFixed(2)}` 
+                        : benchmarks[metric].low.toFixed(2)
+                    }
+                  </span>
+                )}
+                {benchmarks[metric]?.medium && (
+                  <span className="ml-2">
+                    Medium: {metricConfig.format === 'percentage' 
+                      ? `${(benchmarks[metric].medium * 100).toFixed(2)}%` 
+                      : metricConfig.format === 'currency' 
+                        ? `$${benchmarks[metric].medium.toFixed(2)}` 
+                        : benchmarks[metric].medium.toFixed(2)
+                    }
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </>
       ) : (
-        <div style={{ textAlign: 'center', padding: '2rem', color: '#718096' }}>
+        <div className="h-40 flex items-center justify-center text-gray-500">
           No data available for visualization
         </div>
       )}

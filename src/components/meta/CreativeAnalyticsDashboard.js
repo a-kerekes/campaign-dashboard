@@ -774,14 +774,14 @@ const CreativeAnalyticsDashboard = () => {
               <div className="mb-2 flex space-x-2">
                 <button
                   onClick={toggleDiagnostic}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded focus:outline-none"
                 >
                   {showDiagnostic ? 'Hide Diagnostics' : 'Show Diagnostics'}
                 </button>
                 
                 <button
                   onClick={() => setShowBenchmarkSettings(true)}
-                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded"
+                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded focus:outline-none"
                 >
                   Benchmark Settings
                 </button>
@@ -827,6 +827,7 @@ const CreativeAnalyticsDashboard = () => {
                     creativeData={analyticsData.creativePerformance}
                     benchmarks={benchmarks}
                     metric={selectedMetricForVisualization}
+                    onMetricChange={(newMetric) => setSelectedMetricForVisualization(newMetric)}
                   />
                 </div>
       
@@ -844,14 +845,14 @@ const CreativeAnalyticsDashboard = () => {
             
             {/* Benchmark Settings Modal */}
             {showBenchmarkSettings && (
-              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-90vh overflow-auto">
                   <div className="flex justify-between items-center border-b border-gray-200 p-4">
                     <h3 className="text-lg font-medium text-gray-900">Benchmark Settings</h3>
                     <button
                       type="button"
                       onClick={() => setShowBenchmarkSettings(false)}
-                      className="text-gray-400 hover:text-gray-500"
+                      className="text-gray-400 hover:text-gray-500 focus:outline-none"
                     >
                       <span className="text-2xl">&times;</span>
                     </button>
@@ -883,7 +884,7 @@ const CreativeAnalyticsDashboard = () => {
                   <button
                     onClick={() => runDiagnostics()}
                     disabled={isLoading || !accessToken}
-                    className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded disabled:opacity-50 mr-2"
+                    className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded disabled:opacity-50 mr-2 focus:outline-none"
                   >
                     {isLoading ? 'Running...' : 'Run Diagnostics'}
                   </button>
@@ -955,21 +956,21 @@ const CreativeAnalyticsDashboard = () => {
                       <button
                         onClick={testAccountInsights}
                         disabled={isLoading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50 focus:outline-none"
                       >
                         Test Insights Access
                       </button>
                       <button
                         onClick={testCampaigns}
                         disabled={isLoading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50 focus:outline-none"
                       >
                         Test Campaigns Access
                       </button>
                       <button
                         onClick={testAdCreatives}
                         disabled={isLoading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50 focus:outline-none"
                       >
                         Test Ad Creatives Access
                       </button>
