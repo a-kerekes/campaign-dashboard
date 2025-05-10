@@ -6,6 +6,9 @@ import AiAdvisor from './AiAdvisor';
 import BreakdownChart from './BreakdownChart';
 import metaAPI from './metaAPI';
 import MetaAuthButton from './MetaAuthButton';
+import EnhancedCreativePerformanceTable from './EnhancedCreativePerformanceTable';
+import BenchmarkVisualization from './BenchmarkVisualization';
+import BenchmarkManager from './BenchmarkManager';
 
 // Meta API version constant
 const META_API_VERSION = 'v22.0';
@@ -49,12 +52,39 @@ const CreativeAnalyticsDashboard = () => {
   const [testResults, setTestResults] = useState({});
   const [isFbInitialized, setIsFbInitialized] = useState(false);
   const [diagnosticSelectedAccount, setDiagnosticSelectedAccount] = useState('');
+  
+  // Benchmark state
+  const [benchmarks, setBenchmarks] = useState({});
+  const [showBenchmarkSettings, setShowBenchmarkSettings] = useState(false);
+  const [selectedMetricForVisualization, setSelectedMetricForVisualization] = useState('ctr');
+  const [selectedCreative, setSelectedCreative] = useState(null);
 
   // Initialize Facebook SDK on component mount
-useEffect(() => {
-  // We don't need to initialize the SDK here since MetaAuthButton handles it
-  console.log("Using MetaAuthButton for SDK initialization");
-}, []);
+  useEffect(() => {
+    // We don't need to initialize the SDK here since MetaAuthButton handles it
+    console.log("Using MetaAuthButton for SDK initialization");
+  }, []);
+
+  // Fetch benchmarks when account changes
+  const fetchBenchmarks = async () => {
+    if (!selectedAccountId) return;
+    
+    try {
+      const response = await metaAPI.fetchBenchmarks(selectedAccountId);
+      if (response.data) {
+        setBenchmarks(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching benchmarks:', error);
+    }
+  };
+
+  // Load benchmarks when account changes
+  useEffect(() => {
+    if (isConnected && selectedAccountId) {
+      fetchBenchmarks();
+    }
+  }, [isConnected, selectedAccountId]);
 
   // Function to load performance data wrapped in useCallback
   const loadPerformanceData = useCallback(async () => {
@@ -674,266 +704,6 @@ useEffect(() => {
     }
   };
 
-  // Complete renderCreativeTable function with inline styles
-  const renderCreativeTable = () => {
-    if (!analyticsData || !analyticsData.creativePerformance || analyticsData.creativePerformance.length === 0) {
-      return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <p className="text-gray-500 text-center">No creative performance data available for the selected account and date range.</p>
-        </div>
-      );
-    }
-    
-    // Filter creatives to show only those from the currently selected account
-    let filteredCreatives = analyticsData.creativePerformance.filter(creative => 
-      creative.accountId === selectedAccountId
-    );
-    
-    if (filteredCreatives.length === 0) {
-      return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <p className="text-gray-500 text-center">No creative performance data available for the selected account.</p>
-        </div>
-      );
-    }
-    
-    // Group creatives by their creative asset (based on thumbnailUrl or creativeId)
-    const groupedCreatives = {};
-    
-    filteredCreatives.forEach(creative => {
-      // Use the thumbnail URL or creative ID as the grouping key
-      const groupKey = creative.thumbnailUrl || creative.creativeId;
-      
-      if (!groupedCreatives[groupKey]) {
-        // Store the full ad name
-        const fullName = creative.adName;
-        
-        // Initialize a new group with the first creative's data
-        groupedCreatives[groupKey] = {
-          creativeId: creative.creativeId,
-          thumbnailUrl: creative.thumbnailUrl,
-          adName: fullName, // Keep full name
-          objectStorySpec: creative.objectStorySpec,
-          impressions: 0,
-          clicks: 0,
-          spend: 0,
-          purchases: 0,
-          revenue: 0,
-          instances: 0,
-          adsets: new Set()
-        };
-      }
-      
-      // For all metrics, ensure we're working with proper numbers
-      groupedCreatives[groupKey].impressions += parseInt(creative.impressions || 0, 10);
-      groupedCreatives[groupKey].clicks += parseInt(creative.clicks || 0, 10);
-      groupedCreatives[groupKey].spend += parseFloat(creative.spend || 0);
-      
-      // Special handling for purchases - ignore the field if it's unreasonably large
-      let purchaseCount = 0;
-      if (creative.purchases !== undefined && creative.purchases !== null) {
-        if (typeof creative.purchases === 'string') {
-          // If it's a comma-separated string, remove commas before parsing
-          const cleanedValue = creative.purchases.replace(/,/g, '');
-          purchaseCount = parseInt(cleanedValue, 10) || 0;
-        } else {
-          purchaseCount = parseInt(creative.purchases, 10) || 0;
-        }
-        
-        // If the number is unrealistically large (Meta API data issue)
-        if (purchaseCount > 1000000) {
-          console.warn(`Ignoring unrealistic purchase value: ${purchaseCount} for ${creative.adName}`);
-          // Try to extract a more realistic number from the actual data in the API
-          // Often, the real purchase count is at the start of the string
-          if (typeof creative.purchases === 'string' && creative.purchases.includes(',')) {
-            const firstPart = creative.purchases.split(',')[0];
-            purchaseCount = parseInt(firstPart, 10) || 0;
-            
-            // Still sanity check it
-            if (purchaseCount > 1000) {
-              purchaseCount = 0;
-            }
-          } else {
-            purchaseCount = 0;
-          }
-        }
-      }
-      groupedCreatives[groupKey].purchases += purchaseCount;
-      
-      // Revenue handling
-      groupedCreatives[groupKey].revenue += parseFloat(creative.revenue || 0);
-      groupedCreatives[groupKey].instances += 1;
-      
-      // Track distinct ad sets
-      if (creative.adsetName) {
-        groupedCreatives[groupKey].adsets.add(creative.adsetName);
-      }
-    });
-    
-    // Convert the grouped data to an array and calculate derived metrics
-    const summarizedCreatives = Object.values(groupedCreatives).map(group => {
-      // Calculate derived metrics
-      const ctr = group.impressions > 0 ? (group.clicks / group.impressions) * 100 : 0;
-      const cpc = group.clicks > 0 ? group.spend / group.clicks : 0;
-      const costPerPurchase = group.purchases > 0 ? group.spend / group.purchases : 0;
-      const roas = group.spend > 0 && group.revenue > 0 ? group.revenue / group.spend : 0;
-      
-      return {
-        ...group,
-        ctr,
-        cpc,
-        costPerPurchase,
-        roas,
-        adsetCount: group.adsets.size
-      };
-    });
-    
-    // Sort by spend (highest to lowest)
-    const sortedCreatives = summarizedCreatives.sort((a, b) => b.spend - a.spend);
-    
-    // Custom inline styles for more reliable alternating rows
-    const tableStyles = {
-      table: {
-        width: '100%',
-        borderCollapse: 'collapse',
-        fontSize: '0.75rem',
-      },
-      headerCell: {
-        backgroundColor: '#EBF5FF', // Light blue for header
-        color: '#4A5568',
-        fontWeight: '600',
-        textAlign: 'right',
-        padding: '0.75rem 1rem',
-        borderBottom: '1px solid #E2E8F0',
-        position: 'sticky',
-        top: 0,
-        textTransform: 'uppercase',
-      },
-      headerCellLeft: {
-        backgroundColor: '#EBF5FF', // Light blue for header
-        color: '#4A5568',
-        fontWeight: '600',
-        textAlign: 'left',
-        padding: '0.75rem 1rem',
-        borderBottom: '1px solid #E2E8F0',
-        position: 'sticky',
-        top: 0,
-        textTransform: 'uppercase',
-      },
-      evenRow: {
-        backgroundColor: '#FFFFFF', // White for even rows
-      },
-      oddRow: {
-        backgroundColor: '#F0F7FF', // Very light blue for odd rows
-      },
-      cell: {
-        padding: '0.75rem 1rem',
-        borderBottom: '1px solid #E2E8F0',
-        textAlign: 'right',
-        color: '#4A5568',
-      },
-      cellLeft: {
-        padding: '0.75rem 1rem',
-        borderBottom: '1px solid #E2E8F0',
-        textAlign: 'left',
-        color: '#4A5568',
-      },
-      positiveRoas: {
-        color: '#38A169', // Green
-        fontWeight: '600',
-      },
-      negativeRoas: {
-        color: '#E53E3E', // Red
-        fontWeight: '600',
-      }
-    };
-    
-    return (
-      <div style={{ overflowX: 'auto', backgroundColor: 'white', borderRadius: '0.375rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
-        <table style={tableStyles.table}>
-          <thead>
-            <tr>
-              <th style={tableStyles.headerCellLeft}>Creative</th>
-              <th style={tableStyles.headerCell}>Ad Sets</th>
-              <th style={tableStyles.headerCell}>Impressions</th>
-              <th style={tableStyles.headerCell}>Clicks</th>
-              <th style={tableStyles.headerCell}>CTR</th>
-              <th style={tableStyles.headerCell}>CPC</th>
-              <th style={tableStyles.headerCell}>CPM</th>
-              <th style={tableStyles.headerCell}>Purchases</th>
-              <th style={tableStyles.headerCell}>Cost/Purchase</th>
-              <th style={tableStyles.headerCell}>Spend</th>
-              <th style={tableStyles.headerCell}>ROAS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedCreatives.map((creative, index) => (
-              <tr 
-                key={creative.creativeId} 
-                style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}
-              >
-                <td style={tableStyles.cellLeft}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                    {creative.thumbnailUrl && (
-                      <div style={{ marginRight: '0.75rem' }}>
-                        <img 
-                          style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.125rem', objectFit: 'cover', border: '1px solid #E2E8F0' }} 
-                          src={creative.thumbnailUrl} 
-                          alt="" 
-                        />
-                      </div>
-                    )}
-                    <div style={{ maxWidth: '20rem' }}>
-                      <div style={{ fontWeight: '500', marginBottom: '0.25rem', wordBreak: 'break-word' }}>
-                        {creative.adName}
-                      </div>
-                      <div style={{ color: '#718096', fontSize: '0.75rem' }}>
-                        Instances: {creative.instances}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td style={tableStyles.cell}>
-                  {creative.adsetCount}
-                </td>
-                <td style={tableStyles.cell}>
-                  {formatNumber(creative.impressions)}
-                </td>
-                <td style={tableStyles.cell}>
-                  {formatNumber(creative.clicks)}
-                </td>
-                <td style={tableStyles.cell}>
-                  {creative.ctr >= 0 ? creative.ctr.toFixed(2) : "0.00"}%
-                </td>
-                <td style={tableStyles.cell}>
-                  {formatCurrency(creative.cpc)}
-                </td>
-                <td style={tableStyles.cell}>
-                  {formatCurrency(creative.impressions > 0 ? (creative.spend / creative.impressions) * 1000 : 0)}
-                </td>
-                <td style={tableStyles.cell}>
-                  {formatNumber(creative.purchases)}
-                </td>
-                <td style={tableStyles.cell}>
-                  {creative.purchases > 0 ? formatCurrency(creative.costPerPurchase) : "$0.00"}
-                </td>
-                <td style={{...tableStyles.cell, fontWeight: '600'}}>
-                  {formatCurrency(creative.spend)}
-                </td>
-                <td style={{
-                  ...tableStyles.cell, 
-                  ...(creative.roas >= 1 ? tableStyles.positiveRoas : tableStyles.negativeRoas)
-                }}>
-                  {creative.roas > 0 ? creative.roas.toFixed(2) + 'x' : '0.00x'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
   return (
     <div className="p-6">
       <div className="mb-8">
@@ -1015,12 +785,19 @@ useEffect(() => {
                 </select>
               </div>
               
-              <div className="mb-2">
+              <div className="mb-2 flex space-x-2">
                 <button
                   onClick={toggleDiagnostic}
                   className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded"
                 >
                   {showDiagnostic ? 'Hide Diagnostics' : 'Show Diagnostics'}
+                </button>
+                
+                <button
+                  onClick={() => setShowBenchmarkSettings(true)}
+                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded"
+                >
+                  Benchmark Settings
                 </button>
               </div>
               
@@ -1057,12 +834,54 @@ useEffect(() => {
                     placementData={placementBreakdown}
                   />
                 </div>
+                
+                {/* Benchmark Visualization */}
+                <div className="mb-6">
+                  <BenchmarkVisualization 
+                    creativeData={analyticsData.creativePerformance}
+                    benchmarks={benchmarks}
+                    metric={selectedMetricForVisualization}
+                  />
+                </div>
       
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold mb-4">Creative Performance</h3>
-                  {renderCreativeTable()}
+                  <EnhancedCreativePerformanceTable 
+                    analyticsData={analyticsData}
+                    selectedAccountId={selectedAccountId}
+                    benchmarks={benchmarks}
+                    onCreativeSelect={setSelectedCreative}
+                  />
                 </div>
               </>
+            )}
+            
+            {/* Benchmark Settings Modal */}
+            {showBenchmarkSettings && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-90vh overflow-auto">
+                  <div className="flex justify-between items-center border-b border-gray-200 p-4">
+                    <h3 className="text-lg font-medium text-gray-900">Benchmark Settings</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowBenchmarkSettings(false)}
+                      className="text-gray-400 hover:text-gray-500"
+                    >
+                      <span className="text-2xl">&times;</span>
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    <BenchmarkManager 
+                      selectedAccountId={selectedAccountId}
+                      onClose={() => setShowBenchmarkSettings(false)}
+                      onSave={(updatedBenchmarks) => {
+                        setBenchmarks(updatedBenchmarks);
+                        setShowBenchmarkSettings(false);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
             
             {/* Diagnostic Tool Section */}
