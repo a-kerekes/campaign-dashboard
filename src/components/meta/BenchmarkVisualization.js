@@ -40,13 +40,15 @@ const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) =>
     
     // Find the selected metric configuration
     const selectedMetric = metrics.find(m => m.id === metric) || metrics[0];
-    setMetricConfig({
+    const newMetricConfig = {
       name: selectedMetric.name,
       format: selectedMetric.format,
       colorLow: selectedMetric.higherIsBetter ? '#FCA5A5' : '#6EE7B7',     // Red if higher is better, green if lower is better
       colorMedium: '#FCD34D',                                             // Yellow for medium
       colorHigh: selectedMetric.higherIsBetter ? '#6EE7B7' : '#FCA5A5'    // Green if higher is better, red if lower is better
-    });
+    };
+    
+    setMetricConfig(newMetricConfig);
     
     // Get benchmark thresholds
     const thresholds = benchmarks[metric] || { low: null, medium: null };
@@ -63,20 +65,20 @@ const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) =>
       
       // Determine performance level
       let performanceLevel = 'high';
-      let color = metricConfig.colorHigh;
+      let color = newMetricConfig.colorHigh;
       
       if (thresholds.low !== null && selectedMetric.higherIsBetter && value < thresholds.low) {
         performanceLevel = 'low';
-        color = metricConfig.colorLow;
+        color = newMetricConfig.colorLow;
       } else if (thresholds.medium !== null && selectedMetric.higherIsBetter && value < thresholds.medium) {
         performanceLevel = 'medium';
-        color = metricConfig.colorMedium;
+        color = newMetricConfig.colorMedium;
       } else if (thresholds.low !== null && !selectedMetric.higherIsBetter && value > thresholds.low) {
         performanceLevel = 'low'; // For metrics where lower is better (like CPC)
-        color = metricConfig.colorLow;
+        color = newMetricConfig.colorLow;
       } else if (thresholds.medium !== null && !selectedMetric.higherIsBetter && value > thresholds.medium) {
         performanceLevel = 'medium';
-        color = metricConfig.colorMedium;
+        color = newMetricConfig.colorMedium;
       }
       
       // For CTR, convert back to percentage for display
@@ -107,7 +109,7 @@ const BenchmarkVisualization = ({ creativeData, benchmarks, metric = 'ctr' }) =>
     // Take top N items for display
     setProcessedData(sortedData.slice(0, 10));
     
-  }, [creativeData, benchmarks, metric]);
+  }, [creativeData, benchmarks, metric, metrics]);
 
   // Get axis tick values
   const getAxisValues = () => {

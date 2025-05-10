@@ -1,6 +1,6 @@
 // src/components/meta/BenchmarkManager.js
-import React, { useState, useEffect } from 'react';
-import { Save, Edit, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Edit } from 'lucide-react'; // Only import the icon that is actually used
 import metaAPI from './metaAPI';
 
 // Metrics configuration with formats and default values
@@ -20,14 +20,23 @@ const BenchmarkManager = ({ selectedAccountId, onClose, onSave }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Fetch existing benchmarks when account changes
-  useEffect(() => {
-    if (selectedAccountId) {
-      fetchBenchmarks();
-    }
-  }, [selectedAccountId]);
+  // Initialize default benchmarks
+  const initializeDefaultBenchmarks = useCallback(() => {
+    const defaultBenchmarks = {};
+    
+    metricsConfig.forEach(metric => {
+      defaultBenchmarks[metric.id] = {
+        low: metric.defaultLow,
+        medium: metric.defaultMedium,
+        high: null
+      };
+    });
+    
+    setBenchmarks(defaultBenchmarks);
+  }, []);
 
-  const fetchBenchmarks = async () => {
+  // Fetch benchmarks with useCallback to avoid dependency issues
+  const fetchBenchmarks = useCallback(async () => {
     try {
       // Use the updated metaAPI function to fetch benchmarks
       const response = await metaAPI.fetchBenchmarks(selectedAccountId);
@@ -48,21 +57,14 @@ const BenchmarkManager = ({ selectedAccountId, onClose, onSave }) => {
       setError('Failed to load benchmark settings');
       initializeDefaultBenchmarks();
     }
-  };
+  }, [selectedAccountId, initializeDefaultBenchmarks]);
 
-  const initializeDefaultBenchmarks = () => {
-    const defaultBenchmarks = {};
-    
-    metricsConfig.forEach(metric => {
-      defaultBenchmarks[metric.id] = {
-        low: metric.defaultLow,
-        medium: metric.defaultMedium,
-        high: null
-      };
-    });
-    
-    setBenchmarks(defaultBenchmarks);
-  };
+  // Fetch existing benchmarks when account changes
+  useEffect(() => {
+    if (selectedAccountId) {
+      fetchBenchmarks();
+    }
+  }, [selectedAccountId, fetchBenchmarks]);
 
   const handleBenchmarkChange = (metricId, level, value) => {
     const numericValue = value === '' ? null : parseFloat(value);

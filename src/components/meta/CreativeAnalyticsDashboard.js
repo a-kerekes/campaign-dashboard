@@ -16,19 +16,6 @@ const META_API_VERSION = 'v22.0';
 // Import the specific functions from the default export
 const { fetchDailyMetrics, fetchBreakdownMetrics } = metaAPI;
 
-// Self-contained utility functions (no external imports needed)
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(value);
-};
-
-const formatNumber = (value) => {
-  return new Intl.NumberFormat('en-US').format(value);
-};
-
 const CreativeAnalyticsDashboard = () => {
   // Dashboard state
   const [accessToken, setAccessToken] = useState('');
@@ -50,7 +37,6 @@ const CreativeAnalyticsDashboard = () => {
   // Diagnostic tool state
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [testResults, setTestResults] = useState({});
-  const [isFbInitialized, setIsFbInitialized] = useState(false);
   const [diagnosticSelectedAccount, setDiagnosticSelectedAccount] = useState('');
   
   // Benchmark state
@@ -66,7 +52,7 @@ const CreativeAnalyticsDashboard = () => {
   }, []);
 
   // Fetch benchmarks when account changes
-  const fetchBenchmarks = async () => {
+  const fetchBenchmarks = useCallback(async () => {
     if (!selectedAccountId) return;
     
     try {
@@ -77,14 +63,14 @@ const CreativeAnalyticsDashboard = () => {
     } catch (error) {
       console.error('Error fetching benchmarks:', error);
     }
-  };
+  }, [selectedAccountId]);
 
   // Load benchmarks when account changes
   useEffect(() => {
     if (isConnected && selectedAccountId) {
       fetchBenchmarks();
     }
-  }, [isConnected, selectedAccountId]);
+  }, [isConnected, selectedAccountId, fetchBenchmarks]);
 
   // Function to load performance data wrapped in useCallback
   const loadPerformanceData = useCallback(async () => {
