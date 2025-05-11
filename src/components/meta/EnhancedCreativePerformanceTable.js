@@ -3,13 +3,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Download, Eye, Copy } from 'lucide-react';
 import metaAPI from './metaAPI';
 
-// Metrics configuration - with explicit percentage handling
+// Metrics configuration
 const metricsConfig = [
-  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 1.0, defaultMedium: 1.5, isPercentage: true },
-  { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1, isPercentage: false },
-  { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20, isPercentage: false },
-  { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2, isPercentage: false },
-  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30, isPercentage: false }
+  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 1.0, defaultMedium: 1.5 },
+  { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1 },
+  { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20 },
+  { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2 },
+  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 }
 ];
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect }) => {
@@ -33,7 +33,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   }, [analyticsData]);
   
-  // Initialize benchmarks - FIXED to ensure all benchmarks are properly set
+  // Initialize benchmarks
   useEffect(() => {
     if (propBenchmarks) {
       setBenchmarks(propBenchmarks);
@@ -51,6 +51,11 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       setTempBenchmarks(defaultBenchmarks);
     }
   }, [propBenchmarks]);
+
+  // Log benchmarks when they change - for debugging
+  useEffect(() => {
+    console.log("Current Benchmarks:", benchmarks);
+  }, [benchmarks]);
 
   // Fetch benchmarks with useCallback
   const fetchBenchmarks = useCallback(async () => {
@@ -149,8 +154,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const formattedBenchmarks = {};
       Object.keys(tempBenchmarks).forEach(metricId => {
         formattedBenchmarks[metricId] = {
-          low: tempBenchmarks[metricId].low === '' ? null : tempBenchmarks[metricId].low,
-          medium: tempBenchmarks[metricId].medium === '' ? null : tempBenchmarks[metricId].medium
+          low: tempBenchmarks[metricId].low === '' ? null : parseFloat(tempBenchmarks[metricId].low),
+          medium: tempBenchmarks[metricId].medium === '' ? null : parseFloat(tempBenchmarks[metricId].medium)
         };
       });
       
@@ -164,6 +169,9 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       setIsEditingBenchmarks(false);
       setStatusMessage('Benchmarks saved successfully');
       setTimeout(() => setStatusMessage(''), 3000);
+      
+      // Log saved benchmarks for debugging
+      console.log("Saved benchmarks:", formattedBenchmarks);
     } catch (error) {
       console.error('Error saving benchmarks:', error);
       setStatusMessage('Error saving benchmarks');
@@ -257,59 +265,75 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Get benchmark status class - FIXED to handle percentage metrics correctly
+  // FIXED: Get benchmark status class with better handling
   const getBenchmarkStatusClass = (metric, value) => {
-    // Early exit if no benchmarks
-    if (!benchmarks || !benchmarks[metric]) return '';
-    
-    const { low, medium } = benchmarks[metric];
-    
-    // Return empty if benchmarks are not set
-    if (low === null || low === undefined || medium === null || medium === undefined) return '';
-    
-    // Handle null/undefined value
-    if (value === null || value === undefined) return '';
-    
-    // Get the metric configuration
-    const metricConfig = metricsConfig.find(m => m.id === metric);
-    
-    // Default to higher is better if not found
-    const isHigherBetter = metricConfig ? metricConfig.higherIsBetter : true;
-    
-    // Adjust value based on metric type
-    let adjustedValue = value;
-    if (metricConfig && metricConfig.isPercentage) {
-      // For percentage values like CTR which are displayed as percentages (1.5 means 1.5%)
-      // We work with the raw value directly
-      adjustedValue = value;
+    // Short-circuit if no benchmarks or no value
+    if (!benchmarks || !benchmarks[metric]) {
+      return '';
     }
     
-    // Determine color based on metric type
-    if (isHigherBetter) {
+    // Get benchmark values
+    const lowValue = benchmarks[metric].low;
+    const mediumValue = benchmarks[metric].medium;
+    
+    // Skip if benchmark values aren't properly set
+    if (lowValue === null || lowValue === undefined || 
+        mediumValue === null || mediumValue === undefined) {
+      return '';
+    }
+    
+    // Skip if value is invalid
+    if (value === null || value === undefined) {
+      return '';
+    }
+    
+    // Get numeric values
+    const numericValue = parseFloat(value);
+    const numericLow = parseFloat(lowValue);
+    const numericMedium = parseFloat(mediumValue);
+    
+    // Determine if higher is better for this metric
+    const higherIsBetter = ['ctr', 'roas'].includes(metric);
+    
+    // Apply the appropriate color class
+    if (higherIsBetter) {
       // For metrics where higher is better (CTR, ROAS)
-      if (adjustedValue < low) {
+      if (numericValue < numericLow) {
         return 'bg-red-100 text-red-800';
-      } else if (adjustedValue < medium) {
+      } else if (numericValue < numericMedium) {
         return 'bg-yellow-100 text-yellow-800';
       } else {
         return 'bg-green-100 text-green-800';
       }
     } else {
-      // For metrics where lower is better (CPC, CPM, Cost per Purchase)
-      if (adjustedValue > low) {
+      // For metrics where lower is better (CPC, CPM, Cost/Purchase)
+      if (numericValue > numericLow) {
         return 'bg-red-100 text-red-800';
-      } else if (adjustedValue > medium) {
+      } else if (numericValue > numericMedium) {
         return 'bg-yellow-100 text-yellow-800';
       } else {
         return 'bg-green-100 text-green-800';
       }
     }
   };
-
-  // Log to help debug benchmark issues
-  useEffect(() => {
-    console.log('Current Benchmarks:', benchmarks);
-  }, [benchmarks]);
+  
+  // Use inline styles for more reliable coloring
+  const getInlineStyles = (metric, value) => {
+    const colorClass = getBenchmarkStatusClass(metric, value);
+    
+    if (!colorClass) return {};
+    
+    // Map color classes to inline styles
+    if (colorClass.includes('bg-red-100')) {
+      return { backgroundColor: '#fee2e2', color: '#991b1b' };
+    } else if (colorClass.includes('bg-yellow-100')) {
+      return { backgroundColor: '#fef3c7', color: '#92400e' };
+    } else if (colorClass.includes('bg-green-100')) {
+      return { backgroundColor: '#d1fae5', color: '#065f46' };
+    }
+    
+    return {};
+  };
 
   return (
     <div>
@@ -649,35 +673,50 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     {creative.clicks ? creative.clicks.toLocaleString() : 0}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('ctr', creative.ctr || 0)}`}>
+                    <div 
+                      className="px-2 py-1 rounded-full text-xs w-full text-center"
+                      style={getInlineStyles('ctr', creative.ctr)}
+                    >
                       {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('cpc', creative.cpc || 0)}`}>
+                    <div 
+                      className="px-2 py-1 rounded-full text-xs w-full text-center"
+                      style={getInlineStyles('cpc', creative.cpc)}
+                    >
                       ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('cpm', creative.cpm || 0)}`}>
+                    <div 
+                      className="px-2 py-1 rounded-full text-xs w-full text-center"
+                      style={getInlineStyles('cpm', creative.cpm)}
+                    >
                       ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {creative.purchases || 0}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('costPerPurchase', creative.costPerPurchase || 0)}`}>
+                    <div 
+                      className="px-2 py-1 rounded-full text-xs w-full text-center"
+                      style={getInlineStyles('costPerPurchase', creative.costPerPurchase)}
+                    >
                       ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('roas', creative.roas || 0)}`}>
+                    <div 
+                      className="px-2 py-1 rounded-full text-xs w-full text-center"
+                      style={getInlineStyles('roas', creative.roas)}
+                    >
                       {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                     <div className="flex items-center space-x-1">
@@ -732,6 +771,16 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           </div>
         </div>
       </div>
+      
+      {/* Add this style tag to ensure the colors are applied */}
+      <style jsx>{`
+        .bg-red-100 { background-color: #fee2e2 !important; }
+        .text-red-800 { color: #991b1b !important; }
+        .bg-yellow-100 { background-color: #fef3c7 !important; }
+        .text-yellow-800 { color: #92400e !important; }
+        .bg-green-100 { background-color: #d1fae5 !important; }
+        .text-green-800 { color: #065f46 !important; }
+      `}</style>
     </div>
   );
 };
