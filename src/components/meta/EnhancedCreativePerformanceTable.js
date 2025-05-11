@@ -1,6 +1,6 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Eye, Copy } from 'lucide-react';
+import { Download } from 'lucide-react';
 import metaAPI from './metaAPI';
 
 // Metrics configuration
@@ -19,7 +19,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCreatives, setFilteredCreatives] = useState([]);
   const [selectedCreativeId, setSelectedCreativeId] = useState(null);
-  const [expandedCreativeId, setExpandedCreativeId] = useState(null);
   const [benchmarks, setBenchmarks] = useState(propBenchmarks || {});
   const [isEditingBenchmarks, setIsEditingBenchmarks] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -131,11 +130,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Handle creative expansion
-  const handleCreativeExpand = (creativeId) => {
-    setExpandedCreativeId(expandedCreativeId === creativeId ? null : creativeId);
-  };
-
   // Handle benchmark change
   const handleBenchmarkChange = (metricId, level, value) => {
     setTempBenchmarks(prev => ({
@@ -239,18 +233,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Copy creative ID to clipboard
-  const copyCreativeId = (id) => {
-    navigator.clipboard.writeText(id).then(() => {
-      setStatusMessage('Creative ID copied to clipboard');
-      setTimeout(() => setStatusMessage(''), 3000);
-    }).catch(err => {
-      console.error('Error copying to clipboard:', err);
-      setStatusMessage('Error copying to clipboard');
-      setTimeout(() => setStatusMessage(''), 3000);
-    });
-  };
-
   // Format value according to format
   const formatValue = (value, format) => {
     if (value === null || value === undefined) return 'N/A';
@@ -265,7 +247,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // FIXED: Get benchmark status class with better handling
+  // Get benchmark status class with better handling
   const getBenchmarkStatusClass = (metric, value) => {
     // Short-circuit if no benchmarks or no value
     if (!benchmarks || !benchmarks[metric]) {
@@ -299,37 +281,37 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     if (higherIsBetter) {
       // For metrics where higher is better (CTR, ROAS)
       if (numericValue < numericLow) {
-        return 'bg-red-100 text-red-800';
+        return 'text-red-600';
       } else if (numericValue < numericMedium) {
-        return 'bg-yellow-100 text-yellow-800';
+        return 'text-yellow-600';
       } else {
-        return 'bg-green-100 text-green-800';
+        return 'text-green-600';
       }
     } else {
       // For metrics where lower is better (CPC, CPM, Cost/Purchase)
       if (numericValue > numericLow) {
-        return 'bg-red-100 text-red-800';
+        return 'text-red-600';
       } else if (numericValue > numericMedium) {
-        return 'bg-yellow-100 text-yellow-800';
+        return 'text-yellow-600';
       } else {
-        return 'bg-green-100 text-green-800';
+        return 'text-green-600';
       }
     }
   };
   
   // Use inline styles for more reliable coloring
-  const getInlineStyles = (metric, value) => {
+  const getColorStyle = (metric, value) => {
     const colorClass = getBenchmarkStatusClass(metric, value);
     
     if (!colorClass) return {};
     
     // Map color classes to inline styles
-    if (colorClass.includes('bg-red-100')) {
-      return { backgroundColor: '#fee2e2', color: '#991b1b' };
-    } else if (colorClass.includes('bg-yellow-100')) {
-      return { backgroundColor: '#fef3c7', color: '#92400e' };
-    } else if (colorClass.includes('bg-green-100')) {
-      return { backgroundColor: '#d1fae5', color: '#065f46' };
+    if (colorClass.includes('text-red-600')) {
+      return { color: '#dc2626' };
+    } else if (colorClass.includes('text-yellow-600')) {
+      return { color: '#d97706' };
+    } else if (colorClass.includes('text-green-600')) {
+      return { color: '#059669' };
     }
     
     return {};
@@ -337,7 +319,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
 
   return (
     <div>
-      {/* Set Performance Benchmarks Section - Above the table header */}
+      {/* Header Section */}
       <div className="mb-4">
         <h3 className="text-lg font-semibold mb-2">Creative Performance</h3>
         
@@ -548,206 +530,132 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Creative Performance Table - Cleaner UI similar to Image 2 */}
+      <div className="bg-white rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-100 border-b border-gray-200">
+              <tr className="bg-gray-50 border-b">
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'adName' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('adName')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  style={{width: '30%'}}
                 >
                   Creative
-                  {sortColumn === 'adName' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'adsetName' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('adsetName')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Ad Sets
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'impressions' ? 'bg-blue-50' : ''}`}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                   onClick={() => handleSort('impressions')}
                   style={{cursor: 'pointer'}}
                 >
-                  Impressions
-                  {sortColumn === 'impressions' && (
+                  Impressions {sortColumn === 'impressions' && (
                     <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'clicks' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('clicks')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Clicks
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'ctr' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('ctr')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   CTR
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'cpc' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('cpc')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   CPC
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'cpm' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('cpm')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   CPM
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'purchases' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('purchases')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Purchases
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'costPerPurchase' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('costPerPurchase')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Cost/Purchase
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'spend' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('spend')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Spend
                 </th>
                 <th 
-                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'roas' ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSort('roas')}
-                  style={{cursor: 'pointer'}}
+                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   ROAS
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {filteredCreatives.map((creative) => (
                 <tr 
                   key={creative.creativeId || creative.adId || Math.random().toString(36)}
-                  className={`hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
+                  className={`border-b hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
                   onClick={() => handleCreativeSelect(creative.creativeId)}
+                  style={{cursor: 'pointer'}}
                 >
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 py-4">
                     <div className="flex items-center">
                       {creative.thumbnailUrl && (
                         <img 
                           src={creative.thumbnailUrl} 
                           alt={creative.adName}
-                          className="w-8 h-8 object-cover rounded mr-2"
+                          className="w-12 h-12 object-cover rounded mr-3"
                         />
                       )}
-                      <div className="text-sm font-medium text-gray-900 truncate max-w-xs" title={creative.adName}>
+                      <div className="text-sm text-gray-900" title={creative.adName}>
                         {creative.adName}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 text-center text-sm text-gray-500">
                     {creative.adsetCount || 1}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 text-center text-sm text-gray-500">
                     {creative.impressions ? creative.impressions.toLocaleString() : 0}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 text-center text-sm text-gray-500">
                     {creative.clicks ? creative.clicks.toLocaleString() : 0}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <div 
-                      className="px-2 py-1 rounded-full text-xs w-full text-center"
-                      style={getInlineStyles('ctr', creative.ctr)}
-                    >
-                      {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
-                    </div>
+                  <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('ctr', creative.ctr)}>
+                    {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <div 
-                      className="px-2 py-1 rounded-full text-xs w-full text-center"
-                      style={getInlineStyles('cpc', creative.cpc)}
-                    >
-                      ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
-                    </div>
+                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('cpc', creative.cpc)}>
+                    ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <div 
-                      className="px-2 py-1 rounded-full text-xs w-full text-center"
-                      style={getInlineStyles('cpm', creative.cpm)}
-                    >
-                      ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
-                    </div>
+                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('cpm', creative.cpm)}>
+                    ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 text-center text-sm text-gray-500">
                     {creative.purchases || 0}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <div 
-                      className="px-2 py-1 rounded-full text-xs w-full text-center"
-                      style={getInlineStyles('costPerPurchase', creative.costPerPurchase)}
-                    >
-                      ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
-                    </div>
+                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
+                    ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 text-center text-sm text-gray-500">
                     ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <div 
-                      className="px-2 py-1 rounded-full text-xs w-full text-center"
-                      style={getInlineStyles('roas', creative.roas)}
-                    >
-                      {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-500">
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreativeExpand(creative.creativeId);
-                        }}
-                        className="p-1 text-blue-600 hover:text-blue-800"
-                        title="View details"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyCreativeId(creative.creativeId);
-                        }}
-                        className="p-1 text-gray-600 hover:text-gray-800"
-                        title="Copy creative ID"
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
+                  <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('roas', creative.roas)}>
+                    {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
                   </td>
                 </tr>
               ))}
               
               {filteredCreatives.length === 0 && (
                 <tr>
-                  <td colSpan="12" className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan="11" className="px-4 py-6 text-center text-gray-500">
                     No creatives found matching your criteria.
                   </td>
                 </tr>
@@ -755,32 +663,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             </tbody>
           </table>
         </div>
-        
-        <div className="p-3 bg-gray-50 border-t text-xs text-gray-500 flex items-center space-x-4">
-          <div className="flex items-center">
-            <span className="inline-block w-3 h-3 rounded-full bg-red-100 border border-red-300 mr-1"></span>
-            <span>Low Performance</span>
-          </div>
-          <div className="flex items-center">
-            <span className="inline-block w-3 h-3 rounded-full bg-yellow-100 border border-yellow-300 mr-1"></span>
-            <span>Medium Performance</span>
-          </div>
-          <div className="flex items-center">
-            <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300 mr-1"></span>
-            <span>High Performance</span>
-          </div>
-        </div>
       </div>
-      
-      {/* Add this style tag to ensure the colors are applied */}
-      <style jsx>{`
-        .bg-red-100 { background-color: #fee2e2 !important; }
-        .text-red-800 { color: #991b1b !important; }
-        .bg-yellow-100 { background-color: #fef3c7 !important; }
-        .text-yellow-800 { color: #92400e !important; }
-        .bg-green-100 { background-color: #d1fae5 !important; }
-        .text-green-800 { color: #065f46 !important; }
-      `}</style>
     </div>
   );
 };
