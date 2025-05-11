@@ -1,11 +1,11 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Copy, Eye } from 'lucide-react';
+import { Download, Eye, Copy } from 'lucide-react';
 import metaAPI from './metaAPI';
 
 // Metrics configuration
 const metricsConfig = [
-  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 0.5, defaultMedium: 1.0 },
+  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 1.0, defaultMedium: 1.5 },
   { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1 },
   { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20 },
   { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2 },
@@ -296,238 +296,375 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   };
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="flex justify-between items-center p-4 border-b">
-        <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Creative Performance
-          </h3>
-          <span className="text-sm text-gray-500">
-            {filteredCreatives.length} creatives
-          </span>
+    <div>
+      {/* Set Performance Benchmarks Section - Above the table header */}
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold mb-2">Creative Performance</h3>
+        
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center">
+            <span className="text-sm text-gray-500 mr-2">{filteredCreatives.length} creatives</span>
+            <button
+              onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
+              className="text-sm text-blue-600 hover:text-blue-800 underline mr-4"
+            >
+              {isEditingBenchmarks ? 'Close' : 'Set Performance Benchmarks'}
+            </button>
+          </div>
+          
+          <div className="flex items-center">
+            <input
+              type="text"
+              placeholder="Search creatives..."
+              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mr-2"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            
+            <button
+              onClick={exportToCSV}
+              className="p-1 bg-gray-100 rounded hover:bg-gray-200 text-gray-700"
+              title="Export to CSV"
+            >
+              <Download size={16} />
+            </button>
+          </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            placeholder="Search creatives..."
-            className="px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          
-          <button
-            onClick={exportToCSV}
-            className="p-2 bg-gray-100 rounded hover:bg-gray-200 text-gray-700"
-            title="Export to CSV"
-          >
-            <Download size={16} />
-          </button>
-          
-          <button
-            onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
-            className="px-3 py-2 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-          >
-            {isEditingBenchmarks ? 'Close' : 'Set Benchmarks'}
-          </button>
-        </div>
+        {statusMessage && (
+          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-2">
+            {statusMessage}
+          </div>
+        )}
       </div>
       
-      {statusMessage && (
-        <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center">
-          {statusMessage}
-        </div>
-      )}
-      
+      {/* Benchmark Settings */}
       {isEditingBenchmarks && (
-        <div className="p-4 bg-gray-50 border-b">
+        <div className="mb-4 p-3 bg-gray-50 border rounded-md">
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-medium text-gray-800">Set Performance Benchmarks</h4>
             <button 
               onClick={saveBenchmarks} 
-              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
             >
               Save Benchmarks
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {metricsConfig.map(metric => (
-              <div key={metric.id} className="bg-white p-3 rounded border">
-                <div className="font-medium text-sm mb-2 text-gray-700">{metric.name}</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      {metric.higherIsBetter ? 'Low (Below)' : 'Poor (Above)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        step={metric.format === 'percentage' ? '0.1' : '0.5'}
-                        className="w-full p-1 text-sm border rounded"
-                        value={tempBenchmarks[metric.id]?.low ?? ''}
-                        onChange={(e) => handleBenchmarkChange(metric.id, 'low', e.target.value)}
-                      />
-                      <span className="absolute right-2 top-1 text-gray-400 text-sm">
-                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">
-                      {metric.higherIsBetter ? 'Good (Above)' : 'Good (Below)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        step={metric.format === 'percentage' ? '0.1' : '0.5'}
-                        className="w-full p-1 text-sm border rounded"
-                        value={tempBenchmarks[metric.id]?.medium ?? ''}
-                        onChange={(e) => handleBenchmarkChange(metric.id, 'medium', e.target.value)}
-                      />
-                      <span className="absolute right-2 top-1 text-gray-400 text-sm">
-                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
-                      </span>
-                    </div>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            {/* CTR */}
+            <div>
+              <div className="font-medium text-sm mb-1">CTR</div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500">Low (Below)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.ctr?.low ?? ''}
+                    onChange={(e) => handleBenchmarkChange('ctr', 'low', e.target.value)}
+                  />
+                  <span className="ml-1">%</span>
                 </div>
               </div>
-            ))}
+              <div>
+                <label className="block text-xs text-gray-500">Good (Above)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.ctr?.medium ?? ''}
+                    onChange={(e) => handleBenchmarkChange('ctr', 'medium', e.target.value)}
+                  />
+                  <span className="ml-1">%</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* CPC */}
+            <div>
+              <div className="font-medium text-sm mb-1">CPC</div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500">Poor (Above)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.cpc?.low ?? ''}
+                    onChange={(e) => handleBenchmarkChange('cpc', 'low', e.target.value)}
+                  />
+                  <span className="ml-1">$</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500">Good (Below)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.cpc?.medium ?? ''}
+                    onChange={(e) => handleBenchmarkChange('cpc', 'medium', e.target.value)}
+                  />
+                  <span className="ml-1">$</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* CPM */}
+            <div>
+              <div className="font-medium text-sm mb-1">CPM</div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500">Poor (Above)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.cpm?.low ?? ''}
+                    onChange={(e) => handleBenchmarkChange('cpm', 'low', e.target.value)}
+                  />
+                  <span className="ml-1">$</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500">Good (Below)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.cpm?.medium ?? ''}
+                    onChange={(e) => handleBenchmarkChange('cpm', 'medium', e.target.value)}
+                  />
+                  <span className="ml-1">$</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* ROAS */}
+            <div>
+              <div className="font-medium text-sm mb-1">ROAS</div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500">Low (Below)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.roas?.low ?? ''}
+                    onChange={(e) => handleBenchmarkChange('roas', 'low', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500">Good (Above)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.roas?.medium ?? ''}
+                    onChange={(e) => handleBenchmarkChange('roas', 'medium', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Cost/Purchase */}
+            <div>
+              <div className="font-medium text-sm mb-1">Cost/Purchase</div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500">Poor (Above)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.costPerPurchase?.low ?? ''}
+                    onChange={(e) => handleBenchmarkChange('costPerPurchase', 'low', e.target.value)}
+                  />
+                  <span className="ml-1">$</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500">Good (Below)</label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="w-full p-1 text-sm border rounded"
+                    value={tempBenchmarks.costPerPurchase?.medium ?? ''}
+                    onChange={(e) => handleBenchmarkChange('costPerPurchase', 'medium', e.target.value)}
+                  />
+                  <span className="ml-1">$</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
       
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50">
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'adName' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('adName')}
-              >
-                Creative
-                {sortColumn === 'adName' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'impressions' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('impressions')}
-              >
-                Impressions
-                {sortColumn === 'impressions' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'clicks' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('clicks')}
-              >
-                Clicks
-                {sortColumn === 'clicks' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'ctr' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('ctr')}
-              >
-                CTR
-                {sortColumn === 'ctr' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'spend' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('spend')}
-              >
-                Spend
-                {sortColumn === 'spend' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'cpc' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('cpc')}
-              >
-                CPC
-                {sortColumn === 'cpc' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'purchases' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('purchases')}
-              >
-                Purchases
-                {sortColumn === 'purchases' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${sortColumn === 'roas' ? 'bg-blue-50' : ''}`}
-                onClick={() => handleSort('roas')}
-              >
-                ROAS
-                {sortColumn === 'roas' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredCreatives.map((creative) => (
-              <React.Fragment key={creative.creativeId || creative.adId}>
+      {/* Creative Performance Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-100 border-b border-gray-200">
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'adName' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('adName')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Creative
+                  {sortColumn === 'adName' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'adsetName' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('adsetName')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Ad Sets
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'impressions' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('impressions')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Impressions
+                  {sortColumn === 'impressions' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'clicks' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('clicks')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Clicks
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'ctr' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('ctr')}
+                  style={{cursor: 'pointer'}}
+                >
+                  CTR
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'cpc' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('cpc')}
+                  style={{cursor: 'pointer'}}
+                >
+                  CPC
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'cpm' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('cpm')}
+                  style={{cursor: 'pointer'}}
+                >
+                  CPM
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'purchases' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('purchases')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Purchases
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'costPerPurchase' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('costPerPurchase')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Cost/Purchase
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'spend' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('spend')}
+                  style={{cursor: 'pointer'}}
+                >
+                  Spend
+                </th>
+                <th 
+                  className={`px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortColumn === 'roas' ? 'bg-blue-50' : ''}`}
+                  onClick={() => handleSort('roas')}
+                  style={{cursor: 'pointer'}}
+                >
+                  ROAS
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredCreatives.map((creative) => (
                 <tr 
+                  key={creative.creativeId || creative.adId}
                   className={`hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
                   onClick={() => handleCreativeSelect(creative.creativeId)}
                 >
-                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <div className="flex items-center space-x-2">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center">
                       {creative.thumbnailUrl && (
                         <img 
                           src={creative.thumbnailUrl} 
                           alt={creative.adName}
-                          className="w-10 h-10 object-cover rounded"
+                          className="w-8 h-8 object-cover rounded mr-2"
                         />
                       )}
-                      <div className="flex-1 truncate max-w-xs" title={creative.adName}>
+                      <div className="text-sm font-medium text-gray-900 truncate max-w-xs" title={creative.adName}>
                         {creative.adName}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    1
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {creative.impressions ? creative.impressions.toLocaleString() : 0}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {creative.clicks ? creative.clicks.toLocaleString() : 0}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('ctr', creative.ctr)}`}>
                       {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('cpc', creative.cpc || 0)}`}>
                       ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('cpm', creative.cpm || 0)}`}>
+                      ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {creative.purchases || 0}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('costPerPurchase', creative.costPerPurchase || 0)}`}>
+                      ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('roas', creative.roas || 0)}`}>
                       {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center space-x-2">
+                  <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                    <div className="flex items-center space-x-1">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -551,51 +688,32 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     </div>
                   </td>
                 </tr>
-                
-                {expandedCreativeId === creative.creativeId && (
-                  <tr className="bg-gray-50">
-                    <td colSpan="9" className="px-4 py-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Creative Details</h4>
-                          <p><span className="font-medium">ID:</span> {creative.creativeId}</p>
-                          <p><span className="font-medium">Ad ID:</span> {creative.adId}</p>
-                          <p><span className="font-medium">Ad Set:</span> {creative.adsetName || 'Unknown'}</p>
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Performance Metrics</h4>
-                          <p><span className="font-medium">CPM:</span> <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('cpm', creative.cpm || 0)}`}>${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}</span></p>
-                          <p><span className="font-medium">Cost per Purchase:</span> <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('costPerPurchase', creative.costPerPurchase || 0)}`}>${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}</span></p>
-                          <p><span className="font-medium">Conversion Rate:</span> {creative.conversionRate ? `${creative.conversionRate.toFixed(2)}%` : '0.00%'}</p>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-            
-            {filteredCreatives.length === 0 && (
-              <tr>
-                <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                  No creatives found matching your criteria.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      
-      <div className="p-3 bg-gray-50 border-t text-sm">
-        <div className="flex items-center space-x-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-red-100 border border-red-300"></span>
-          <span className="text-gray-600 mr-3">Low</span>
-          
-          <span className="inline-block w-3 h-3 rounded-full bg-yellow-100 border border-yellow-300"></span>
-          <span className="text-gray-600 mr-3">Medium</span>
-          
-          <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300"></span>
-          <span className="text-gray-600">High</span>
+              ))}
+              
+              {filteredCreatives.length === 0 && (
+                <tr>
+                  <td colSpan="12" className="px-4 py-6 text-center text-gray-500">
+                    No creatives found matching your criteria.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="p-3 bg-gray-50 border-t text-xs text-gray-500 flex items-center space-x-4">
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-100 border border-red-300 mr-1"></span>
+            <span>Low Performance</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-yellow-100 border border-yellow-300 mr-1"></span>
+            <span>Medium Performance</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300 mr-1"></span>
+            <span>High Performance</span>
+          </div>
         </div>
       </div>
     </div>
