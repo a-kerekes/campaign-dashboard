@@ -320,15 +320,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   return (
     <div>
       {/* Header Section */}
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold mb-2">Creative Performance</h3>
+      <div className="mb-3">
+        <h3 className="text-base font-semibold mb-2">Creative Performance</h3>
         
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center">
-            <span className="text-sm text-gray-500 mr-2">{filteredCreatives.length} creatives</span>
+            <span className="text-xs text-gray-500 mr-2">{filteredCreatives.length} creatives</span>
             <button
               onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
-              className="text-sm text-blue-600 hover:text-blue-800 underline mr-4"
+              className="text-xs text-blue-600 hover:text-blue-800 underline mr-4"
             >
               {isEditingBenchmarks ? 'Close' : 'Set Performance Benchmarks'}
             </button>
@@ -338,7 +338,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             <input
               type="text"
               placeholder="Search creatives..."
-              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mr-2"
+              className="px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 mr-2"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -348,13 +348,13 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               className="p-1 bg-gray-100 rounded hover:bg-gray-200 text-gray-700"
               title="Export to CSV"
             >
-              <Download size={16} />
+              <Download size={14} />
             </button>
           </div>
         </div>
         
         {statusMessage && (
-          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-2">
+          <div className="p-1 bg-blue-50 text-blue-600 text-xs text-center mb-2">
             {statusMessage}
           </div>
         )}
@@ -362,32 +362,32 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       
       {/* Benchmark Settings */}
       {isEditingBenchmarks && (
-        <div className="mb-4 p-3 bg-gray-50 border rounded-md">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="font-medium text-gray-800">Set Performance Benchmarks</h4>
+        <div className="mb-3 p-2 bg-gray-50 border rounded-md">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="font-medium text-xs text-gray-800">Set Performance Benchmarks</h4>
             <button 
               onClick={saveBenchmarks} 
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
             >
               Save Benchmarks
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
             {/* CTR */}
             <div>
-              <div className="font-medium text-sm mb-1">CTR</div>
-              <div className="mb-2">
+              <div className="font-medium text-xs mb-1">CTR</div>
+              <div className="mb-1">
                 <label className="block text-xs text-gray-500">Low (Below)</label>
                 <div className="flex items-center">
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.ctr?.low ?? ''}
                     onChange={(e) => handleBenchmarkChange('ctr', 'low', e.target.value)}
                   />
-                  <span className="ml-1">%</span>
+                  <span className="ml-1 text-xs">%</span>
                 </div>
               </div>
               <div>
@@ -396,29 +396,29 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.ctr?.medium ?? ''}
                     onChange={(e) => handleBenchmarkChange('ctr', 'medium', e.target.value)}
                   />
-                  <span className="ml-1">%</span>
+                  <span className="ml-1 text-xs">%</span>
                 </div>
               </div>
             </div>
             
             {/* CPC */}
             <div>
-              <div className="font-medium text-sm mb-1">CPC</div>
-              <div className="mb-2">
+              <div className="font-medium text-xs mb-1">CPC</div>
+              <div className="mb-1">
                 <label className="block text-xs text-gray-500">Poor (Above)</label>
                 <div className="flex items-center">
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.cpc?.low ?? ''}
                     onChange={(e) => handleBenchmarkChange('cpc', 'low', e.target.value)}
                   />
-                  <span className="ml-1">$</span>
+                  <span className="ml-1 text-xs">$</span>
                 </div>
               </div>
               <div>
@@ -427,29 +427,29 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.cpc?.medium ?? ''}
                     onChange={(e) => handleBenchmarkChange('cpc', 'medium', e.target.value)}
                   />
-                  <span className="ml-1">$</span>
+                  <span className="ml-1 text-xs">$</span>
                 </div>
               </div>
             </div>
             
             {/* CPM */}
             <div>
-              <div className="font-medium text-sm mb-1">CPM</div>
-              <div className="mb-2">
+              <div className="font-medium text-xs mb-1">CPM</div>
+              <div className="mb-1">
                 <label className="block text-xs text-gray-500">Poor (Above)</label>
                 <div className="flex items-center">
                   <input
                     type="number"
                     step="0.5"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.cpm?.low ?? ''}
                     onChange={(e) => handleBenchmarkChange('cpm', 'low', e.target.value)}
                   />
-                  <span className="ml-1">$</span>
+                  <span className="ml-1 text-xs">$</span>
                 </div>
               </div>
               <div>
@@ -458,25 +458,25 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   <input
                     type="number"
                     step="0.5"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.cpm?.medium ?? ''}
                     onChange={(e) => handleBenchmarkChange('cpm', 'medium', e.target.value)}
                   />
-                  <span className="ml-1">$</span>
+                  <span className="ml-1 text-xs">$</span>
                 </div>
               </div>
             </div>
             
             {/* ROAS */}
             <div>
-              <div className="font-medium text-sm mb-1">ROAS</div>
-              <div className="mb-2">
+              <div className="font-medium text-xs mb-1">ROAS</div>
+              <div className="mb-1">
                 <label className="block text-xs text-gray-500">Low (Below)</label>
                 <div className="flex items-center">
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.roas?.low ?? ''}
                     onChange={(e) => handleBenchmarkChange('roas', 'low', e.target.value)}
                   />
@@ -488,7 +488,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.roas?.medium ?? ''}
                     onChange={(e) => handleBenchmarkChange('roas', 'medium', e.target.value)}
                   />
@@ -498,18 +498,18 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             
             {/* Cost/Purchase */}
             <div>
-              <div className="font-medium text-sm mb-1">Cost/Purchase</div>
-              <div className="mb-2">
+              <div className="font-medium text-xs mb-1">Cost/Purchase</div>
+              <div className="mb-1">
                 <label className="block text-xs text-gray-500">Poor (Above)</label>
                 <div className="flex items-center">
                   <input
                     type="number"
                     step="0.5"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.costPerPurchase?.low ?? ''}
                     onChange={(e) => handleBenchmarkChange('costPerPurchase', 'low', e.target.value)}
                   />
-                  <span className="ml-1">$</span>
+                  <span className="ml-1 text-xs">$</span>
                 </div>
               </div>
               <div>
@@ -518,11 +518,11 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   <input
                     type="number"
                     step="0.5"
-                    className="w-full p-1 text-sm border rounded"
+                    className="w-full p-1 text-xs border rounded"
                     value={tempBenchmarks.costPerPurchase?.medium ?? ''}
                     onChange={(e) => handleBenchmarkChange('costPerPurchase', 'medium', e.target.value)}
                   />
-                  <span className="ml-1">$</span>
+                  <span className="ml-1 text-xs">$</span>
                 </div>
               </div>
             </div>
@@ -530,25 +530,25 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table - Cleaner UI similar to Image 2 */}
+      {/* Creative Performance Table - Cleaner UI with smaller fonts and striped rows */}
       <div className="bg-white rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   style={{width: '30%'}}
                 >
                   Creative
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Ad Sets
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                   onClick={() => handleSort('impressions')}
                   style={{cursor: 'pointer'}}
                 >
@@ -557,97 +557,97 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   )}
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Clicks
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   CTR
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   CPC
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   CPM
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Purchases
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Cost/Purchase
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   Spend
                 </th>
                 <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   ROAS
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filteredCreatives.map((creative) => (
+              {filteredCreatives.map((creative, index) => (
                 <tr 
                   key={creative.creativeId || creative.adId || Math.random().toString(36)}
-                  className={`border-b hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
+                  className={`border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedCreativeId === creative.creativeId ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
                   onClick={() => handleCreativeSelect(creative.creativeId)}
                   style={{cursor: 'pointer'}}
                 >
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-3">
                     <div className="flex items-center">
                       {creative.thumbnailUrl && (
                         <img 
                           src={creative.thumbnailUrl} 
                           alt={creative.adName}
-                          className="w-12 h-12 object-cover rounded mr-3"
+                          className="w-10 h-10 object-cover rounded mr-2"
                         />
                       )}
-                      <div className="text-sm text-gray-900" title={creative.adName}>
+                      <div className="text-xs text-gray-900" title={creative.adName}>
                         {creative.adName}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td className="px-3 py-3 text-center text-xs text-gray-500">
                     {creative.adsetCount || 1}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td className="px-3 py-3 text-center text-xs text-gray-500">
                     {creative.impressions ? creative.impressions.toLocaleString() : 0}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td className="px-3 py-3 text-center text-xs text-gray-500">
                     {creative.clicks ? creative.clicks.toLocaleString() : 0}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('ctr', creative.ctr)}>
+                  <td className="px-3 py-3 text-center text-xs font-medium" style={getColorStyle('ctr', creative.ctr)}>
                     {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('cpc', creative.cpc)}>
+                  <td className="px-3 py-3 text-center text-xs" style={getColorStyle('cpc', creative.cpc)}>
                     ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('cpm', creative.cpm)}>
+                  <td className="px-3 py-3 text-center text-xs" style={getColorStyle('cpm', creative.cpm)}>
                     ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td className="px-3 py-3 text-center text-xs text-gray-500">
                     {creative.purchases || 0}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
+                  <td className="px-3 py-3 text-center text-xs" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
                     ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
+                  <td className="px-3 py-3 text-center text-xs text-gray-500">
                     ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('roas', creative.roas)}>
+                  <td className="px-3 py-3 text-center text-xs font-medium" style={getColorStyle('roas', creative.roas)}>
                     {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
                   </td>
                 </tr>
@@ -655,7 +655,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               
               {filteredCreatives.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="px-4 py-6 text-center text-gray-500">
+                  <td colSpan="11" className="px-3 py-4 text-center text-xs text-gray-500">
                     No creatives found matching your criteria.
                   </td>
                 </tr>
