@@ -3,13 +3,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Download, Eye, Copy } from 'lucide-react';
 import metaAPI from './metaAPI';
 
-// Metrics configuration
+// Metrics configuration - with explicit percentage handling
 const metricsConfig = [
-  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 1.0, defaultMedium: 1.5 },
-  { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1 },
-  { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20 },
-  { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2 },
-  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 }
+  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 1.0, defaultMedium: 1.5, isPercentage: true },
+  { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1, isPercentage: false },
+  { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20, isPercentage: false },
+  { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2, isPercentage: false },
+  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30, isPercentage: false }
 ];
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect }) => {
@@ -33,7 +33,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   }, [analyticsData]);
   
-  // Initialize benchmarks
+  // Initialize benchmarks - FIXED to ensure all benchmarks are properly set
   useEffect(() => {
     if (propBenchmarks) {
       setBenchmarks(propBenchmarks);
@@ -58,7 +58,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     
     try {
       const response = await metaAPI.fetchBenchmarks(selectedAccountId);
-      if (response.data) {
+      if (response && response.data) {
         setBenchmarks(response.data);
         setTempBenchmarks(response.data);
       }
@@ -198,8 +198,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         creative.adName,
         creative.impressions,
         creative.clicks,
-        creative.ctr.toFixed(2),
-        creative.spend.toFixed(2),
+        creative.ctr?.toFixed(2) || '0.00',
+        creative.spend?.toFixed(2) || '0.00',
         creative.cpc?.toFixed(2) || '0.00',
         creative.cpm?.toFixed(2) || '0.00',
         creative.purchases || 0,
@@ -257,43 +257,59 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Get benchmark status class
+  // Get benchmark status class - FIXED to handle percentage metrics correctly
   const getBenchmarkStatusClass = (metric, value) => {
+    // Early exit if no benchmarks
     if (!benchmarks || !benchmarks[metric]) return '';
     
     const { low, medium } = benchmarks[metric];
-    if (low === null && medium === null) return '';
     
-    // Adjust for percentage values
+    // Return empty if benchmarks are not set
+    if (low === null || low === undefined || medium === null || medium === undefined) return '';
+    
+    // Handle null/undefined value
+    if (value === null || value === undefined) return '';
+    
+    // Get the metric configuration
+    const metricConfig = metricsConfig.find(m => m.id === metric);
+    
+    // Default to higher is better if not found
+    const isHigherBetter = metricConfig ? metricConfig.higherIsBetter : true;
+    
+    // Adjust value based on metric type
     let adjustedValue = value;
-    if (metric === 'ctr') {
-      adjustedValue = value / 100; // Convert from percentage to decimal
+    if (metricConfig && metricConfig.isPercentage) {
+      // For percentage values like CTR which are displayed as percentages (1.5 means 1.5%)
+      // We work with the raw value directly
+      adjustedValue = value;
     }
     
     // Determine color based on metric type
-    const metricConfig = metricsConfig.find(m => m.id === metric);
-    const isHigherBetter = metricConfig ? metricConfig.higherIsBetter : ['ctr', 'roas'].includes(metric);
-    
     if (isHigherBetter) {
       // For metrics where higher is better (CTR, ROAS)
-      if (low !== null && adjustedValue < low) {
+      if (adjustedValue < low) {
         return 'bg-red-100 text-red-800';
-      } else if (medium !== null && adjustedValue < medium) {
+      } else if (adjustedValue < medium) {
         return 'bg-yellow-100 text-yellow-800';
       } else {
         return 'bg-green-100 text-green-800';
       }
     } else {
       // For metrics where lower is better (CPC, CPM, Cost per Purchase)
-      if (low !== null && adjustedValue > low) {
+      if (adjustedValue > low) {
         return 'bg-red-100 text-red-800';
-      } else if (medium !== null && adjustedValue > medium) {
+      } else if (adjustedValue > medium) {
         return 'bg-yellow-100 text-yellow-800';
       } else {
         return 'bg-green-100 text-green-800';
       }
     }
   };
+
+  // Log to help debug benchmark issues
+  useEffect(() => {
+    console.log('Current Benchmarks:', benchmarks);
+  }, [benchmarks]);
 
   return (
     <div>
@@ -605,7 +621,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             <tbody className="divide-y divide-gray-200">
               {filteredCreatives.map((creative) => (
                 <tr 
-                  key={creative.creativeId || creative.adId}
+                  key={creative.creativeId || creative.adId || Math.random().toString(36)}
                   className={`hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
                   onClick={() => handleCreativeSelect(creative.creativeId)}
                 >
@@ -624,7 +640,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    1
+                    {creative.adsetCount || 1}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {creative.impressions ? creative.impressions.toLocaleString() : 0}
@@ -633,7 +649,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     {creative.clicks ? creative.clicks.toLocaleString() : 0}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('ctr', creative.ctr)}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('ctr', creative.ctr || 0)}`}>
                       {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
                     </span>
                   </td>
