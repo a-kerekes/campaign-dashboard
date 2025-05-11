@@ -1,7 +1,16 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Copy, Eye } from 'lucide-react'; // Removed unused Mail icon
+import { Download, Copy, Eye } from 'lucide-react';
 import metaAPI from './metaAPI';
+
+// Metrics configuration
+const metricsConfig = [
+  { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 0.5, defaultMedium: 1.0 },
+  { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1 },
+  { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20 },
+  { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2 },
+  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 }
+];
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect }) => {
   const [creatives, setCreatives] = useState([]);
@@ -12,7 +21,9 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [selectedCreativeId, setSelectedCreativeId] = useState(null);
   const [expandedCreativeId, setExpandedCreativeId] = useState(null);
   const [benchmarks, setBenchmarks] = useState(propBenchmarks || {});
+  const [isEditingBenchmarks, setIsEditingBenchmarks] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const [tempBenchmarks, setTempBenchmarks] = useState({});
 
   // Initialize creatives from props
   useEffect(() => {
@@ -22,31 +33,44 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   }, [analyticsData]);
   
-  // Fetch benchmarks with useCallback to avoid dependency issues
+  // Initialize benchmarks
+  useEffect(() => {
+    if (propBenchmarks) {
+      setBenchmarks(propBenchmarks);
+      setTempBenchmarks(propBenchmarks);
+    } else {
+      // Initialize default benchmarks if none provided
+      const defaultBenchmarks = {};
+      metricsConfig.forEach(metric => {
+        defaultBenchmarks[metric.id] = {
+          low: metric.defaultLow,
+          medium: metric.defaultMedium
+        };
+      });
+      setBenchmarks(defaultBenchmarks);
+      setTempBenchmarks(defaultBenchmarks);
+    }
+  }, [propBenchmarks]);
+
+  // Fetch benchmarks with useCallback
   const fetchBenchmarks = useCallback(async () => {
-    if (!selectedAccountId) return;
+    if (!selectedAccountId || propBenchmarks) return;
     
     try {
-      // Only fetch benchmarks if they weren't provided via props
-      if (!propBenchmarks) {
-        const response = await metaAPI.fetchBenchmarks(selectedAccountId);
-        if (response.data) {
-          setBenchmarks(response.data);
-        }
+      const response = await metaAPI.fetchBenchmarks(selectedAccountId);
+      if (response.data) {
+        setBenchmarks(response.data);
+        setTempBenchmarks(response.data);
       }
     } catch (error) {
       console.error('Error fetching benchmarks:', error);
     }
   }, [selectedAccountId, propBenchmarks]);
 
-  // Update benchmarks when account changes or prop benchmarks change
+  // Fetch benchmarks when account changes
   useEffect(() => {
-    if (propBenchmarks) {
-      setBenchmarks(propBenchmarks);
-    } else {
-      fetchBenchmarks();
-    }
-  }, [propBenchmarks, fetchBenchmarks]);
+    fetchBenchmarks();
+  }, [fetchBenchmarks]);
 
   // Handle sort
   const handleSort = (column) => {
@@ -54,7 +78,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Toggle sort direction if clicking the same column
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // Set new sort column with default direction (desc for most metrics)
+      // Set new sort column with default direction
       setSortColumn(column);
       setSortDirection(column === 'adName' ? 'asc' : 'desc');
     }
@@ -105,6 +129,46 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   // Handle creative expansion
   const handleCreativeExpand = (creativeId) => {
     setExpandedCreativeId(expandedCreativeId === creativeId ? null : creativeId);
+  };
+
+  // Handle benchmark change
+  const handleBenchmarkChange = (metricId, level, value) => {
+    setTempBenchmarks(prev => ({
+      ...prev,
+      [metricId]: {
+        ...prev[metricId],
+        [level]: value === '' ? '' : parseFloat(value)
+      }
+    }));
+  };
+
+  // Save benchmark changes
+  const saveBenchmarks = async () => {
+    try {
+      // Format any empty strings to null
+      const formattedBenchmarks = {};
+      Object.keys(tempBenchmarks).forEach(metricId => {
+        formattedBenchmarks[metricId] = {
+          low: tempBenchmarks[metricId].low === '' ? null : tempBenchmarks[metricId].low,
+          medium: tempBenchmarks[metricId].medium === '' ? null : tempBenchmarks[metricId].medium
+        };
+      });
+      
+      // Save to API if available
+      if (selectedAccountId) {
+        await metaAPI.saveBenchmarks(selectedAccountId, formattedBenchmarks);
+      }
+      
+      // Update local state
+      setBenchmarks(formattedBenchmarks);
+      setIsEditingBenchmarks(false);
+      setStatusMessage('Benchmarks saved successfully');
+      setTimeout(() => setStatusMessage(''), 3000);
+    } catch (error) {
+      console.error('Error saving benchmarks:', error);
+      setStatusMessage('Error saving benchmarks');
+      setTimeout(() => setStatusMessage(''), 3000);
+    }
   };
 
   // Export data to CSV
@@ -179,11 +243,26 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     });
   };
 
+  // Format value according to format
+  const formatValue = (value, format) => {
+    if (value === null || value === undefined) return 'N/A';
+    
+    switch (format) {
+      case 'percentage':
+        return `${value.toFixed(2)}%`;
+      case 'currency':
+        return `$${value.toFixed(2)}`;
+      default:
+        return value.toFixed(2).toString();
+    }
+  };
+
   // Get benchmark status class
   const getBenchmarkStatusClass = (metric, value) => {
     if (!benchmarks || !benchmarks[metric]) return '';
     
     const { low, medium } = benchmarks[metric];
+    if (low === null && medium === null) return '';
     
     // Adjust for percentage values
     let adjustedValue = value;
@@ -192,7 +271,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
     
     // Determine color based on metric type
-    const isHigherBetter = ['ctr', 'roas'].includes(metric);
+    const metricConfig = metricsConfig.find(m => m.id === metric);
+    const isHigherBetter = metricConfig ? metricConfig.higherIsBetter : ['ctr', 'roas'].includes(metric);
     
     if (isHigherBetter) {
       // For metrics where higher is better (CTR, ROAS)
@@ -243,12 +323,77 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           >
             <Download size={16} />
           </button>
+          
+          <button
+            onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
+            className="px-3 py-2 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+          >
+            {isEditingBenchmarks ? 'Close' : 'Set Benchmarks'}
+          </button>
         </div>
       </div>
       
       {statusMessage && (
         <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center">
           {statusMessage}
+        </div>
+      )}
+      
+      {isEditingBenchmarks && (
+        <div className="p-4 bg-gray-50 border-b">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="font-medium text-gray-800">Set Performance Benchmarks</h4>
+            <button 
+              onClick={saveBenchmarks} 
+              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Save Benchmarks
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {metricsConfig.map(metric => (
+              <div key={metric.id} className="bg-white p-3 rounded border">
+                <div className="font-medium text-sm mb-2 text-gray-700">{metric.name}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {metric.higherIsBetter ? 'Low (Below)' : 'Poor (Above)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step={metric.format === 'percentage' ? '0.1' : '0.5'}
+                        className="w-full p-1 text-sm border rounded"
+                        value={tempBenchmarks[metric.id]?.low ?? ''}
+                        onChange={(e) => handleBenchmarkChange(metric.id, 'low', e.target.value)}
+                      />
+                      <span className="absolute right-2 top-1 text-gray-400 text-sm">
+                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      {metric.higherIsBetter ? 'Good (Above)' : 'Good (Below)'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step={metric.format === 'percentage' ? '0.1' : '0.5'}
+                        className="w-full p-1 text-sm border rounded"
+                        value={tempBenchmarks[metric.id]?.medium ?? ''}
+                        onChange={(e) => handleBenchmarkChange(metric.id, 'medium', e.target.value)}
+                      />
+                      <span className="absolute right-2 top-1 text-gray-400 text-sm">
+                        {metric.format === 'percentage' ? '%' : metric.format === 'currency' ? '$' : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       
@@ -419,8 +564,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                         </div>
                         <div>
                           <h4 className="font-medium text-gray-900 mb-2">Performance Metrics</h4>
-                          <p><span className="font-medium">CPM:</span> ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}</p>
-                          <p><span className="font-medium">Cost per Purchase:</span> ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}</p>
+                          <p><span className="font-medium">CPM:</span> <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('cpm', creative.cpm || 0)}`}>${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}</span></p>
+                          <p><span className="font-medium">Cost per Purchase:</span> <span className={`px-2 py-1 rounded-full text-xs ${getBenchmarkStatusClass('costPerPurchase', creative.costPerPurchase || 0)}`}>${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}</span></p>
                           <p><span className="font-medium">Conversion Rate:</span> {creative.conversionRate ? `${creative.conversionRate.toFixed(2)}%` : '0.00%'}</p>
                         </div>
                       </div>
@@ -439,6 +584,19 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             )}
           </tbody>
         </table>
+      </div>
+      
+      <div className="p-3 bg-gray-50 border-t text-sm">
+        <div className="flex items-center space-x-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-red-100 border border-red-300"></span>
+          <span className="text-gray-600 mr-3">Low</span>
+          
+          <span className="inline-block w-3 h-3 rounded-full bg-yellow-100 border border-yellow-300"></span>
+          <span className="text-gray-600 mr-3">Medium</span>
+          
+          <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300"></span>
+          <span className="text-gray-600">High</span>
+        </div>
       </div>
     </div>
   );

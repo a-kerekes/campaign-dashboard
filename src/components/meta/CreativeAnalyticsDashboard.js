@@ -7,8 +7,6 @@ import BreakdownChart from './BreakdownChart';
 import metaAPI from './metaAPI';
 import MetaAuthButton from './MetaAuthButton';
 import EnhancedCreativePerformanceTable from './EnhancedCreativePerformanceTable';
-import BenchmarkVisualization from './BenchmarkVisualization';
-import BenchmarkManager from './BenchmarkManager';
 
 // Meta API version constant
 const META_API_VERSION = 'v22.0';
@@ -41,8 +39,6 @@ const CreativeAnalyticsDashboard = () => {
   
   // Benchmark state
   const [benchmarks, setBenchmarks] = useState({});
-  const [showBenchmarkSettings, setShowBenchmarkSettings] = useState(false);
-  const [selectedMetricForVisualization, setSelectedMetricForVisualization] = useState('ctr');
   const [selectedCreative, setSelectedCreative] = useState(null);
 
   // Initialize Facebook SDK on component mount
@@ -769,7 +765,7 @@ const CreativeAnalyticsDashboard = () => {
                   <option value="Last 60 Days">Last 60 Days</option>
                   <option value="Last 90 Days">Last 90 Days</option>
                 </select>
-              </div>
+                </div>
               
               <div className="mb-2 flex space-x-2">
                 <button
@@ -777,13 +773,6 @@ const CreativeAnalyticsDashboard = () => {
                   className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded focus:outline-none"
                 >
                   {showDiagnostic ? 'Hide Diagnostics' : 'Show Diagnostics'}
-                </button>
-                
-                <button
-                  onClick={() => setShowBenchmarkSettings(true)}
-                  className="bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded focus:outline-none"
-                >
-                  Benchmark Settings
                 </button>
               </div>
               
@@ -821,18 +810,8 @@ const CreativeAnalyticsDashboard = () => {
                   />
                 </div>
                 
-                {/* Benchmark Visualization */}
+                {/* Enhanced Creative Performance Table with built-in benchmarks */}
                 <div className="mb-6">
-                  <BenchmarkVisualization 
-                    creativeData={analyticsData.creativePerformance}
-                    benchmarks={benchmarks}
-                    metric={selectedMetricForVisualization}
-                    onMetricChange={(newMetric) => setSelectedMetricForVisualization(newMetric)}
-                  />
-                </div>
-      
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-4">Creative Performance</h3>
                   <EnhancedCreativePerformanceTable 
                     analyticsData={analyticsData}
                     selectedAccountId={selectedAccountId}
@@ -841,34 +820,6 @@ const CreativeAnalyticsDashboard = () => {
                   />
                 </div>
               </>
-            )}
-            
-            {/* Benchmark Settings Modal */}
-            {showBenchmarkSettings && (
-              <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-90vh overflow-auto">
-                  <div className="flex justify-between items-center border-b border-gray-200 p-4">
-                    <h3 className="text-lg font-medium text-gray-900">Benchmark Settings</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowBenchmarkSettings(false)}
-                      className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                    >
-                      <span className="text-2xl">&times;</span>
-                    </button>
-                  </div>
-                  <div className="p-4">
-                    <BenchmarkManager 
-                      selectedAccountId={selectedAccountId}
-                      onClose={() => setShowBenchmarkSettings(false)}
-                      onSave={(updatedBenchmarks) => {
-                        setBenchmarks(updatedBenchmarks);
-                        setShowBenchmarkSettings(false);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
             )}
             
             {/* Diagnostic Tool Section */}
