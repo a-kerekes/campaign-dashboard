@@ -317,27 +317,9 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return {};
   };
 
-  // Column widths for proper alignment
-  const columnWidths = {
-    creative: '30%',
-    adSets: '70px',
-    impressions: '100px',
-    clicks: '70px',
-    ctr: '90px',
-    cpc: '70px',
-    cpm: '80px',
-    purchases: '90px',
-    costPerPurchase: '110px',
-    spend: '90px',
-    roas: '90px'
-  };
-
   return (
     <div>
-      {/* Header Section */}
-      <div className="mb-3">
-        <h3 className="text-base font-semibold mb-2">Creative Performance</h3>
-        
+      <div className="mb-2">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center">
             <span className="text-xs text-gray-500 mr-2">{filteredCreatives.length} creatives</span>
@@ -545,192 +527,169 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table - Fixed column widths and better alignment */}
-      <div className="bg-white overflow-hidden border">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse table-fixed">
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                <th 
-                  className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.creative}}
-                >
-                  <div className="flex justify-start">
-                    <span style={{fontSize: '11px'}}>Creative</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.adSets}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>Ad Sets</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  onClick={() => handleSort('impressions')}
-                  style={{width: columnWidths.impressions, cursor: 'pointer'}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>
-                      Impressions {sortColumn === 'impressions' && (
-                        <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.clicks}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>Clicks</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.ctr}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>CTR</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.cpc}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>CPC</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.cpm}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>CPM</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.purchases}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>Purchases</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.costPerPurchase}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>Cost/Purchase</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
-                  style={{width: columnWidths.spend}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>Spend</span>
-                  </div>
-                </th>
-                <th 
-                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-2"
-                  style={{width: columnWidths.roas}}
-                >
-                  <div className="flex justify-center">
-                    <span style={{fontSize: '11px'}}>ROAS</span>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCreatives.map((creative, index) => (
-                <tr 
-                  key={creative.creativeId || creative.adId || Math.random().toString(36)}
-                  className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedCreativeId === creative.creativeId ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
-                  onClick={() => handleCreativeSelect(creative.creativeId)}
-                  style={{cursor: 'pointer'}}
-                >
-                  <td className="border-r px-2 py-2">
-                    <div className="flex items-center">
-                      {creative.thumbnailUrl && (
-                        <img 
-                          src={creative.thumbnailUrl} 
-                          alt={creative.adName}
-                          className="h-8 w-8 object-cover rounded mr-2"
-                        />
-                      )}
-                      <span className="text-xs text-gray-900 truncate" title={creative.adName} style={{fontSize: '11px'}}>
+      {/* Creative Performance Table - Matching style of reference image 2 */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th 
+                className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '25%'}}
+              >
+                <span style={{fontSize: '11px'}}>CREATIVE</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '60px'}}
+              >
+                <span style={{fontSize: '11px'}}>AD SETS</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                onClick={() => handleSort('impressions')}
+                style={{width: '90px', cursor: 'pointer'}}
+              >
+                <span style={{fontSize: '11px'}}>IMPRESSIONS</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '70px'}}
+              >
+                <span style={{fontSize: '11px'}}>CLICKS</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '70px'}}
+              >
+                <span style={{fontSize: '11px'}}>CTR</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '70px'}}
+              >
+                <span style={{fontSize: '11px'}}>CPC</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '70px'}}
+              >
+                <span style={{fontSize: '11px'}}>CPM</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '90px'}}
+              >
+                <span style={{fontSize: '11px'}}>PURCHASES</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '110px'}}
+              >
+                <span style={{fontSize: '11px'}}>COST/PURCHASE</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '80px'}}
+              >
+                <span style={{fontSize: '11px'}}>SPEND</span>
+              </th>
+              <th 
+                className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-b"
+                style={{width: '70px'}}
+              >
+                <span style={{fontSize: '11px'}}>ROAS</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredCreatives.map((creative, index) => (
+              <tr 
+                key={creative.creativeId || creative.adId || Math.random().toString(36)}
+                className={`border-b hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
+                onClick={() => handleCreativeSelect(creative.creativeId)}
+                style={{cursor: 'pointer'}}
+              >
+                <td className="px-4 py-3">
+                  <div className="flex items-center">
+                    {creative.thumbnailUrl && (
+                      <img 
+                        src={creative.thumbnailUrl} 
+                        alt={creative.adName}
+                        className="h-8 w-8 object-cover rounded mr-2"
+                      />
+                    )}
+                    <div>
+                      <div className="text-xs text-gray-900 leading-tight" style={{fontSize: '11px', lineHeight: '1.2'}}>
                         {creative.adName}
-                      </span>
+                      </div>
+                      <div className="text-xs text-gray-500" style={{fontSize: '10px'}}>
+                        Instances: 8
+                      </div>
                     </div>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
-                      {creative.adsetCount || 1}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
-                      {creative.impressions ? creative.impressions.toLocaleString() : 0}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
-                      {creative.clicks ? creative.clicks.toLocaleString() : 0}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs font-medium" style={{...getColorStyle('ctr', creative.ctr), fontSize: '11px'}}>
-                      {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs" style={{...getColorStyle('cpc', creative.cpc), fontSize: '11px'}}>
-                      ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs" style={{...getColorStyle('cpm', creative.cpm), fontSize: '11px'}}>
-                      ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
-                      {creative.purchases || 0}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs" style={{...getColorStyle('costPerPurchase', creative.costPerPurchase), fontSize: '11px'}}>
-                      ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
-                    </span>
-                  </td>
-                  <td className="text-center border-r px-2 py-2">
-                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
-                      ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
-                    </span>
-                  </td>
-                  <td className="text-center px-2 py-2">
-                    <span className="text-xs font-medium" style={{...getColorStyle('roas', creative.roas), fontSize: '11px'}}>
-                      {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              
-              {filteredCreatives.length === 0 && (
-                <tr>
-                  <td colSpan="11" className="px-2 py-3 text-center text-xs text-gray-500">
-                    No creatives found matching your criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    {creative.adsetCount || 1}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    {creative.impressions ? creative.impressions.toLocaleString() : 0}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    {creative.clicks ? creative.clicks.toLocaleString() : 0}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs font-medium" style={{...getColorStyle('ctr', creative.ctr), fontSize: '11px'}}>
+                    {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    {creative.purchases || 0}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs text-gray-700" style={{fontSize: '11px'}}>
+                    ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className="text-xs font-medium" style={{...getColorStyle('roas', creative.roas), fontSize: '11px'}}>
+                    {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            
+            {filteredCreatives.length === 0 && (
+              <tr>
+                <td colSpan="11" className="px-2 py-3 text-center text-xs text-gray-500">
+                  No creatives found matching your criteria.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
