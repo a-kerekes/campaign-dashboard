@@ -555,70 +555,72 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.creative}}
                 >
-                  Creative
+                  <span style={{fontSize: '11px'}}>Creative</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.adSets}}
                 >
-                  Ad Sets
+                  <span style={{fontSize: '11px'}}>Ad Sets</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   onClick={() => handleSort('impressions')}
                   style={{width: columnWidths.impressions, cursor: 'pointer'}}
                 >
-                  Impressions {sortColumn === 'impressions' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
+                  <span style={{fontSize: '11px'}}>
+                    Impressions {sortColumn === 'impressions' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.clicks}}
                 >
-                  Clicks
+                  <span style={{fontSize: '11px'}}>Clicks</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.ctr}}
                 >
-                  CTR
+                  <span style={{fontSize: '11px'}}>CTR</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.cpc}}
                 >
-                  CPC
+                  <span style={{fontSize: '11px'}}>CPC</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.cpm}}
                 >
-                  CPM
+                  <span style={{fontSize: '11px'}}>CPM</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.purchases}}
                 >
-                  Purchases
+                  <span style={{fontSize: '11px'}}>Purchases</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.costPerPurchase}}
                 >
-                  Cost/Purchase
+                  <span style={{fontSize: '11px'}}>Cost/Purchase</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.spend}}
                 >
-                  Spend
+                  <span style={{fontSize: '11px'}}>Spend</span>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-2"
                   style={{width: columnWidths.roas}}
                 >
-                  ROAS
+                  <span style={{fontSize: '11px'}}>ROAS</span>
                 </th>
               </tr>
             </thead>
