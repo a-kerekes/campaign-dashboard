@@ -555,72 +555,94 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.creative}}
                 >
-                  <span style={{fontSize: '11px'}}>Creative</span>
+                  <div className="flex justify-start">
+                    <span style={{fontSize: '11px'}}>Creative</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.adSets}}
                 >
-                  <span style={{fontSize: '11px'}}>Ad Sets</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>Ad Sets</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   onClick={() => handleSort('impressions')}
                   style={{width: columnWidths.impressions, cursor: 'pointer'}}
                 >
-                  <span style={{fontSize: '11px'}}>
-                    Impressions {sortColumn === 'impressions' && (
-                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>
+                      Impressions {sortColumn === 'impressions' && (
+                        <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.clicks}}
                 >
-                  <span style={{fontSize: '11px'}}>Clicks</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>Clicks</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.ctr}}
                 >
-                  <span style={{fontSize: '11px'}}>CTR</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>CTR</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.cpc}}
                 >
-                  <span style={{fontSize: '11px'}}>CPC</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>CPC</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.cpm}}
                 >
-                  <span style={{fontSize: '11px'}}>CPM</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>CPM</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.purchases}}
                 >
-                  <span style={{fontSize: '11px'}}>Purchases</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>Purchases</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.costPerPurchase}}
                 >
-                  <span style={{fontSize: '11px'}}>Cost/Purchase</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>Cost/Purchase</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   style={{width: columnWidths.spend}}
                 >
-                  <span style={{fontSize: '11px'}}>Spend</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>Spend</span>
+                  </div>
                 </th>
                 <th 
                   className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-2"
                   style={{width: columnWidths.roas}}
                 >
-                  <span style={{fontSize: '11px'}}>ROAS</span>
+                  <div className="flex justify-center">
+                    <span style={{fontSize: '11px'}}>ROAS</span>
+                  </div>
                 </th>
               </tr>
             </thead>
