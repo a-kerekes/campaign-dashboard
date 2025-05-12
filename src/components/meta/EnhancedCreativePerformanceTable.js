@@ -669,3 +669,5 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     </div>
   );
 };
+
+export default EnhancedCreativePerformanceTable;
