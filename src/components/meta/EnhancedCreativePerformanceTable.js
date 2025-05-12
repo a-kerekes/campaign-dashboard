@@ -546,7 +546,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       )}
       
       {/* Creative Performance Table - Fixed column widths and better alignment */}
-      <div className="bg-white rounded-lg overflow-hidden border">
+      <div className="bg-white overflow-hidden border">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse table-fixed">
             <thead>
@@ -636,43 +636,63 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                         <img 
                           src={creative.thumbnailUrl} 
                           alt={creative.adName}
-                          className="w-10 h-10 object-cover rounded mr-2"
+                          className="h-8 w-8 object-cover rounded mr-2"
                         />
                       )}
-                      <div className="text-xs text-gray-900" title={creative.adName}>
+                      <span className="text-xs text-gray-900 truncate" title={creative.adName} style={{fontSize: '11px'}}>
                         {creative.adName}
-                      </div>
+                      </span>
                     </div>
                   </td>
-                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
-                    {creative.adsetCount || 1}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
+                      {creative.adsetCount || 1}
+                    </span>
                   </td>
-                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
-                    {creative.impressions ? creative.impressions.toLocaleString() : 0}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
+                      {creative.impressions ? creative.impressions.toLocaleString() : 0}
+                    </span>
                   </td>
-                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
-                    {creative.clicks ? creative.clicks.toLocaleString() : 0}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
+                      {creative.clicks ? creative.clicks.toLocaleString() : 0}
+                    </span>
                   </td>
-                  <td className="text-center text-xs font-medium border-r px-2 py-2" style={getColorStyle('ctr', creative.ctr)}>
-                    {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs font-medium" style={{...getColorStyle('ctr', creative.ctr), fontSize: '11px'}}>
+                      {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
+                    </span>
                   </td>
-                  <td className="text-center text-xs border-r px-2 py-2" style={getColorStyle('cpc', creative.cpc)}>
-                    ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs" style={{...getColorStyle('cpc', creative.cpc), fontSize: '11px'}}>
+                      ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
+                    </span>
                   </td>
-                  <td className="text-center text-xs border-r px-2 py-2" style={getColorStyle('cpm', creative.cpm)}>
-                    ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs" style={{...getColorStyle('cpm', creative.cpm), fontSize: '11px'}}>
+                      ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
+                    </span>
                   </td>
-                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
-                    {creative.purchases || 0}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
+                      {creative.purchases || 0}
+                    </span>
                   </td>
-                  <td className="text-center text-xs border-r px-2 py-2" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
-                    ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs" style={{...getColorStyle('costPerPurchase', creative.costPerPurchase), fontSize: '11px'}}>
+                      ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
+                    </span>
                   </td>
-                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
-                    ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
+                  <td className="text-center border-r px-2 py-2">
+                    <span className="text-xs text-gray-500" style={{fontSize: '11px'}}>
+                      ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
+                    </span>
                   </td>
-                  <td className="text-center text-xs font-medium px-2 py-2" style={getColorStyle('roas', creative.roas)}>
-                    {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
+                  <td className="text-center px-2 py-2">
+                    <span className="text-xs font-medium" style={{...getColorStyle('roas', creative.roas), fontSize: '11px'}}>
+                      {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
+                    </span>
                   </td>
                 </tr>
               ))}
