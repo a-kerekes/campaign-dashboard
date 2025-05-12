@@ -317,6 +317,21 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return {};
   };
 
+  // Column widths for proper alignment
+  const columnWidths = {
+    creative: '30%',
+    adSets: '70px',
+    impressions: '100px',
+    clicks: '70px',
+    ctr: '90px',
+    cpc: '70px',
+    cpm: '80px',
+    purchases: '90px',
+    costPerPurchase: '110px',
+    spend: '90px',
+    roas: '90px'
+  };
+
   return (
     <div>
       {/* Header Section */}
@@ -530,69 +545,78 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table - Cleaner UI with smaller fonts and striped rows */}
-      <div className="bg-white rounded-lg overflow-hidden">
+      {/* Creative Performance Table - Fixed column widths and better alignment */}
+      <div className="bg-white rounded-lg overflow-hidden border">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse table-fixed">
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th 
-                  className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  style={{width: '30%'}}
+                  className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.creative}}
                 >
                   Creative
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.adSets}}
                 >
                   Ad Sets
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
                   onClick={() => handleSort('impressions')}
-                  style={{cursor: 'pointer'}}
+                  style={{width: columnWidths.impressions, cursor: 'pointer'}}
                 >
                   Impressions {sortColumn === 'impressions' && (
                     <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.clicks}}
                 >
                   Clicks
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.ctr}}
                 >
                   CTR
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.cpc}}
                 >
                   CPC
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.cpm}}
                 >
                   CPM
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.purchases}}
                 >
                   Purchases
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.costPerPurchase}}
                 >
                   Cost/Purchase
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r px-2 py-2"
+                  style={{width: columnWidths.spend}}
                 >
                   Spend
                 </th>
                 <th 
-                  className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-2"
+                  style={{width: columnWidths.roas}}
                 >
                   ROAS
                 </th>
@@ -602,11 +626,11 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               {filteredCreatives.map((creative, index) => (
                 <tr 
                   key={creative.creativeId || creative.adId || Math.random().toString(36)}
-                  className={`border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedCreativeId === creative.creativeId ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
+                  className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedCreativeId === creative.creativeId ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
                   onClick={() => handleCreativeSelect(creative.creativeId)}
                   style={{cursor: 'pointer'}}
                 >
-                  <td className="px-3 py-3">
+                  <td className="border-r px-2 py-2">
                     <div className="flex items-center">
                       {creative.thumbnailUrl && (
                         <img 
@@ -620,34 +644,34 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-center text-xs text-gray-500">
+                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
                     {creative.adsetCount || 1}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs text-gray-500">
+                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
                     {creative.impressions ? creative.impressions.toLocaleString() : 0}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs text-gray-500">
+                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
                     {creative.clicks ? creative.clicks.toLocaleString() : 0}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs font-medium" style={getColorStyle('ctr', creative.ctr)}>
+                  <td className="text-center text-xs font-medium border-r px-2 py-2" style={getColorStyle('ctr', creative.ctr)}>
                     {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs" style={getColorStyle('cpc', creative.cpc)}>
+                  <td className="text-center text-xs border-r px-2 py-2" style={getColorStyle('cpc', creative.cpc)}>
                     ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs" style={getColorStyle('cpm', creative.cpm)}>
+                  <td className="text-center text-xs border-r px-2 py-2" style={getColorStyle('cpm', creative.cpm)}>
                     ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs text-gray-500">
+                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
                     {creative.purchases || 0}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
+                  <td className="text-center text-xs border-r px-2 py-2" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
                     ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs text-gray-500">
+                  <td className="text-center text-xs text-gray-500 border-r px-2 py-2">
                     ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
                   </td>
-                  <td className="px-3 py-3 text-center text-xs font-medium" style={getColorStyle('roas', creative.roas)}>
+                  <td className="text-center text-xs font-medium px-2 py-2" style={getColorStyle('roas', creative.roas)}>
                     {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
                   </td>
                 </tr>
@@ -655,7 +679,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               
               {filteredCreatives.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="px-3 py-4 text-center text-xs text-gray-500">
+                  <td colSpan="11" className="px-2 py-3 text-center text-xs text-gray-500">
                     No creatives found matching your criteria.
                   </td>
                 </tr>
