@@ -4,6 +4,7 @@
   "private": true,
   "homepage": "/",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0",
     "@babel/standalone": "^7.27.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",

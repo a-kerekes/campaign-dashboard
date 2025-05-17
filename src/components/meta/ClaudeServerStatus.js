@@ -1,7 +1,5 @@
-// src/components/meta/ClaudeServerStatus.js (ESLint fix)
 import React, { useState, useEffect } from 'react';
 import { 
-  // Remove unused import
   startClaudeServer, 
   subscribeToServerStatus 
 } from '../../utils/claudeServerLauncher';

@@ -1,16 +1,12 @@
-// src/components/meta/AiAdvisor.js (ESLint fix)
 import React, { useState, useRef, useEffect } from 'react';
-// Remove axios if not used
 import { 
   checkServerRunning, 
   startClaudeServer, 
   subscribeToServerStatus 
 } from '../../utils/claudeServerLauncher';
 
-// Define API URL based on environment
-const API_URL = process.env.NODE_ENV === 'production'
-  ? '/api/ai-advisor'  // Production URL (relative path for serverless function)
-  : 'http://localhost:5000/api/ai-advisor';  // Development URL
+// API endpoint is now relative
+const API_URL = '/api/ai-advisor';
 
 const AiAdvisor = ({ analyticsData }) => {
   const [messages, setMessages] = useState([
@@ -23,7 +19,7 @@ const AiAdvisor = ({ analyticsData }) => {
   
   // Subscribe to server status changes
   useEffect(() => {
-    // Run server check immediately
+    // Check server status immediately
     checkServerRunning();
     
     // Subscribe to status updates
@@ -36,13 +32,24 @@ const AiAdvisor = ({ analyticsData }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle starting the server
+  // Handle checking/starting the serverless function
   const handleStartServer = async () => {
-    const started = await startClaudeServer();
-    if (!started) {
+    setMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content: 'Checking AI service availability...' 
+    }]);
+    
+    const available = await startClaudeServer();
+    
+    if (!available) {
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'Unable to start the AI service. Please try again later or contact support.' 
+        content: 'Unable to connect to the AI service. The API key may not be configured correctly. Please contact support.' 
+      }]);
+    } else {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Connected to AI service! You can now ask your questions.' 
       }]);
     }
   };
@@ -53,35 +60,21 @@ const AiAdvisor = ({ analyticsData }) => {
     
     // Check server status first
     if (serverStatus !== 'running') {
-      // Add user message to chat
-      const userMessage = { role: 'user', content: input };
-      setMessages(prev => [...prev, userMessage]);
-      setInput('');
-      
-      // Try to start the server
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'The AI service is currently offline. I\'ll try to start it now...' 
-      }]);
-      
-      const started = await startClaudeServer();
-      
-      if (!started) {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: 'Sorry, I couldn\'t start the AI service. Please try again later or click the "Start" button.' 
-        }]);
+      // Try to start/check the service
+      const available = await startClaudeServer();
+      if (!available) {
+        // Add user message to chat
+        const userMessage = { role: 'user', content: input };
+        setMessages(prev => [...prev, 
+          userMessage,
+          { 
+            role: 'assistant', 
+            content: 'Sorry, the AI service is currently unavailable. Please try again later or contact support.' 
+          }
+        ]);
+        setInput('');
         return;
       }
-      
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Great! The AI service is now running. I\'ll process your question...' 
-      }]);
-      
-      // Now let's process the original message
-      await processUserMessage(userMessage);
-      return;
     }
     
     // Add user message to chat
@@ -140,20 +133,23 @@ const AiAdvisor = ({ analyticsData }) => {
       
       // Add AI response to chat
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      
+      // Update server status to running since we got a successful response
+      if (serverStatus !== 'running') {
+        setServerStatus('running');
+      }
     } catch (error) {
       console.error('Error getting AI response:', error);
       
       let errorMessage = 'Sorry, I encountered an error. Please try again later.';
       
-      // Check if server went offline during request
       if (error.message && (
         error.message.includes('Failed to fetch') || 
         error.message.includes('Network Error')
       )) {
-        // Force a server status check
-        await checkServerRunning();
-        
-        errorMessage = 'The AI service appears to be offline. Would you like to restart it?';
+        // Update server status to offline
+        setServerStatus('offline');
+        errorMessage = 'Unable to connect to the AI service. Please try again later or contact support.';
       } else if (error.response) {
         errorMessage = `Server error (${error.response.status}): ${error.response.data?.error || 'Unknown error'}`;
       } else if (error.message) {
@@ -201,7 +197,7 @@ const AiAdvisor = ({ analyticsData }) => {
                 : '#f44336',
             marginRight: '4px' 
           }} />
-          {serverStatus === 'running' ? 'Online' : serverStatus === 'starting' ? 'Starting...' : 'Offline'}
+          {serverStatus === 'running' ? 'Online' : serverStatus === 'starting' ? 'Connecting...' : 'Offline'}
         </div>
       </h3>
       
