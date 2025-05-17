@@ -1,4 +1,4 @@
-// src/components/meta/AiAdvisor.js (Fixed Overflow Issue)
+// src/components/meta/AiAdvisor.js (Scrollable Container Fix)
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   checkServerRunning, 
@@ -119,6 +119,7 @@ const AiAdvisor = ({ analyticsData }) => {
       6. When appropriate, suggest a follow-up question to help them dig deeper
       7. When giving recommendations, be specific and actionable
       8. IMPORTANT: Keep your responses BRIEF. Aim for 3-5 sentences maximum for most responses.
+      9. Use bullet points for lists and recommendations, rather than long paragraphs.
       
       Remember that you're having a conversation with the user about their specific Meta ad account performance.`;
       
@@ -216,49 +217,65 @@ const AiAdvisor = ({ analyticsData }) => {
         </div>
       </h3>
       
-      {/* Increased height and added word-wrap for chat container */}
+      {/* Improved chat container with proper scrolling */}
       <div 
-        className="overflow-y-auto mb-4 p-3 border rounded bg-gray-50" 
+        className="mb-4 border rounded bg-gray-50" 
         style={{
-          height: "450px",
-          wordBreak: "break-word",
-          wordWrap: "break-word",
-          overflowWrap: "break-word"
+          position: "relative",
+          height: "450px", /* Fixed height */
+          width: "100%",  /* Full width of parent */
+          overflow: "hidden", /* Hide overflow */
         }}
       >
-        {messages.map((message, index) => (
-          <div 
-            key={`msg-${index}`}
-            style={{
-              marginBottom: "12px",
+        {/* Inner scrollable container with visible scrollbar */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            overflowY: "scroll", /* Vertical scrollbar */
+            padding: "12px",
+            scrollbarWidth: "thin", /* Firefox */
+            scrollbarColor: "#CBD5E0 #F7FAFC", /* Firefox scrollbar colors */
+          }}
+        >
+          {messages.map((message, index) => (
+            <div 
+              key={`msg-${index}`}
+              style={{
+                marginBottom: "12px",
+                padding: "12px",
+                borderRadius: "6px",
+                maxWidth: "85%", /* Adjusted to leave room for scrollbar */
+                marginLeft: message.role === 'user' ? 'auto' : '0',
+                backgroundColor: message.role === 'user' ? '#e9f5ff' : '#f3f4f6',
+                color: message.role === 'user' ? '#0066cc' : '#333',
+                wordBreak: "break-word",  /* Ensure text wraps properly */
+                overflowWrap: "break-word",
+                whiteSpace: "pre-wrap"  /* Preserve line breaks */
+              }}
+            >
+              {message.content}
+            </div>
+          ))}
+          {isLoading && (
+            <div style={{
               padding: "12px",
               borderRadius: "6px",
-              maxWidth: "90%", // Increased from 75% to allow more space
-              marginLeft: message.role === 'user' ? 'auto' : '0',
-              backgroundColor: message.role === 'user' ? '#e9f5ff' : '#f3f4f6',
-              color: message.role === 'user' ? '#0066cc' : '#333',
-              wordBreak: "break-word",  // Ensure text wraps properly
-              overflowWrap: "break-word"
-            }}
-          >
-            {message.content}
-          </div>
-        ))}
-        {isLoading && (
-          <div style={{
-            padding: "12px",
-            borderRadius: "6px",
-            backgroundColor: "#f3f4f6",
-            color: "#333"
-          }}>
-            <div style={{display: "flex", gap: "4px"}}>
-              <div style={{width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#888", animation: "bounce 1s infinite"}}></div>
-              <div style={{width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#888", animation: "bounce 1s infinite 0.2s"}}></div>
-              <div style={{width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#888", animation: "bounce 1s infinite 0.4s"}}></div>
+              backgroundColor: "#f3f4f6",
+              color: "#333"
+            }}>
+              <div style={{display: "flex", gap: "4px"}}>
+                <div style={{width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#888", animation: "bounce 1s infinite"}}></div>
+                <div style={{width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#888", animation: "bounce 1s infinite 0.2s"}}></div>
+                <div style={{width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#888", animation: "bounce 1s infinite 0.4s"}}></div>
+              </div>
             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
       
       {serverStatus === 'offline' && (
