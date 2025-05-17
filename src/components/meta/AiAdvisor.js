@@ -1,4 +1,4 @@
-// src/components/meta/AiAdvisor.js (Improved for conversational interactions)
+// src/components/meta/AiAdvisor.js (Fixed Overflow Issue)
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   checkServerRunning, 
@@ -118,6 +118,7 @@ const AiAdvisor = ({ analyticsData }) => {
       5. Keep responses concise and focused on the user's specific question
       6. When appropriate, suggest a follow-up question to help them dig deeper
       7. When giving recommendations, be specific and actionable
+      8. IMPORTANT: Keep your responses BRIEF. Aim for 3-5 sentences maximum for most responses.
       
       Remember that you're having a conversation with the user about their specific Meta ad account performance.`;
       
@@ -215,7 +216,16 @@ const AiAdvisor = ({ analyticsData }) => {
         </div>
       </h3>
       
-      <div className="h-80 overflow-y-auto mb-4 p-3 border rounded bg-gray-50" style={{height: "400px"}}>
+      {/* Increased height and added word-wrap for chat container */}
+      <div 
+        className="overflow-y-auto mb-4 p-3 border rounded bg-gray-50" 
+        style={{
+          height: "450px",
+          wordBreak: "break-word",
+          wordWrap: "break-word",
+          overflowWrap: "break-word"
+        }}
+      >
         {messages.map((message, index) => (
           <div 
             key={`msg-${index}`}
@@ -223,10 +233,12 @@ const AiAdvisor = ({ analyticsData }) => {
               marginBottom: "12px",
               padding: "12px",
               borderRadius: "6px",
-              maxWidth: "75%",
+              maxWidth: "90%", // Increased from 75% to allow more space
               marginLeft: message.role === 'user' ? 'auto' : '0',
               backgroundColor: message.role === 'user' ? '#e9f5ff' : '#f3f4f6',
-              color: message.role === 'user' ? '#0066cc' : '#333'
+              color: message.role === 'user' ? '#0066cc' : '#333',
+              wordBreak: "break-word",  // Ensure text wraps properly
+              overflowWrap: "break-word"
             }}
           >
             {message.content}
