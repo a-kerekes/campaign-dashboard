@@ -15,6 +15,8 @@ import MetaApiDiagnostic from './components/meta/MetaApiDiagnostic';
 import PrivacyPolicy from './components/pages/PrivacyPolicy';
 import TermsOfService from './components/pages/TermsOfService';
 import TenantSelector from './components/TenantSelector';
+import ClaudeServerStatus from './components/meta/ClaudeServerStatus';
+import { initServerMonitoring, checkServerRunning } from './utils/claudeServerLauncher';
 import './App.css';
 
 // Define a simple direct admin component for testing
@@ -65,6 +67,12 @@ function App() {
 
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
+  }, []);
+
+  // Initialize Claude server monitoring
+  useEffect(() => {
+    const cleanup = initServerMonitoring();
+    return cleanup;
   }, []);
 
   // Add favicon links in the document
@@ -126,6 +134,11 @@ function App() {
   const Navigation = () => {
     const { logout, currentUser, currentTenant, isAdmin, cleanStringValue } = useAuth();
     const navigate = useNavigate();
+    
+    // Start Claude server when nav component mounts (user is logged in)
+    useEffect(() => {
+      checkServerRunning();
+    }, []);
     
     // Debug logging
     console.log("Navigation rendering, admin check:", {
@@ -197,6 +210,9 @@ function App() {
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
+          {/* Add Claude Server Status */}
+          <ClaudeServerStatus />
+          
           {/* Add Tenant Selector */}
           {currentUser && (
             <div style={{ marginRight: '15px', minWidth: '150px' }}>
@@ -304,6 +320,12 @@ function App() {
   // Dashboard component with header and footer
   const DashboardLayout = () => {
     const { currentTenant } = useAuth();
+    
+    // Start Claude server when user accesses dashboard
+    useEffect(() => {
+      checkServerRunning();
+    }, []);
+    
     return (
       <div className="App">
         <header className="App-header">
@@ -322,6 +344,12 @@ function App() {
   // Creative Analytics Dashboard layout
   const CreativeAnalyticsLayout = () => {
     const { currentTenant } = useAuth();
+    
+    // Start Claude server when user accesses creative analytics
+    useEffect(() => {
+      checkServerRunning();
+    }, []);
+    
     return (
       <div className="App">
         <header className="App-header">

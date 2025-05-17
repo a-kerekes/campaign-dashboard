@@ -1,6 +1,11 @@
-// src/components/meta/AiAdvisor.js
+// src/components/meta/AiAdvisor.js (ESLint fix)
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+// Remove axios if not used
+import { 
+  checkServerRunning, 
+  startClaudeServer, 
+  subscribeToServerStatus 
+} from '../../utils/claudeServerLauncher';
 
 // Define API URL based on environment
 const API_URL = process.env.NODE_ENV === 'production'
@@ -13,21 +18,83 @@ const AiAdvisor = ({ analyticsData }) => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [serverStatus, setServerStatus] = useState('unknown');
   const messagesEndRef = useRef(null);
+  
+  // Subscribe to server status changes
+  useEffect(() => {
+    // Run server check immediately
+    checkServerRunning();
+    
+    // Subscribe to status updates
+    const unsubscribe = subscribeToServerStatus(setServerStatus);
+    return unsubscribe;
+  }, []);
   
   // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Handle starting the server
+  const handleStartServer = async () => {
+    const started = await startClaudeServer();
+    if (!started) {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Unable to start the AI service. Please try again later or contact support.' 
+      }]);
+    }
+  };
+
   // Handle sending messages to AI API
   const handleSendMessage = async () => {
     if (!input.trim()) return;
+    
+    // Check server status first
+    if (serverStatus !== 'running') {
+      // Add user message to chat
+      const userMessage = { role: 'user', content: input };
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      
+      // Try to start the server
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'The AI service is currently offline. I\'ll try to start it now...' 
+      }]);
+      
+      const started = await startClaudeServer();
+      
+      if (!started) {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: 'Sorry, I couldn\'t start the AI service. Please try again later or click the "Start" button.' 
+        }]);
+        return;
+      }
+      
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Great! The AI service is now running. I\'ll process your question...' 
+      }]);
+      
+      // Now let's process the original message
+      await processUserMessage(userMessage);
+      return;
+    }
     
     // Add user message to chat
     const userMessage = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    
+    // Process the message
+    await processUserMessage(userMessage);
+  };
+  
+  // Process a user message and get a response from Claude
+  const processUserMessage = async (userMessage) => {
     setIsLoading(true);
     
     try {
@@ -56,27 +123,41 @@ const AiAdvisor = ({ analyticsData }) => {
       
       console.log('Sending request to:', API_URL);
       
-      // Try primary API endpoint
-      const response = await axios.post(API_URL, {
-        messages: conversationHistory
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: conversationHistory }),
       });
       
-      console.log('Received response:', response.data);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Received response:', data);
       
       // Add AI response to chat
-      setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
     } catch (error) {
       console.error('Error getting AI response:', error);
       
       let errorMessage = 'Sorry, I encountered an error. Please try again later.';
       
-      if (error.response) {
-        console.error('Error response:', error.response.data);
-        console.error('Error status:', error.response.status);
+      // Check if server went offline during request
+      if (error.message && (
+        error.message.includes('Failed to fetch') || 
+        error.message.includes('Network Error')
+      )) {
+        // Force a server status check
+        await checkServerRunning();
+        
+        errorMessage = 'The AI service appears to be offline. Would you like to restart it?';
+      } else if (error.response) {
         errorMessage = `Server error (${error.response.status}): ${error.response.data?.error || 'Unknown error'}`;
-      } else if (error.request) {
-        console.error('No response received:', error.request);
-        errorMessage = 'No response from server. Please check if the API server is running.';
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
       }
       
       setMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
@@ -87,7 +168,42 @@ const AiAdvisor = ({ analyticsData }) => {
 
   return (
     <div className="bg-white rounded-lg shadow p-4 mb-6">
-      <h3 className="text-lg font-semibold mb-4">AI Performance Advisor</h3>
+      <h3 className="text-lg font-semibold mb-4 flex items-center">
+        <span>AI Performance Advisor</span>
+        
+        {/* Server status indicator */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          marginLeft: '10px',
+          padding: '2px 8px',
+          borderRadius: '12px',
+          backgroundColor: serverStatus === 'running' 
+            ? 'rgba(76, 175, 80, 0.1)' 
+            : serverStatus === 'starting'
+              ? 'rgba(255, 152, 0, 0.1)'
+              : 'rgba(244, 67, 54, 0.1)',
+          fontSize: '12px',
+          color: serverStatus === 'running' 
+            ? '#4CAF50' 
+            : serverStatus === 'starting' 
+              ? '#FF9800' 
+              : '#f44336'
+        }}>
+          <div style={{ 
+            width: '6px', 
+            height: '6px', 
+            borderRadius: '50%', 
+            backgroundColor: serverStatus === 'running' 
+              ? '#4CAF50' 
+              : serverStatus === 'starting' 
+                ? '#FF9800' 
+                : '#f44336',
+            marginRight: '4px' 
+          }} />
+          {serverStatus === 'running' ? 'Online' : serverStatus === 'starting' ? 'Starting...' : 'Offline'}
+        </div>
+      </h3>
       
       <div className="h-80 overflow-y-auto mb-4 p-3 border rounded bg-gray-50" style={{height: "320px"}}>
         {messages.map((message, index) => (
@@ -123,6 +239,26 @@ const AiAdvisor = ({ analyticsData }) => {
         <div ref={messagesEndRef} />
       </div>
       
+      {serverStatus === 'offline' && (
+        <div className="mb-4 p-3 border rounded bg-red-50" style={{ borderColor: '#ffcdd2' }}>
+          <p className="text-red-700 mb-2">AI service is currently offline.</p>
+          <button
+            onClick={handleStartServer}
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            style={{
+              backgroundColor: "#0066cc",
+              color: "white",
+              padding: "6px 12px",
+              borderRadius: "4px",
+              border: "none",
+              cursor: "pointer"
+            }}
+          >
+            Start AI Service
+          </button>
+        </div>
+      )}
+      
       <div style={{display: "flex"}}>
         <input
           type="text"
@@ -130,26 +266,28 @@ const AiAdvisor = ({ analyticsData }) => {
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
           placeholder="Ask about your ad performance..."
+          disabled={isLoading || (serverStatus !== 'running' && serverStatus !== 'unknown')}
           style={{
             flexGrow: 1,
             padding: "8px",
             border: "1px solid #ccc",
             borderTopLeftRadius: "4px",
             borderBottomLeftRadius: "4px",
-            outline: "none"
+            outline: "none",
+            opacity: serverStatus !== 'running' && serverStatus !== 'unknown' ? 0.7 : 1
           }}
         />
         <button
           onClick={handleSendMessage}
-          disabled={isLoading}
+          disabled={isLoading || (serverStatus !== 'running' && serverStatus !== 'unknown')}
           style={{
-            backgroundColor: isLoading ? "#ccc" : "#0066cc",
+            backgroundColor: isLoading || (serverStatus !== 'running' && serverStatus !== 'unknown') ? "#ccc" : "#0066cc",
             color: "white",
             padding: "8px 16px",
             borderTopRightRadius: "4px",
             borderBottomRightRadius: "4px",
             border: "none",
-            cursor: isLoading ? "default" : "pointer"
+            cursor: isLoading || (serverStatus !== 'running' && serverStatus !== 'unknown') ? "default" : "pointer"
           }}
         >
           {isLoading ? 'Thinking...' : 'Send'}
