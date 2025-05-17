@@ -1,3 +1,4 @@
+// src/components/meta/AiAdvisor.js (Improved for conversational interactions)
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   checkServerRunning, 
@@ -91,25 +92,38 @@ const AiAdvisor = ({ analyticsData }) => {
     setIsLoading(true);
     
     try {
-      // Prepare context data from analytics to add to the prompt
-      const contextData = {
-        totalImpressions: analyticsData?.summary?.totalImpressions || 0,
-        totalClicks: analyticsData?.summary?.totalClicks || 0,
-        totalSpend: analyticsData?.summary?.totalSpend || 0,
-        ctr: analyticsData?.summary?.avgCtr || 0,
-        conversions: analyticsData?.funnel?.purchases || 0,
-        conversionRate: analyticsData?.advancedMetrics?.linkClickToConversion || 0,
-        costPerPurchase: analyticsData?.advancedMetrics?.costPerPurchase || 0,
-        roas: analyticsData?.advancedMetrics?.roas || 0
-      };
+      // Get the account name or ID for context
+      const accountInfo = analyticsData?.account?.name || 'this Meta ad account';
       
-      // Create conversation history including context
+      // Create a system prompt that encourages conversational, targeted responses
+      const systemPrompt = `You are an expert Meta Ads advisor helping with ${accountInfo}. 
+      
+      Here's the account data you have access to (only reference this when specifically asked about these metrics):
+      - Total Impressions: ${analyticsData?.summary?.totalImpressions?.toLocaleString() || 'N/A'}
+      - Total Clicks: ${analyticsData?.summary?.totalClicks?.toLocaleString() || 'N/A'}
+      - Total Spend: $${analyticsData?.summary?.totalSpend?.toLocaleString() || 'N/A'}
+      - CTR: ${analyticsData?.summary?.avgCtr?.toFixed(2) || 'N/A'}%
+      - Conversions: ${analyticsData?.funnel?.purchases?.toLocaleString() || 'N/A'}
+      - Conversion Rate: ${analyticsData?.advancedMetrics?.linkClickToConversion?.toFixed(2) || 'N/A'}%
+      - Cost per Purchase: $${analyticsData?.advancedMetrics?.costPerPurchase?.toFixed(2) || 'N/A'}
+      - ROAS: ${analyticsData?.advancedMetrics?.roas?.toFixed(2) || 'N/A'}x
+      
+      Creative performance data is also available if the user asks about it.
+      
+      Follow these important guidelines:
+      1. Be conversational and friendly but professional
+      2. NEVER provide a full analysis unless specifically asked - respond directly to what was asked
+      3. For simple greetings like "hi" or "hello", just greet back and ask what they'd like to know about their Meta ads
+      4. If the user asks a vague question, ask a follow-up question to clarify what specific aspect they're interested in
+      5. Keep responses concise and focused on the user's specific question
+      6. When appropriate, suggest a follow-up question to help them dig deeper
+      7. When giving recommendations, be specific and actionable
+      
+      Remember that you're having a conversation with the user about their specific Meta ad account performance.`;
+      
+      // Create conversation history
       const conversationHistory = [
-        { role: 'system', content: `You are an expert Meta Ads advisor analyzing the following data:
-          ${JSON.stringify(contextData, null, 2)}
-          
-          Provide specific, actionable advice based on this data. Focus on identifying issues and suggesting improvements. Be concise and practical in your recommendations.` 
-        },
+        { role: 'system', content: systemPrompt },
         ...messages.filter(m => m.role !== 'system'),
         userMessage
       ];
@@ -201,7 +215,7 @@ const AiAdvisor = ({ analyticsData }) => {
         </div>
       </h3>
       
-      <div className="h-80 overflow-y-auto mb-4 p-3 border rounded bg-gray-50" style={{height: "320px"}}>
+      <div className="h-80 overflow-y-auto mb-4 p-3 border rounded bg-gray-50" style={{height: "400px"}}>
         {messages.map((message, index) => (
           <div 
             key={`msg-${index}`}
