@@ -1,4 +1,4 @@
-// src/components/meta/AiAdvisor.js (Scrollable Container Fix)
+// src/components/meta/AiAdvisor.js (Enhanced with Multiple Data Sources)
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   checkServerRunning, 
@@ -9,7 +9,11 @@ import {
 // API endpoint is now relative
 const API_URL = '/api/ai-advisor';
 
-const AiAdvisor = ({ analyticsData }) => {
+const AiAdvisor = ({ 
+  analyticsData, 
+  audienceInsightsData, // New prop for audience insights
+  creativePerformanceData // New prop for creative performance data
+}) => {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Welcome to AI Advisor. Ask me anything about your ad performance data!' }
   ]);
@@ -87,6 +91,43 @@ const AiAdvisor = ({ analyticsData }) => {
     await processUserMessage(userMessage);
   };
   
+  // Helper function to detect which data the user is asking about
+  const detectDataInterest = (messageContent) => {
+    const lowerCaseContent = messageContent.toLowerCase();
+    
+    // Check for audience insights related terms
+    const isAskingAboutAudience = 
+      lowerCaseContent.includes('audience') || 
+      lowerCaseContent.includes('demographic') || 
+      lowerCaseContent.includes('age') || 
+      lowerCaseContent.includes('gender') || 
+      lowerCaseContent.includes('platform') || 
+      lowerCaseContent.includes('placement');
+    
+    // Check for creative performance related terms
+    const isAskingAboutCreatives = 
+      lowerCaseContent.includes('creative') || 
+      lowerCaseContent.includes('image') || 
+      lowerCaseContent.includes('video') || 
+      lowerCaseContent.includes('ad copy') || 
+      lowerCaseContent.includes('best performing ad') || 
+      lowerCaseContent.includes('worst performing ad');
+    
+    // Check for general analytics terms
+    const isAskingAboutAnalytics = 
+      lowerCaseContent.includes('performance') || 
+      lowerCaseContent.includes('metric') || 
+      lowerCaseContent.includes('ctr') || 
+      lowerCaseContent.includes('conversion') || 
+      lowerCaseContent.includes('roas');
+    
+    return {
+      audience: isAskingAboutAudience,
+      creatives: isAskingAboutCreatives,
+      analytics: isAskingAboutAnalytics
+    };
+  };
+  
   // Process a user message and get a response from Claude
   const processUserMessage = async (userMessage) => {
     setIsLoading(true);
@@ -95,22 +136,63 @@ const AiAdvisor = ({ analyticsData }) => {
       // Get the account name or ID for context
       const accountInfo = analyticsData?.account?.name || 'this Meta ad account';
       
-      // Create a system prompt that encourages conversational, targeted responses
-      const systemPrompt = `You are an expert Meta Ads advisor helping with ${accountInfo}. 
+      // Detect what kind of data the user is asking about
+      const dataInterest = detectDataInterest(userMessage.content);
       
-      Here's the account data you have access to (only reference this when specifically asked about these metrics):
-      - Total Impressions: ${analyticsData?.summary?.totalImpressions?.toLocaleString() || 'N/A'}
-      - Total Clicks: ${analyticsData?.summary?.totalClicks?.toLocaleString() || 'N/A'}
-      - Total Spend: $${analyticsData?.summary?.totalSpend?.toLocaleString() || 'N/A'}
-      - CTR: ${analyticsData?.summary?.avgCtr?.toFixed(2) || 'N/A'}%
-      - Conversions: ${analyticsData?.funnel?.purchases?.toLocaleString() || 'N/A'}
-      - Conversion Rate: ${analyticsData?.advancedMetrics?.linkClickToConversion?.toFixed(2) || 'N/A'}%
-      - Cost per Purchase: $${analyticsData?.advancedMetrics?.costPerPurchase?.toFixed(2) || 'N/A'}
-      - ROAS: ${analyticsData?.advancedMetrics?.roas?.toFixed(2) || 'N/A'}x
+      // Prepare context data for the system prompt
+      let contextData = {};
       
-      Creative performance data is also available if the user asks about it.
+      // Add general analytics data
+      contextData.analytics = {
+        totalImpressions: analyticsData?.summary?.totalImpressions?.toLocaleString() || 'N/A',
+        totalClicks: analyticsData?.summary?.totalClicks?.toLocaleString() || 'N/A',
+        totalSpend: analyticsData?.summary?.totalSpend?.toLocaleString() || 'N/A',
+        ctr: analyticsData?.summary?.avgCtr?.toFixed(2) || 'N/A',
+        conversions: analyticsData?.funnel?.purchases?.toLocaleString() || 'N/A',
+        conversionRate: analyticsData?.advancedMetrics?.linkClickToConversion?.toFixed(2) || 'N/A',
+        costPerPurchase: analyticsData?.advancedMetrics?.costPerPurchase?.toFixed(2) || 'N/A',
+        roas: analyticsData?.advancedMetrics?.roas?.toFixed(2) || 'N/A'
+      };
       
-      Follow these important guidelines:
+      // Add audience insights data if available
+      if (audienceInsightsData) {
+        contextData.audience = audienceInsightsData;
+      }
+      
+      // Add creative performance data if available
+      if (creativePerformanceData) {
+        // If we have detailed creative data, include it
+        contextData.creatives = creativePerformanceData;
+      }
+      
+      // Create a system prompt that includes relevant data based on user's question
+      let systemPrompt = `You are an expert Meta Ads advisor helping with ${accountInfo}.`;
+      
+      // If asking about audience insights and we have that data
+      if (dataInterest.audience && audienceInsightsData) {
+        systemPrompt += `\n\nRegarding audience insights, here's the data I have access to:
+        ${JSON.stringify(contextData.audience, null, 2)}`;
+      }
+      
+      // If asking about creative performance and we have that data
+      if (dataInterest.creatives && creativePerformanceData) {
+        systemPrompt += `\n\nRegarding creative performance, here's the data I have access to:
+        ${JSON.stringify(contextData.creatives, null, 2)}`;
+      }
+      
+      // Always include general analytics
+      systemPrompt += `\n\nHere's the general account data I have access to:
+      - Total Impressions: ${contextData.analytics.totalImpressions}
+      - Total Clicks: ${contextData.analytics.totalClicks}
+      - Total Spend: $${contextData.analytics.totalSpend}
+      - CTR: ${contextData.analytics.ctr}%
+      - Conversions: ${contextData.analytics.conversions}
+      - Conversion Rate: ${contextData.analytics.conversionRate}%
+      - Cost per Purchase: $${contextData.analytics.costPerPurchase}
+      - ROAS: ${contextData.analytics.roas}x`;
+      
+      // Add guidelines for response
+      systemPrompt += `\n\nFollow these important guidelines:
       1. Be conversational and friendly but professional
       2. NEVER provide a full analysis unless specifically asked - respond directly to what was asked
       3. For simple greetings like "hi" or "hello", just greet back and ask what they'd like to know about their Meta ads
@@ -118,10 +200,10 @@ const AiAdvisor = ({ analyticsData }) => {
       5. Keep responses concise and focused on the user's specific question
       6. When appropriate, suggest a follow-up question to help them dig deeper
       7. When giving recommendations, be specific and actionable
-      8. IMPORTANT: Keep your responses BRIEF. Aim for 3-5 sentences maximum for most responses.
-      9. Use bullet points for lists and recommendations, rather than long paragraphs.
+      8. Use bullet points for lists and recommendations, rather than long paragraphs
+      9. IMPORTANT: Keep your responses BRIEF. Aim for 3-5 sentences maximum for most responses.
       
-      Remember that you're having a conversation with the user about their specific Meta ad account performance.`;
+      Remember that you're having a conversation with the user about their specific Meta ad account performance. You have access to data from multiple sections of their dashboard: general analytics, audience insights (demographics, platforms, etc.), and creative performance (individual ads and their metrics).`;
       
       // Create conversation history
       const conversationHistory = [
@@ -334,7 +416,7 @@ const AiAdvisor = ({ analyticsData }) => {
       </div>
       
       <div style={{marginTop: "12px", fontSize: "14px", color: "#666"}}>
-        Try asking: "Which creative is performing best?" or "How can I improve my conversion rate?"
+        Try asking: "Which creative is performing best?" or "Tell me about my audience demographics"
       </div>
     </div>
   );

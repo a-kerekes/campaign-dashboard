@@ -321,7 +321,11 @@ const CreativeAnalyticsDashboard = () => {
         creativePerformance,
         topCreatives,
         campaigns: campaignsResponse.data.data,
-        accountInsights: insightsResponse.data.data
+        accountInsights: insightsResponse.data.data,
+        account: {
+          id: selectedAccountId,
+          name: accounts.find(a => a.id === selectedAccountId)?.name || 'Meta Ad Account'
+        }
       });
       
       console.log('Performance data and time series data loaded successfully');
@@ -332,7 +336,7 @@ const CreativeAnalyticsDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange]);
+  }, [accessToken, selectedAccountId, dateRange, accounts]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
@@ -765,7 +769,7 @@ const CreativeAnalyticsDashboard = () => {
                   <option value="Last 60 Days">Last 60 Days</option>
                   <option value="Last 90 Days">Last 90 Days</option>
                 </select>
-                </div>
+              </div>
               
               <div className="mb-2 flex space-x-2">
                 <button
@@ -797,7 +801,16 @@ const CreativeAnalyticsDashboard = () => {
                     dateRange={dateRange}
                     timeSeriesData={timeSeriesData} 
                   />
-                  <AiAdvisor analyticsData={analyticsData} />
+                  <AiAdvisor 
+                    analyticsData={analyticsData}
+                    audienceInsightsData={{
+                      age: ageBreakdown,
+                      gender: genderBreakdown,
+                      platform: platformBreakdown,
+                      placement: placementBreakdown
+                    }}
+                    creativePerformanceData={analyticsData?.creativePerformance || []}
+                  />
                 </div>
                 
                 {/* Add the Breakdown Chart */}
