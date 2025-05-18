@@ -13,12 +13,11 @@ import {
 import { getMetaMetricsByTenant } from './metaAPI';
 import { useAuth } from '../../context/AuthContext';
 
-const AdMetricsChart = ({ accessToken = null }) => {
+const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken = null }) => {
   const [viewType, setViewType] = useState('funnel'); // 'funnel' or 'timeSeries'
   const [metricsData, setMetricsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [dateRange, setDateRange] = useState('Last 30 Days');
   const [isRealData, setIsRealData] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
   const { currentTenant, isAdmin } = useAuth();
@@ -30,82 +29,65 @@ const AdMetricsChart = ({ accessToken = null }) => {
     purchases: true
   });
 
+  // Debug log to help identify what props are being received
+  useEffect(() => {
+    console.log("AdMetricsChart Props:", {
+      hasAnalyticsData: !!analyticsData,
+      analyticsDataSummary: analyticsData?.summary,
+      hasTimeSeriesData: !!timeSeriesData,
+      timeSeriesDataLength: timeSeriesData ? timeSeriesData.length : 0,
+      dateRange
+    });
+  }, [analyticsData, timeSeriesData, dateRange]);
+
+  // Use timeSeriesData passed as prop when available
+  useEffect(() => {
+    if (timeSeriesData && timeSeriesData.length > 0) {
+      console.log("Using timeSeriesData passed from parent component:", timeSeriesData.length, "records");
+      
+      // Format the data if needed
+      const formattedData = timeSeriesData.map(item => ({
+        ...item,
+        formattedDate: new Date(item.date).toLocaleDateString()
+      }));
+      
+      setMetricsData(formattedData);
+      setLoading(false);
+      setError(null);
+      // Assume it's mock data if process.env.REACT_APP_USE_MOCK_DATA is true or if analyticsData flag indicates it
+      setIsRealData(false);
+    }
+  }, [timeSeriesData]);
+
   // Handle date range change
   const handleDateRangeChange = (e) => {
     const newDateRange = e.target.value;
     console.log('Date range changed from', dateRange, 'to', newDateRange);
-    setDateRange(newDateRange);
+    // This might need to call a prop function if you want to pass the change up to the parent
   };
 
-  // Fetch data when tenant, date range, accessToken, or useMockData changes
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!currentTenant?.id) {
-        // No tenant selected yet
-        setLoading(false);
-        setError('No tenant selected');
-        setMetricsData([]);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      console.log(`Fetching metrics data for tenant: ${currentTenant.id}, date range: ${dateRange}, hasToken: ${!!accessToken}, useMockData: ${useMockData}`);
-      
-      try {
-        // If user has explicitly requested mock data
-        if (useMockData) {
-          console.log('User requested mock data, fetching...');
-          const result = await getMetaMetricsByTenant(currentTenant.id, dateRange, null); // Null token forces mock data
-          
-          if (result.error) {
-            console.error('Error fetching mock data:', result.error);
-            setError(result.error);
-            setMetricsData([]);
-            setIsRealData(false);
-          } else if (result.data) {
-            const formattedData = result.data.map(item => ({
-              ...item,
-              formattedDate: new Date(item.date).toLocaleDateString()
-            }));
-            
-            setMetricsData(formattedData);
-            setIsRealData(false); // Clearly indicate it's mock data
-          }
-        } else {
-          // Normal flow - try to get real data
-          const result = await getMetaMetricsByTenant(currentTenant.id, dateRange, accessToken);
-          
-          if (result.error) {
-            console.error('API returned error:', result.error);
-            setError(result.error);
-            setMetricsData([]);
-            setIsRealData(result.isRealData || false);
-          } else if (result.data) {
-            console.log('API returned data:', result.data.length, 'records', 'isRealData:', result.isRealData);
-            
-            const formattedData = result.data.map(item => ({
-              ...item,
-              formattedDate: new Date(item.date).toLocaleDateString()
-            }));
-            
-            setMetricsData(formattedData);
-            setIsRealData(result.isRealData || false);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching metrics data:', err);
-        setError('Failed to load metrics data');
-        setMetricsData([]);
-        setIsRealData(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [currentTenant, dateRange, accessToken, useMockData]); // Include useMockData in dependencies
+  // For "Use Sample Data" button - should generate and pass up to parent
+  const handleUseSampleData = () => {
+    console.log("Using sample data for development");
+    setUseMockData(true);
+    
+    // Generate empty data array to force the chart to re-render
+    // The parent component should handle the actual data generation
+    const emptyDataArray = [];
+    for (let i = 0; i < 30; i++) {
+      emptyDataArray.push({
+        date: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+        impressions: 0,
+        clicks: 0,
+        landingPageViews: 0,
+        addToCarts: 0,
+        purchases: 0
+      });
+    }
+    
+    setMetricsData(emptyDataArray);
+    window.location.reload(); // Force reload to apply mock data setting
+  };
 
   // Toggle metrics
   const toggleMetric = (metric) => {
@@ -159,8 +141,12 @@ const AdMetricsChart = ({ accessToken = null }) => {
     }
   };
 
+  // Check if we need to show the empty state - this is the most important change!
+  // We should use the timeSeriesData passed from parent, not rely on our own API fetch
+  const showEmptyState = (!timeSeriesData || timeSeriesData.length === 0) && (!metricsData || metricsData.length === 0);
+  
   // Show loading state
-  if (loading) {
+  if (loading && !timeSeriesData) {
     return (
       <div className="p-4 bg-white rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Ad Metrics</h2>
@@ -171,7 +157,7 @@ const AdMetricsChart = ({ accessToken = null }) => {
   }
 
   // Show error state
-  if (error) {
+  if (error && !timeSeriesData) {
     return (
       <div className="p-4 bg-white rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Ad Metrics</h2>
@@ -187,7 +173,7 @@ const AdMetricsChart = ({ accessToken = null }) => {
           {isRealData && (
             <div className="mt-4">
               <button
-                onClick={() => setUseMockData(true)}
+                onClick={handleUseSampleData}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Use Sample Data For Development
@@ -199,50 +185,34 @@ const AdMetricsChart = ({ accessToken = null }) => {
     );
   }
 
-  // Show empty state
-  if (!metricsData || metricsData.length === 0) {
+  // Show empty state - THIS IS A KEY SECTION THAT SHOWS THE USE SAMPLE DATA BUTTON
+  if (showEmptyState) {
     return (
       <div className="p-4 bg-white rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Ad Metrics</h2>
         <div className="bg-gray-50 border border-gray-200 text-gray-800 px-4 py-8 rounded text-center">
-          {isRealData ? (
-            <div>
-              <p className="mb-4">No metrics data available from Meta API for this time period.</p>
-              <p className="text-sm text-gray-600 mb-4">This may occur if:</p>
-              <ul className="text-sm text-gray-600 list-disc list-inside mb-4">
-                <li>There is no ad data for the selected date range</li>
-                <li>The Meta API token doesn't have sufficient permissions</li>
-                <li>The ad account is new or has no campaigns</li>
-              </ul>
-              <button
-                onClick={() => setUseMockData(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Use Sample Data For Development
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p>No metrics data available for this time period.</p>
-              {accessToken && !useMockData && (
-                <button
-                  onClick={() => setUseMockData(true)}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Use Sample Data For Development
-                </button>
-              )}
-            </div>
-          )}
+          <div>
+            <p className="mb-4">No metrics data available from Meta API for this time period.</p>
+            <p className="text-sm text-gray-600 mb-4">This may occur if:</p>
+            <ul className="text-sm text-gray-600 list-disc list-inside mb-4">
+              <li>There is no ad data for the selected date range</li>
+              <li>The Meta API token doesn't have sufficient permissions</li>
+              <li>The ad account is new or has no campaigns</li>
+            </ul>
+            <button
+              onClick={handleUseSampleData}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Use Sample Data For Development
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Reset mock data mode if we're viewing real data
-  if (useMockData && isRealData && metricsData.length > 0) {
-    setUseMockData(false);
-  }
+  // Determine if we have data - either from props or from local state
+  const dataToUse = timeSeriesData && timeSeriesData.length > 0 ? timeSeriesData : metricsData;
 
   // Define colors for each stage
   const colors = {
@@ -255,11 +225,11 @@ const AdMetricsChart = ({ accessToken = null }) => {
 
   // Format funnel data
   const funnelData = [
-    { name: 'Impressions', value: metricsData.reduce((sum, item) => sum + item.impressions, 0), key: 'impressions' },
-    { name: 'Clicks', value: metricsData.reduce((sum, item) => sum + item.clicks, 0), key: 'clicks' },
-    { name: 'Landing Page Views', value: metricsData.reduce((sum, item) => sum + item.landingPageViews, 0), key: 'landingPageViews' },
-    { name: 'Add to Carts', value: metricsData.reduce((sum, item) => sum + (item.addToCarts || 0), 0), key: 'addToCarts' },
-    { name: 'Purchases', value: metricsData.reduce((sum, item) => sum + (item.purchases || 0), 0), key: 'purchases' }
+    { name: 'Impressions', value: dataToUse.reduce((sum, item) => sum + (item.impressions || 0), 0), key: 'impressions' },
+    { name: 'Clicks', value: dataToUse.reduce((sum, item) => sum + (item.clicks || 0), 0), key: 'clicks' },
+    { name: 'Landing Page Views', value: dataToUse.reduce((sum, item) => sum + (item.landingPageViews || 0), 0), key: 'landingPageViews' },
+    { name: 'Add to Carts', value: dataToUse.reduce((sum, item) => sum + (item.addToCarts || 0), 0), key: 'addToCarts' },
+    { name: 'Purchases', value: dataToUse.reduce((sum, item) => sum + (item.purchases || 0), 0), key: 'purchases' }
   ];
 
   return (
@@ -454,7 +424,7 @@ const AdMetricsChart = ({ accessToken = null }) => {
           <div style={{height: '320px'}}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={metricsData}
+                data={dataToUse}
                 margin={{ top: 5, right: 30, left: 20, bottom: getDateRangeNumber(dateRange) >= 60 ? 50 : 25 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
