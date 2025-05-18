@@ -3,40 +3,17 @@ import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import axios from 'axios';
 
-// Meta API configuration with improved environment variable handling
-const META_API_VERSION = 'v22.0'; // Matches Facebook Developer Console
+// Meta API configuration with environment variables
+const FACEBOOK_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || '997685078957756';
+const META_ACCESS_TOKEN = process.env.REACT_APP_META_ACCESS_TOKEN || '';
+const META_API_VERSION = 'v22.0';
 const META_API_BASE_URL = 'https://graph.facebook.com';
 
-// Facebook SDK initialization with environment variable for app ID
+console.log('Using Facebook App ID:', FACEBOOK_APP_ID);
+
+// Simplified Facebook SDK initialization that avoids ethereum conflicts
 export const initFacebookSDK = () => {
-  console.log('Initializing Facebook SDK with version:', META_API_VERSION);
-  
-  // Create a backup of ethereum property before anything else happens
-  try {
-    if (window.ethereum) {
-      console.log('Ethereum property exists, backing up before SDK initialization');
-      // Save the original ethereum object
-      window._originalEthereum = window.ethereum;
-      
-      // Delete the property and replace it with a getter/setter
-      delete window.ethereum;
-      
-      // Define a completely new property descriptor
-      Object.defineProperty(window, 'ethereum', {
-        configurable: true,
-        get: function() {
-          console.log('Getting ethereum property');
-          return window._originalEthereum;
-        },
-        set: function(val) {
-          console.log('Attempt to set ethereum property blocked');
-          // Silently ignore attempts to set this property
-        }
-      });
-    }
-  } catch (error) {
-    console.error('Error protecting ethereum property:', error);
-  }
+  console.log('Initializing Facebook SDK');
   
   return new Promise((resolve, reject) => {
     // Check if SDK is already loaded
@@ -49,12 +26,12 @@ export const initFacebookSDK = () => {
     window.fbAsyncInit = function() {
       try {
         window.FB.init({
-          appId: process.env.REACT_APP_FACEBOOK_APP_ID,
+          appId: FACEBOOK_APP_ID,
           cookie: true,
           xfbml: true,
           version: META_API_VERSION
         });
-        console.log('Facebook SDK initialized with version:', META_API_VERSION);
+        console.log('Facebook SDK initialized successfully');
         resolve(window.FB);
       } catch (error) {
         console.error('Error initializing Facebook SDK:', error);
@@ -62,31 +39,20 @@ export const initFacebookSDK = () => {
       }
     };
 
-    // Load the SDK asynchronously with correct version
+    // Load the SDK asynchronously with standard URL
     (function(d, s, id) {
       var js, fjs = d.getElementsByTagName(s)[0];
       if (d.getElementById(id)) return;
       js = d.createElement(s); js.id = id;
-      // Include the version number directly in the SDK URL
-      const sdkUrl = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
-      js.src = sdkUrl;
-      console.log('Loading FB SDK with URL:', sdkUrl);
+      js.src = "https://connect.facebook.net/en_US/sdk.js";
       js.onerror = function() {
+        console.error('Failed to load Facebook SDK');
         reject(new Error('Failed to load Facebook SDK script'));
       };
       fjs.parentNode.insertBefore(js, fjs);
+      console.log('Facebook SDK script tag added to document');
     }(document, 'script', 'facebook-jssdk'));
   });
-};
-
-// Get token with priority: provided token > session storage > environment variable
-export const getStoredToken = (providedToken) => {
-  if (providedToken) return providedToken;
-  
-  const sessionToken = sessionStorage.getItem('metaAccessToken');
-  if (sessionToken) return sessionToken;
-  
-  return process.env.REACT_APP_META_ACCESS_TOKEN || null;
 };
 
 // Authentication function with domain-specific redirect URI
@@ -101,12 +67,12 @@ export const login = () => {
     const currentDomain = window.location.hostname;
     let redirectUri;
     
-    if (currentDomain === 'localhost') {
-      redirectUri = `http://${currentDomain}:${window.location.port}/dashboard`;
-    } else if (currentDomain.includes('myaiadsmanager.com')) {
+    if (currentDomain.includes('myaiadsmanager.com')) {
       redirectUri = 'https://myaiadsmanager.com/api/auth/callback/facebook';
     } else if (currentDomain.includes('campaign-dashboard-attilas-projects')) {
       redirectUri = 'https://campaign-dashboard-attilas-projects-ea2ebf76.vercel.app/api/auth/callback/facebook';
+    } else if (currentDomain === 'localhost') {
+      redirectUri = 'http://localhost:3000/api/auth/callback/facebook';
     } else {
       // Default to the topaz domain
       redirectUri = 'https://campaign-dashboard-topaz.vercel.app/api/auth/callback/facebook';
@@ -169,7 +135,17 @@ export const fbLogout = () => {
 
 // ======== Meta API Helper Functions ========
 
-// Improved fetch from Meta API with better error handling
+// Get token with priority: provided token > session storage > environment variable
+function getStoredToken(providedToken) {
+  if (providedToken) return providedToken;
+  
+  const sessionToken = sessionStorage.getItem('metaAccessToken');
+  if (sessionToken) return sessionToken;
+  
+  return META_ACCESS_TOKEN;
+}
+
+// Improved fetch from Meta API with better error handling and app ID
 async function fetchFromMetaAPI(endpoint, params = {}, providedToken = null) {
   const token = getStoredToken(providedToken);
   
@@ -189,7 +165,7 @@ async function fetchFromMetaAPI(endpoint, params = {}, providedToken = null) {
     const response = await axios.get(url, {
       params: {
         access_token: token,
-        app_id: process.env.REACT_APP_FACEBOOK_APP_ID, // Include app ID explicitly
+        app_id: FACEBOOK_APP_ID, // Include app ID explicitly
         ...params
       }
     });
@@ -214,7 +190,7 @@ async function fetchFromMetaAPI(endpoint, params = {}, providedToken = null) {
       } else if (metaError.code === 200) {
         // Invalid app ID
         return { 
-          error: `Invalid Facebook App ID: ${process.env.REACT_APP_FACEBOOK_APP_ID || 'Not set'}. Please check your application configuration.`,
+          error: `Invalid Facebook App ID: ${FACEBOOK_APP_ID}. Please check your application configuration.`,
           code: metaError.code,
           configIssue: true
         };
@@ -594,10 +570,10 @@ export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days
       }
       
       // Check if environment variable for app ID exists
-      if (!process.env.REACT_APP_FACEBOOK_APP_ID) {
-        console.error('App ID environment variable not found');
+      if (!FACEBOOK_APP_ID) {
+        console.error('App ID not found');
         return {
-          error: 'Facebook App ID not configured. Please set REACT_APP_FACEBOOK_APP_ID in your environment variables.',
+          error: 'Facebook App ID not configured. Please check your environment variables.',
           configIssue: true
         };
       }
@@ -609,7 +585,7 @@ export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days
         time_increment: 1,
         date_preset: datePreset,
         level: 'account',
-        app_id: process.env.REACT_APP_FACEBOOK_APP_ID // Explicitly include app ID
+        app_id: FACEBOOK_APP_ID // Explicitly include app ID
       };
       
       const result = await fetchFromMetaAPI(endpoint, params, token);
@@ -746,7 +722,7 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
       const params = {
         fields: `id,name,status,created_time,effective_status,insights.date_preset(${datePreset}){impressions,clicks,spend,ctr,cpc}`,
         limit: 25, // Adjust based on your needs
-        app_id: process.env.REACT_APP_FACEBOOK_APP_ID // Explicitly include app ID
+        app_id: FACEBOOK_APP_ID // Explicitly include app ID
       };
       
       const result = await fetchFromMetaAPI(endpoint, params, token);
@@ -816,7 +792,6 @@ const metaAPI = {
   login,
   logout,
   fbLogout,
-  getStoredToken,
   
   // Main API functions
   getMetaAdAccountsByTenant,
