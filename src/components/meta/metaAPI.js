@@ -3,53 +3,110 @@ import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import axios from 'axios';
 
-// Meta API configuration 
-// Note: In production, you should use environment variables for sensitive values
-const META_ACCESS_TOKEN = process.env.REACT_APP_META_ACCESS_TOKEN || ''; 
-const META_API_VERSION = 'v22.0';
+// Meta API configuration with improved environment variable handling
+const META_API_VERSION = 'v22.0'; // Matches Facebook Developer Console
 const META_API_BASE_URL = 'https://graph.facebook.com';
 
-// Facebook SDK initialization
+// Facebook SDK initialization with environment variable for app ID
 export const initFacebookSDK = () => {
-  console.log('Initializing Facebook SDK');
+  console.log('Initializing Facebook SDK with version:', META_API_VERSION);
   
-  return new Promise((resolve) => {
-    window.fbAsyncInit = function() {
-      window.FB.init({
-        appId: '997685078957756', // Hardcoded for testing
-        cookie: true,
-        xfbml: true,
-        version: 'v22.0'
+  // Create a backup of ethereum property before anything else happens
+  try {
+    if (window.ethereum) {
+      console.log('Ethereum property exists, backing up before SDK initialization');
+      // Save the original ethereum object
+      window._originalEthereum = window.ethereum;
+      
+      // Delete the property and replace it with a getter/setter
+      delete window.ethereum;
+      
+      // Define a completely new property descriptor
+      Object.defineProperty(window, 'ethereum', {
+        configurable: true,
+        get: function() {
+          console.log('Getting ethereum property');
+          return window._originalEthereum;
+        },
+        set: function(val) {
+          console.log('Attempt to set ethereum property blocked');
+          // Silently ignore attempts to set this property
+        }
       });
-      console.log('Facebook SDK initialized successfully');
+    }
+  } catch (error) {
+    console.error('Error protecting ethereum property:', error);
+  }
+  
+  return new Promise((resolve, reject) => {
+    // Check if SDK is already loaded
+    if (window.FB) {
+      console.log('Facebook SDK already initialized');
       resolve(window.FB);
+      return;
+    }
+    
+    window.fbAsyncInit = function() {
+      try {
+        window.FB.init({
+          appId: process.env.REACT_APP_FACEBOOK_APP_ID,
+          cookie: true,
+          xfbml: true,
+          version: META_API_VERSION
+        });
+        console.log('Facebook SDK initialized with version:', META_API_VERSION);
+        resolve(window.FB);
+      } catch (error) {
+        console.error('Error initializing Facebook SDK:', error);
+        reject(error);
+      }
     };
 
-    // Load the SDK asynchronously
+    // Load the SDK asynchronously with correct version
     (function(d, s, id) {
       var js, fjs = d.getElementsByTagName(s)[0];
       if (d.getElementById(id)) return;
       js = d.createElement(s); js.id = id;
-      js.src = "https://connect.facebook.net/en_US/sdk.js";
+      // Include the version number directly in the SDK URL
+      const sdkUrl = `https://connect.facebook.net/en_US/sdk/v${META_API_VERSION.substring(1)}.js`;
+      js.src = sdkUrl;
+      console.log('Loading FB SDK with URL:', sdkUrl);
+      js.onerror = function() {
+        reject(new Error('Failed to load Facebook SDK script'));
+      };
       fjs.parentNode.insertBefore(js, fjs);
-      console.log('Facebook SDK script tag added to document');
     }(document, 'script', 'facebook-jssdk'));
   });
+};
+
+// Get token with priority: provided token > session storage > environment variable
+export const getStoredToken = (providedToken) => {
+  if (providedToken) return providedToken;
+  
+  const sessionToken = sessionStorage.getItem('metaAccessToken');
+  if (sessionToken) return sessionToken;
+  
+  return process.env.REACT_APP_META_ACCESS_TOKEN || null;
 };
 
 // Authentication function with domain-specific redirect URI
 export const login = () => {
   return new Promise((resolve, reject) => {
+    if (!window.FB) {
+      reject(new Error('Facebook SDK not initialized. Call initFacebookSDK() first.'));
+      return;
+    }
+    
     // Determine which domain we're on to use the correct redirect URI
     const currentDomain = window.location.hostname;
     let redirectUri;
     
-    if (currentDomain.includes('myaiadsmanager.com')) {
+    if (currentDomain === 'localhost') {
+      redirectUri = `http://${currentDomain}:${window.location.port}/dashboard`;
+    } else if (currentDomain.includes('myaiadsmanager.com')) {
       redirectUri = 'https://myaiadsmanager.com/api/auth/callback/facebook';
     } else if (currentDomain.includes('campaign-dashboard-attilas-projects')) {
       redirectUri = 'https://campaign-dashboard-attilas-projects-ea2ebf76.vercel.app/api/auth/callback/facebook';
-    } else if (currentDomain === 'localhost') {
-      redirectUri = 'http://localhost:3000/api/auth/callback/facebook';
     } else {
       // Default to the topaz domain
       redirectUri = 'https://campaign-dashboard-topaz.vercel.app/api/auth/callback/facebook';
@@ -60,6 +117,10 @@ export const login = () => {
     window.FB.login(function(response) {
       if (response.authResponse) {
         console.log('Login successful, auth response:', response.authResponse);
+        
+        // Store token in session storage for later use
+        sessionStorage.setItem('metaAccessToken', response.authResponse.accessToken);
+        
         resolve(response.authResponse.accessToken);
       } else {
         console.error('Login failed or cancelled by user');
@@ -77,7 +138,15 @@ export const login = () => {
 // Logout function
 export const logout = () => {
   return new Promise((resolve) => {
+    if (!window.FB) {
+      console.warn('Facebook SDK not initialized, cannot logout');
+      resolve(null);
+      return;
+    }
+    
     window.FB.logout(function(response) {
+      // Clear the stored token
+      sessionStorage.removeItem('metaAccessToken');
       resolve(response);
     });
   });
@@ -88,6 +157,8 @@ export const fbLogout = () => {
   return new Promise((resolve, reject) => {
     try {
       window.FB.logout(function(response) {
+        // Clear the stored token
+        sessionStorage.removeItem('metaAccessToken');
         resolve(response);
       });
     } catch (error) {
@@ -98,15 +169,27 @@ export const fbLogout = () => {
 
 // ======== Meta API Helper Functions ========
 
-// Fetch from Meta Graph API with error handling
-async function fetchFromMetaAPI(endpoint, params = {}, token = META_ACCESS_TOKEN) {
+// Improved fetch from Meta API with better error handling
+async function fetchFromMetaAPI(endpoint, params = {}, providedToken = null) {
+  const token = getStoredToken(providedToken);
+  
+  if (!token) {
+    console.error('No access token available for Meta API call');
+    return { 
+      error: 'Missing access token for Meta API', 
+      code: 'NO_TOKEN',
+      authRequired: true
+    };
+  }
+  
   try {
     const url = `${META_API_BASE_URL}/${META_API_VERSION}/${endpoint}`;
-    console.log('Fetching from Meta API:', url, params);
+    console.log('Fetching from Meta API:', url);
     
     const response = await axios.get(url, {
       params: {
         access_token: token,
+        app_id: process.env.REACT_APP_FACEBOOK_APP_ID, // Include app ID explicitly
         ...params
       }
     });
@@ -116,11 +199,32 @@ async function fetchFromMetaAPI(endpoint, params = {}, token = META_ACCESS_TOKEN
     console.error('Error fetching from Meta API:', error);
     
     // Handle Meta API specific errors
-    if (error.response) {
-      const metaError = error.response.data.error || {};
+    if (error.response && error.response.data && error.response.data.error) {
+      const metaError = error.response.data.error;
+      
+      // Handle specific error codes
+      if (metaError.code === 190) {
+        // Token expired or invalid
+        sessionStorage.removeItem('metaAccessToken');
+        return { 
+          error: 'Facebook access token expired or invalid. Please log in again.',
+          code: metaError.code,
+          authRequired: true
+        };
+      } else if (metaError.code === 200) {
+        // Invalid app ID
+        return { 
+          error: `Invalid Facebook App ID: ${process.env.REACT_APP_FACEBOOK_APP_ID || 'Not set'}. Please check your application configuration.`,
+          code: metaError.code,
+          configIssue: true
+        };
+      }
+      
       return { 
         error: `Meta API Error: ${metaError.message || error.message}`,
-        code: metaError.code
+        code: metaError.code,
+        subcode: metaError.subcode,
+        fbtrace_id: metaError.fbtrace_id // Useful for debugging with Facebook support
       };
     }
     
@@ -205,6 +309,7 @@ function getDateRangeNumber(dateRange) {
   }
 }
 
+// Mock data generation functions
 function generateMockTimeData(days) {
   const data = [];
   const today = new Date();
@@ -370,6 +475,14 @@ export async function getMetaAdAccountsByTenant(tenantId) {
       const result = await fetchFromMetaAPI(endpoint, params);
       
       if (result.error) {
+        // Check if authentication is required
+        if (result.authRequired) {
+          return { 
+            error: result.error,
+            authRequired: true
+          };
+        }
+        
         throw new Error(result.error);
       }
       
@@ -385,7 +498,7 @@ export async function getMetaAdAccountsByTenant(tenantId) {
         tenantName: tenant.name
       };
       
-      return { data: [account] };
+      return { data: [account], isRealData: true };
     } catch (error) {
       console.error('Error fetching Meta ad account, using mock data:', error);
       // Return mock account data for this tenant
@@ -399,7 +512,9 @@ export async function getMetaAdAccountsByTenant(tenantId) {
           timezone: 'America/New_York',
           tenantId: tenantId,
           tenantName: tenant.name
-        }]
+        }],
+        isRealData: false,
+        mockReason: 'Error fetching ad account data'
       };
     }
   } catch (error) {
@@ -408,10 +523,11 @@ export async function getMetaAdAccountsByTenant(tenantId) {
   }
 }
 
-// Get Meta metrics for a specific tenant
-export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days', accessToken = null) {
-  console.log('getMetaMetricsByTenant called with:', { tenantId, dateRange, hasToken: !!accessToken });
+// Get Meta metrics for a specific tenant with improved token handling
+export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days', providedToken = undefined) {
+  console.log('getMetaMetricsByTenant called with:', { tenantId, dateRange, hasToken: !!providedToken });
   
+  // Input validation
   if (!tenantId) {
     console.error('No tenant ID provided');
     return { error: 'No tenant ID provided' };
@@ -441,80 +557,13 @@ export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days
     const datePreset = getMetaDatePreset(dateRange);
     console.log('Using date preset:', datePreset, 'for date range:', dateRange);
     
-    // Determine if we should try to fetch real data
-    const shouldAttemptRealApi = !!accessToken;
+    // Determine data source strategy based on token
+    const useMockData = providedToken === null; // Explicitly requested mock data
     
-    if (shouldAttemptRealApi) {
-      try {
-        console.log('Attempting to fetch real data from Meta API');
-        
-        // Attempt to fetch real data from Meta API
-        const endpoint = `act_${adAccountId}/insights`;
-        const params = {
-          access_token: accessToken,
-          fields: 'impressions,clicks,inline_link_clicks,actions',
-          time_increment: 1,
-          date_preset: datePreset,
-          level: 'account'
-        };
-        
-        // Create URL with query parameters
-        const url = new URL(`${META_API_BASE_URL}/${META_API_VERSION}/${endpoint}`);
-        Object.keys(params).forEach(key => 
-          url.searchParams.append(key, params[key])
-        );
-        
-        // Make the API request
-        const response = await fetch(url.toString());
-        const data = await response.json();
-        
-        // Check for errors in the response
-        if (data.error) {
-          console.error('Meta API error:', data.error);
-          return { 
-            error: `Meta API Error: ${data.error.message || 'Unknown error'}`,
-            isRealData: true 
-          };
-        }
-        
-        // Transform Meta API data to our format
-        const formattedData = data.data.map(item => {
-          // Extract various conversion metrics from actions array if available
-          const actions = item.actions || [];
-          const landingPageViews = getActionValue(actions, 'landing_page_view');
-          const addToCarts = getActionValue(actions, 'add_to_cart');
-          const purchases = getActionValue(actions, 'purchase');
-          
-          return {
-            date: item.date_start,
-            adAccountId: metaAdAccountId,
-            impressions: parseInt(item.impressions || 0),
-            clicks: parseInt(item.clicks || 0),
-            landingPageViews,
-            addToCarts,
-            purchases
-          };
-        });
-        
-        console.log('Fetched real metrics data:', formattedData.length, 'records');
-        
-        // Return real data regardless of whether it's empty
-        return { 
-          data: formattedData, 
-          isRealData: true,
-          isEmpty: formattedData.length === 0
-        };
-      } catch (error) {
-        console.error('Error fetching real metrics:', error);
-        return { 
-          error: `Error fetching data from Meta API: ${error.message}`, 
-          isRealData: true
-        };
-      }
-    } else if (accessToken === null) {
-      // User explicitly requested mock data (null token)
+    // Strategy 1: Use mock data if explicitly requested
+    if (useMockData) {
+      console.log('Using mock data as requested');
       const days = getDateRangeNumber(dateRange);
-      console.log('Generating mock data for', days, 'days');
       const timeData = generateMockTimeData(days);
       
       // Add the tenant's Meta ad account ID to each record
@@ -522,12 +571,115 @@ export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days
         item.adAccountId = metaAdAccountId;
       });
       
-      return { data: timeData, isRealData: false };
-    } else {
-      // No token provided
       return { 
-        error: 'No access token provided for Meta API.', 
-        isRealData: false
+        data: timeData, 
+        isRealData: false,
+        mockReason: 'Explicitly requested mock data'
+      };
+    }
+    
+    // Strategy 2: Try to fetch real data
+    try {
+      console.log('Attempting to fetch real data from Meta API');
+      
+      // Get token with priority: provided token > session storage > environment variable
+      const token = getStoredToken(providedToken);
+      
+      if (!token) {
+        console.warn('No Meta API token available');
+        return { 
+          error: 'No authentication token available for Meta API. Please log in.',
+          authRequired: true
+        };
+      }
+      
+      // Check if environment variable for app ID exists
+      if (!process.env.REACT_APP_FACEBOOK_APP_ID) {
+        console.error('App ID environment variable not found');
+        return {
+          error: 'Facebook App ID not configured. Please set REACT_APP_FACEBOOK_APP_ID in your environment variables.',
+          configIssue: true
+        };
+      }
+      
+      // Attempt to fetch real data from Meta API
+      const endpoint = `act_${adAccountId}/insights`;
+      const params = {
+        fields: 'impressions,clicks,inline_link_clicks,actions',
+        time_increment: 1,
+        date_preset: datePreset,
+        level: 'account',
+        app_id: process.env.REACT_APP_FACEBOOK_APP_ID // Explicitly include app ID
+      };
+      
+      const result = await fetchFromMetaAPI(endpoint, params, token);
+      
+      // Check for errors
+      if (result.error) {
+        // Special handling for authentication errors
+        if (result.authRequired) {
+          return {
+            error: result.error,
+            authRequired: true
+          };
+        }
+        
+        // Special handling for configuration issues
+        if (result.configIssue) {
+          return {
+            error: result.error,
+            configIssue: true
+          };
+        }
+        
+        throw new Error(result.error);
+      }
+      
+      // Check if data exists
+      if (!result.data.data || result.data.data.length === 0) {
+        console.log('No data returned from Meta API');
+        return { 
+          data: [], 
+          isRealData: true,
+          isEmpty: true,
+          message: 'No metrics data available for the selected time period'
+        };
+      }
+      
+      // Transform Meta API data to our format
+      const formattedData = result.data.data.map(item => {
+        // Extract various conversion metrics from actions array if available
+        const actions = item.actions || [];
+        const landingPageViews = getActionValue(actions, 'landing_page_view');
+        const addToCarts = getActionValue(actions, 'add_to_cart');
+        const purchases = getActionValue(actions, 'purchase');
+        
+        return {
+          date: item.date_start,
+          adAccountId: metaAdAccountId,
+          impressions: parseInt(item.impressions || 0),
+          clicks: parseInt(item.clicks || 0),
+          landingPageViews,
+          addToCarts,
+          purchases
+        };
+      });
+      
+      console.log('Fetched real metrics data:', formattedData.length, 'records');
+      
+      return { 
+        data: formattedData, 
+        isRealData: true
+      };
+    } catch (error) {
+      console.error('Error fetching real metrics:', error);
+      
+      // If use didn't explicitly request mock data but real data failed,
+      // let the caller decide whether to fallback to mock data
+      return { 
+        error: `Error fetching data from Meta API: ${error.message}`, 
+        isRealData: true,
+        fallbackToMock: true
       };
     }
   } catch (error) {
@@ -537,7 +689,7 @@ export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days
 }
 
 // Get Meta ad data specific to a tenant
-export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days') {
+export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days', providedToken = undefined) {
   if (!tenantId) {
     console.error('No tenant ID provided');
     return { error: 'No tenant ID provided' };
@@ -566,18 +718,60 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
     // Get the date preset based on the provided date range
     const datePreset = getMetaDatePreset(dateRange);
     
+    // Determine data strategy based on token
+    const useMockData = providedToken === null; // Explicitly requested mock data
+    
+    if (useMockData) {
+      return { 
+        data: generateMockAdData(metaAdAccountId, dateRange),
+        isRealData: false,
+        mockReason: 'Explicitly requested mock data'
+      };
+    }
+    
     try {
+      // Get token with priority order
+      const token = getStoredToken(providedToken);
+      
+      if (!token) {
+        console.warn('No Meta API token available');
+        return { 
+          error: 'No authentication token available for Meta API. Please log in.',
+          authRequired: true
+        };
+      }
+      
       // Attempt to fetch real ad data from Meta API
       const endpoint = `act_${adAccountId}/ads`;
       const params = {
         fields: `id,name,status,created_time,effective_status,insights.date_preset(${datePreset}){impressions,clicks,spend,ctr,cpc}`,
-        limit: 25 // Adjust based on your needs
+        limit: 25, // Adjust based on your needs
+        app_id: process.env.REACT_APP_FACEBOOK_APP_ID // Explicitly include app ID
       };
       
-      const result = await fetchFromMetaAPI(endpoint, params);
+      const result = await fetchFromMetaAPI(endpoint, params, token);
       
       if (result.error) {
+        // Special handling for authentication errors
+        if (result.authRequired) {
+          return {
+            error: result.error,
+            authRequired: true
+          };
+        }
+        
         throw new Error(result.error);
+      }
+      
+      // Check if data exists
+      if (!result.data.data || result.data.data.length === 0) {
+        console.log('No ad data returned from Meta API');
+        return { 
+          data: [], 
+          isRealData: true,
+          isEmpty: true,
+          message: 'No ad data available for the selected time period'
+        };
       }
       
       // Transform Meta API data to our format
@@ -598,12 +792,16 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
         };
       });
       
-      return { data: ads };
+      return { data: ads, isRealData: true };
     } catch (error) {
       console.error('Error fetching real ad data, falling back to mock data:', error);
       
       // Fallback to mock data if Meta API fails
-      return { data: generateMockAdData(metaAdAccountId, dateRange) };
+      return { 
+        data: generateMockAdData(metaAdAccountId, dateRange), 
+        isRealData: false,
+        mockReason: 'API Error: ' + error.message
+      };
     }
   } catch (error) {
     console.error('Error in getMetaAdDataByTenant:', error);
@@ -611,575 +809,33 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
   }
 }
 
-// Get all Meta ad accounts for admin users
-export async function getAllMetaAdAccounts() {
-  try {
-    // Get all tenants and their associated Meta ad accounts
-    const tenantsSnapshot = await getDocs(collection(db, 'tenants'));
-    const tenants = [];
-    
-    tenantsSnapshot.forEach(doc => {
-      const tenantData = doc.data();
-      if (tenantData.metaAdAccountId) {
-        tenants.push({
-          id: doc.id,
-          name: tenantData.name,
-          metaAdAccountId: tenantData.metaAdAccountId
-        });
-      }
-    });
-    
-    try {
-      // Try to fetch all accounts from Meta API
-      if (META_ACCESS_TOKEN) {
-        const endpoint = 'me/adaccounts';
-        const params = {
-          fields: 'id,name,account_id,account_status,currency,timezone_name',
-          limit: 100
-        };
-        
-        const result = await fetchFromMetaAPI(endpoint, params);
-        
-        if (result.error) {
-          throw new Error(result.error);
-        }
-        
-        // Match the accounts with tenants
-        const accounts = result.data.data.map(account => {
-          const matchingTenant = tenants.find(t => t.metaAdAccountId === account.id);
-          return {
-            id: account.id,
-            name: account.name,
-            accountId: account.account_id,
-            status: getAccountStatusLabel(account.account_status),
-            currency: account.currency,
-            timezone: account.timezone_name,
-            tenantId: matchingTenant?.id || null,
-            tenantName: matchingTenant?.name || 'Unassigned'
-          };
-        });
-        
-        return accounts;
-      } else {
-        throw new Error('No META_ACCESS_TOKEN available');
-      }
-    } catch (error) {
-      console.error('Error fetching Meta ad accounts, using mock data:', error);
-      
-      // Fallback to mock accounts based on tenant data
-      return tenants.map((tenant, index) => ({
-        id: tenant.metaAdAccountId,
-        name: `${tenant.name} Ad Account`,
-        accountId: tenant.metaAdAccountId.replace('act_', ''),
-        status: 'ACTIVE',
-        currency: 'USD',
-        timezone: 'America/New_York',
-        tenantId: tenant.id,
-        tenantName: tenant.name
-      }));
-    }
-  } catch (error) {
-    console.error('Error in getAllMetaAdAccounts:', error);
-    return [];
-  }
-}
-
-// ======== Creative Analytics Functions ========
-
-// Fetch creative performance
-export async function fetchCreativePerformance(adAccountId, dateRange = 'last_30d') {
-  if (!adAccountId) {
-    return { error: 'No ad account ID provided' };
-  }
-  
-  // Remove "act_" prefix if it exists
-  const formattedAdAccountId = adAccountId.startsWith('act_') 
-    ? adAccountId.substring(4) 
-    : adAccountId;
-  
-  try {
-    // First, get all ads for the account
-    const endpoint = `act_${formattedAdAccountId}/ads`;
-    const params = {
-      fields: 'id,name,creative{id,thumbnail_url,effective_object_story_id}',
-      limit: 100
-    };
-    
-    const result = await fetchFromMetaAPI(endpoint, params);
-    
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    
-    // Extract creative IDs
-    const ads = result.data.data;
-    const creativeIds = ads
-      .filter(ad => ad.creative)
-      .map(ad => ad.creative.id);
-    
-    if (creativeIds.length === 0) {
-      return { data: [] };
-    }
-    
-    // Now get insights for these creatives
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    
-    const since = thirtyDaysAgo.toISOString().split('T')[0];
-    const until = today.toISOString().split('T')[0];
-    
-    // Split into batches of 50 to avoid excessive query size
-    const batchResults = [];
-    
-    for (let i = 0; i < creativeIds.length; i += 50) {
-      const batch = creativeIds.slice(i, i + 50);
-      
-      const insightsEndpoint = `act_${formattedAdAccountId}/insights`;
-      const insightsParams = {
-        level: 'ad',
-        fields: 'ad_id,spend,impressions,clicks,actions,cost_per_action_type',
-        filtering: JSON.stringify([{
-          field: 'ad.creative.id',
-          operator: 'IN',
-          value: batch
-        }]),
-        time_range: JSON.stringify({
-          since,
-          until
-        }),
-        limit: 500
-      };
-      
-      const batchResult = await fetchFromMetaAPI(insightsEndpoint, insightsParams);
-      
-      if (batchResult.error) {
-        console.error('Error fetching batch insights:', batchResult.error);
-        continue;
-      }
-      
-      batchResults.push(...batchResult.data.data);
-    }
-    
-    // Map insights back to creative information
-    const creativePerformance = batchResults.map(insight => {
-      const ad = ads.find(ad => ad.id === insight.ad_id);
-      return {
-        adId: insight.ad_id,
-        adName: ad ? ad.name : 'Unknown',
-        creativeId: ad && ad.creative ? ad.creative.id : 'Unknown',
-        thumbnailUrl: ad && ad.creative ? ad.creative.thumbnail_url : null,
-        spend: parseFloat(insight.spend || 0),
-        impressions: parseInt(insight.impressions || 0, 10),
-        clicks: parseInt(insight.clicks || 0, 10),
-        ctr: insight.clicks && insight.impressions ? 
-          (parseInt(insight.clicks, 10) / parseInt(insight.impressions, 10) * 100).toFixed(2) : 0,
-        conversions: insight.actions ? 
-          insight.actions.filter(action => action.action_type === 'purchase').reduce((sum, action) => sum + parseInt(action.value, 10), 0) : 0,
-        cpa: insight.cost_per_action_type ? 
-          insight.cost_per_action_type.find(item => item.action_type === 'purchase')?.value || 0 : 0,
-        roas: (insight.actions && parseFloat(insight.spend)) ? 
-          (insight.actions.filter(action => action.action_type === 'purchase')
-            .reduce((sum, action) => sum + (parseFloat(action.value) || 0), 0) / parseFloat(insight.spend)).toFixed(2) : 0
-      };
-    });
-    
-    return { data: creativePerformance };
-  } catch (error) {
-    console.error('Error fetching creative performance:', error);
-    return { error: error.message };
-  }
-}
-
-// Get creative details
-export async function fetchCreativeDetails(creativeId) {
-  if (!creativeId) {
-    return { error: 'No creative ID provided' };
-  }
-  
-  try {
-    const endpoint = creativeId;
-    const params = {
-      fields: 'id,thumbnail_url,object_story_spec,effective_object_story_id,image_url,video_id'
-    };
-    
-    const result = await fetchFromMetaAPI(endpoint, params);
-    
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    
-    return { data: result.data };
- } catch (error) {
-   console.error('Error fetching creative details:', error);
-   return { error: error.message };
- }
-}
-
-// ======== Benchmark Management Functions ========
-
-/**
-* Fetch benchmark settings for a specific ad account
-* @param {string} adAccountId - Meta ad account ID
-* @returns {Promise<Object>} - Response containing benchmark data or error
-*/
-export async function fetchBenchmarks(adAccountId) {
- if (!adAccountId) {
-   return { error: 'No ad account ID provided' };
- }
- 
- try {
-   // Remove "act_" prefix if it exists for consistency
-   const formattedAccountId = adAccountId.startsWith('act_') 
-     ? adAccountId.substring(4) 
-     : adAccountId;
-   
-   // First check if we already have benchmarks stored in our database
-   const benchmarkDocRef = doc(db, 'metaBenchmarks', `act_${formattedAccountId}`);
-   const benchmarkDoc = await getDoc(benchmarkDocRef);
-   
-   if (benchmarkDoc.exists()) {
-     return { data: benchmarkDoc.data().benchmarks };
-   } else {
-     // Initialize with default benchmarks
-     return {
-       data: {
-         ctr: { low: 0.01, medium: 0.02, high: null },
-         cpc: { low: 1.5, medium: 2.5, high: null },
-         cpm: { low: 20, medium: 30, high: null },
-         costPerPurchase: { low: 50, medium: 80, high: null },
-         conversionRate: { low: 0.02, medium: 0.04, high: null },
-         roas: { low: 1, medium: 2, high: null }
-       }
-     };
-   }
- } catch (error) {
-   console.error('Error fetching benchmarks:', error);
-   return { error: error.message };
- }
-}
-
-/**
-* Save benchmark settings for a specific ad account
-* @param {string} adAccountId - Meta ad account ID
-* @param {Object} benchmarkData - Benchmark configuration data
-* @returns {Promise<Object>} - Success or error response
-*/
-export async function saveBenchmarks(adAccountId, benchmarkData) {
- if (!adAccountId) {
-   return { error: 'No ad account ID provided' };
- }
- 
- try {
-   // Remove "act_" prefix if it exists for consistency
-   const formattedAccountId = adAccountId.startsWith('act_') 
-     ? adAccountId.substring(4) 
-     : adAccountId;
-   
-   // Store benchmarks in Firestore
-   const benchmarkDocRef = doc(db, 'metaBenchmarks', `act_${formattedAccountId}`);
-   
-   await setDoc(benchmarkDocRef, {
-     adAccountId: `act_${formattedAccountId}`,
-     benchmarks: benchmarkData,
-     updatedAt: new Date().toISOString()
-   });
-   
-   return { success: true };
- } catch (error) {
-   console.error('Error saving benchmarks:', error);
-   return { error: error.message };
- }
-}
-
-/**
-* Apply benchmarks to creative performance data
-* @param {Array} creativeData - Array of creative performance objects
-* @param {Object} benchmarks - Benchmark settings
-* @returns {Array} - Enhanced creative data with benchmark status
-*/
-export function applyBenchmarksToCreatives(creativeData, benchmarks) {
- if (!creativeData || !benchmarks) return creativeData;
- 
- return creativeData.map(creative => {
-   const benchmarkedCreative = { ...creative };
-   
-   // Add benchmark status for key metrics
-   if (benchmarks.ctr) {
-     const { low, medium } = benchmarks.ctr;
-     const value = creative.ctr / 100; // Convert from percentage to decimal
-     
-     if (low !== null && value < low) {
-       benchmarkedCreative.ctrStatus = 'low';
-     } else if (medium !== null && value < medium) {
-       benchmarkedCreative.ctrStatus = 'medium';
-     } else {
-       benchmarkedCreative.ctrStatus = 'high';
-     }
-   }
-   
-   if (benchmarks.cpc) {
-     const { low, medium } = benchmarks.cpc;
-     const value = creative.cpc;
-     
-     if (low !== null && value < low) {
-       benchmarkedCreative.cpcStatus = 'high'; // Lower CPC is better
-     } else if (medium !== null && value < medium) {
-       benchmarkedCreative.cpcStatus = 'medium';
-     } else {
-       benchmarkedCreative.cpcStatus = 'low';
-     }
-   }
-   
-   if (benchmarks.roas) {
-     const { low, medium } = benchmarks.roas;
-     const value = creative.roas;
-     
-     if (low !== null && value < low) {
-       benchmarkedCreative.roasStatus = 'low';
-     } else if (medium !== null && value < medium) {
-       benchmarkedCreative.roasStatus = 'medium';
-     } else {
-       benchmarkedCreative.roasStatus = 'high';
-     }
-   }
-   
-   return benchmarkedCreative;
- });
-}
-
-/**
-* Generate a performance report with benchmark comparisons
-* @param {string} adAccountId - Meta ad account ID
-* @param {Object} creativeData - Creative performance data
-* @param {Object} benchmarks - Benchmark settings
-* @param {string} format - Report format (pdf, csv)
-* @returns {Promise<Blob>} - Report file as blob
-*/
-export async function generatePerformanceReport(adAccountId, creativeData, benchmarks, format = 'csv') {
- if (!adAccountId || !creativeData) {
-   throw new Error('Missing required parameters');
- }
- 
- try {
-   // Apply benchmarks to creative data
-   const benchmarkedData = applyBenchmarksToCreatives(creativeData, benchmarks);
-   
-   if (format === 'csv') {
-     // Generate CSV
-     const csvRows = [];
-     
-     // Add headers
-     csvRows.push([
-       'Creative',
-       'Ad Sets',
-       'Impressions',
-       'Clicks',
-       'CTR',
-       'CTR Benchmark',
-       'CPC',
-       'CPC Benchmark',
-       'CPM',
-       'CPM Benchmark',
-       'Purchases',
-       'Cost/Purchase',
-       'Spend',
-       'ROAS',
-       'ROAS Benchmark'
-     ].join(','));
-     
-     // Add data rows
-     benchmarkedData.forEach(creative => {
-       const row = [
-         `"${creative.adName || ''}"`,
-         creative.adsetCount || 0,
-         creative.impressions || 0,
-         creative.clicks || 0,
-         `${(creative.ctr || 0).toFixed(2)}%`,
-         creative.ctrStatus || 'N/A',
-         `${(creative.cpc || 0).toFixed(2)}`,
-         creative.cpcStatus || 'N/A',
-         `${(creative.cpm || 0).toFixed(2)}`,
-         creative.cpmStatus || 'N/A',
-         creative.purchases || 0,
-         `${(creative.costPerPurchase || 0).toFixed(2)}`,
-         `${(creative.spend || 0).toFixed(2)}`,
-         `${(creative.roas || 0).toFixed(2)}x`,
-         creative.roasStatus || 'N/A'
-       ];
-       
-       csvRows.push(row.join(','));
-     });
-     
-     // Create CSV blob
-     const csvContent = csvRows.join('\n');
-     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-     
-     return blob;
-   } else {
-     // For now, we only support CSV format
-     throw new Error('Unsupported report format');
-   }
- } catch (error) {
-   console.error('Error generating performance report:', error);
-   throw error;
- }
-}
-
-// ======== Legacy Functions for Backward Compatibility ========
-
-// Original daily metrics function (now tenant-aware)
-export function fetchDailyMetrics(dateRange, adAccountId = null) {
- if (adAccountId) {
-   // If ad account ID is provided, use it directly
-   try {
-     const endpoint = `act_${adAccountId.replace('act_', '')}/insights`;
-     const params = {
-       fields: 'impressions,clicks,inline_link_clicks,actions',
-       time_increment: 1,
-       date_preset: getMetaDatePreset(dateRange),
-       level: 'account'
-     };
-     
-     return fetchFromMetaAPI(endpoint, params)
-       .then(result => {
-         if (result.error) {
-           throw new Error(result.error);
-         }
-         
-         // Transform API data to our format
-         const formattedData = result.data.data.map(item => {
-           const actions = item.actions || [];
-           const landingPageViews = getActionValue(actions, 'landing_page_view');
-           const addToCarts = getActionValue(actions, 'add_to_cart');
-           const purchases = getActionValue(actions, 'purchase');
-           
-           return {
-             date: item.date_start,
-             adAccountId: `act_${adAccountId.replace('act_', '')}`,
-             impressions: parseInt(item.impressions || 0),
-             clicks: parseInt(item.clicks || 0),
-             landingPageViews,
-             addToCarts,
-             purchases
-           };
-         });
-         
-         return formattedData;
-       })
-       .catch(error => {
-         console.error('Error fetching daily metrics, using mock data:', error);
-         // Fall back to mock data
-         const days = getDateRangeNumber(dateRange);
-         return generateMockTimeData(days);
-       });
-   } catch (error) {
-     console.error('Error in fetchDailyMetrics:', error);
-     // Fall back to mock data
-     const days = getDateRangeNumber(dateRange);
-     return generateMockTimeData(days);
-   }
- } else {
-   // No ad account ID, use mock data
-   const days = getDateRangeNumber(dateRange);
-   return generateMockTimeData(days);
- }
-}
-
-// Original breakdown metrics function (now tenant-aware) - explicitly exported for use in other files
-export function fetchBreakdownMetrics(dimension, dateRange, adAccountId = null) {
- if (adAccountId) {
-   // If ad account ID is provided, use it directly
-   try {
-     const endpoint = `act_${adAccountId.replace('act_', '')}/insights`;
-     const metaDimension = getMetaBreakdownDimension(dimension);
-     
-     const params = {
-       fields: 'impressions,clicks,inline_link_clicks,spend,actions',
-       date_preset: getMetaDatePreset(dateRange),
-       breakdowns: metaDimension,
-       level: 'account'
-     };
-     
-     return fetchFromMetaAPI(endpoint, params)
-       .then(result => {
-         if (result.error) {
-           throw new Error(result.error);
-         }
-         
-         // Transform API data to our format
-         const formattedData = result.data.data.map(item => {
-           const actions = item.actions || [];
-           const landingPageViews = getActionValue(actions, 'landing_page_view');
-           const addToCarts = getActionValue(actions, 'add_to_cart');
-           const purchases = getActionValue(actions, 'purchase');
-           
-           // Get the category name based on the dimension
-           const category = getCategoryFromBreakdown(item, metaDimension);
-           
-           // Calculate derived metrics
-           const impressions = parseInt(item.impressions || 0);
-           const clicks = parseInt(item.clicks || 0);
-           const spend = parseFloat(item.spend || 0);
-           
-           const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
-           const cpc = clicks > 0 ? (spend / clicks) : 0;
-           const roas = spend > 0 ? (purchases * 50 / spend) : 0; // Assuming $50 average order value
-           
-           return {
-             category,
-             impressions,
-             clicks,
-             ctr: parseFloat(ctr.toFixed(2)),
-             spend: parseFloat(spend.toFixed(2)),
-             cpc: parseFloat(cpc.toFixed(2)),
-             landingPageViews,
-             addToCarts,
-             purchases,
-             roas: parseFloat(roas.toFixed(2))
-           };
-         });
-         
-         return formattedData;
-       })
-       .catch(error => {
-         console.error('Error fetching breakdown metrics, using mock data:', error);
-         // Fall back to mock data
-         return generateMockBreakdownData(dimension, dateRange);
-       });
-   } catch (error) {
-     console.error('Error in fetchBreakdownMetrics:', error);
-     // Fall back to mock data
-     return generateMockBreakdownData(dimension, dateRange);
-   }
- } else {
-   // No ad account ID, use mock data
-   return generateMockBreakdownData(dimension, dateRange);
- }
-}
-
 // Export all functions
 const metaAPI = {
- // Existing functions
- getMetaMetricsByTenant,
- getMetaAdDataByTenant,
- getMetaAdAccountsByTenant,
- getAllMetaAdAccounts,
- fetchDailyMetrics,
- fetchBreakdownMetrics,
- fetchCreativePerformance,
- fetchCreativeDetails,
- initFacebookSDK,
- login,
- logout,
- fbLogout,
- 
- // New benchmark functions
- fetchBenchmarks,
- saveBenchmarks,
- applyBenchmarksToCreatives,
- generatePerformanceReport
+  // Authentication
+  initFacebookSDK,
+  login,
+  logout,
+  fbLogout,
+  getStoredToken,
+  
+  // Main API functions
+  getMetaAdAccountsByTenant,
+  getMetaMetricsByTenant,
+  getMetaAdDataByTenant,
+  
+  // Helper functions
+  fetchFromMetaAPI,
+  getMetaDatePreset,
+  getActionValue,
+  getMetaBreakdownDimension,
+  getCategoryFromBreakdown,
+  getAccountStatusLabel,
+  getDateRangeNumber,
+  
+  // Mock data generation
+  generateMockTimeData,
+  generateMockBreakdownData,
+  generateMockAdData
 };
 
-// Export both named functions and default export
 export default metaAPI;
