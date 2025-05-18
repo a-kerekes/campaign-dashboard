@@ -11,8 +11,8 @@ import EnhancedCreativePerformanceTable from './EnhancedCreativePerformanceTable
 // Meta API version constant
 const META_API_VERSION = 'v22.0';
 
-// Import the specific functions from the default export
-const { fetchDailyMetrics, fetchBreakdownMetrics } = metaAPI;
+// REMOVE THIS LINE - This is causing the errors:
+// const { fetchDailyMetrics, fetchBreakdownMetrics } = metaAPI;
 
 const CreativeAnalyticsDashboard = () => {
   // Dashboard state
@@ -107,7 +107,8 @@ const CreativeAnalyticsDashboard = () => {
       
       // FETCH DAILY TIME SERIES DATA
       try {
-        const dailyData = await fetchDailyMetrics(dateRange, selectedAccountId);
+        // Use metaAPI.fetchDailyMetrics instead of destructured function
+        const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId);
         setTimeSeriesData(dailyData);
         console.log(`Successfully loaded ${dailyData.length} days of time series data`);
       } catch (timeSeriesError) {
@@ -117,20 +118,20 @@ const CreativeAnalyticsDashboard = () => {
       
       // FETCH BREAKDOWN DATA
       try {
-        // Fetch age breakdown
-        const ageData = await fetchBreakdownMetrics('age', dateRange, selectedAccountId);
+        // Fetch age breakdown - use metaAPI.fetchBreakdownMetrics instead
+        const ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId);
         setAgeBreakdown(ageData);
         
         // Fetch gender breakdown
-        const genderData = await fetchBreakdownMetrics('gender', dateRange, selectedAccountId);
+        const genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId);
         setGenderBreakdown(genderData);
         
         // Fetch platform breakdown
-        const platformData = await fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId);
+        const platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId);
         setPlatformBreakdown(platformData);
         
         // Fetch placement breakdown
-        const placementData = await fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId);
+        const placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId);
         setPlacementBreakdown(placementData);
         
         console.log('Successfully loaded all breakdown data');

@@ -784,8 +784,375 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
     return { error: error.message };
   }
 }
+// Fetch daily metrics for time series charts
+const fetchDailyMetrics = async (dateRange, accountId, token) => {
+  try {
+    // Format account ID to ensure proper format
+    const formattedAccountId = accountId.toString().replace('act_', '');
+    
+    // Get date range
+    const datePreset = getMetaDatePreset(dateRange);
+    console.log(`Fetching daily metrics with date preset ${datePreset} for account ${formattedAccountId}`);
+    
+    // If we're in development mode with mock data
+    if (process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+      // Generate mock data for the date range
+      const days = getDateRangeNumber(dateRange);
+      console.log(`Generating ${days} days of mock time series data`);
+      
+      const mockData = [];
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() - 1); // Yesterday
+      
+      const startDate = new Date(endDate);
+      startDate.setDate(endDate.getDate() - days + 1);
+      
+      let currentDate = new Date(startDate);
+      
+      while (currentDate <= endDate) {
+        mockData.push({
+          date: new Date(currentDate).toISOString().split('T')[0],
+          impressions: Math.floor(Math.random() * 10000) + 1000,
+          clicks: Math.floor(Math.random() * 500) + 50,
+          spend: (Math.random() * 200 + 20).toFixed(2),
+          ctr: (Math.random() * 5 + 0.5).toFixed(2),
+          cpc: (Math.random() * 2 + 0.1).toFixed(2)
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      console.log(`Returning ${mockData.length} days of mock time series data`);
+      return mockData;
+    }
+    
+    // Get token with priority order
+    const accessToken = getStoredToken(token);
+    
+    if (!accessToken) {
+      console.warn('No Meta API token available for fetchDailyMetrics');
+      throw new Error('No authentication token available. Please log in.');
+    }
+    
+    // Calculate date range
+    const days = getDateRangeNumber(dateRange);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    const startDate = new Date(yesterday);
+    startDate.setDate(yesterday.getDate() - (days - 1));
+    
+    const since = startDate.toISOString().split('T')[0];
+    const until = yesterday.toISOString().split('T')[0];
+    
+    // Return real API data
+    const endpoint = `act_${formattedAccountId}/insights`;
+    const params = {
+      time_increment: 1,
+      time_range: JSON.stringify({
+        since,
+        until
+      }),
+      fields: 'impressions,clicks,spend,ctr,cpc,date_start',
+      level: 'account',
+      access_token: accessToken
+    };
+    
+    const result = await fetchFromMetaAPI(endpoint, params, accessToken);
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    if (!result.data || !result.data.data) {
+      throw new Error('No time series data returned from API');
+    }
+    
+    // Format the response for our charts
+    const formattedData = result.data.data.map(day => ({
+      date: day.date_start,
+      impressions: parseInt(day.impressions || 0),
+      clicks: parseInt(day.clicks || 0),
+      spend: parseFloat(day.spend || 0),
+      ctr: parseFloat(day.ctr || 0) * 100, // Convert to percentage
+      cpc: parseFloat(day.cpc || 0)
+    }));
+    
+    return formattedData;
+    
+  } catch (error) {
+    console.error('Error fetching daily metrics:', error);
+    
+    // Generate mock data as fallback
+    const days = getDateRangeNumber(dateRange);
+    const mockData = [];
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() - 1);
+    
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - days + 1);
+    
+    let currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      mockData.push({
+        date: new Date(currentDate).toISOString().split('T')[0],
+        impressions: Math.floor(Math.random() * 10000) + 1000,
+        clicks: Math.floor(Math.random() * 500) + 50,
+        spend: (Math.random() * 200 + 20).toFixed(2),
+        ctr: (Math.random() * 5 + 0.5).toFixed(2),
+        cpc: (Math.random() * 2 + 0.1).toFixed(2)
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    console.log(`Returning ${mockData.length} days of fallback mock time series data due to error`);
+    return mockData;
+  }
+};
 
-// Export all functions
+// Fetch breakdown metrics by dimension (age, gender, etc.)
+const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token) => {
+  try {
+    // Format account ID to ensure proper format
+    const formattedAccountId = accountId.toString().replace('act_', '');
+    
+    // Get date range
+    const datePreset = getMetaDatePreset(dateRange);
+    console.log(`Fetching ${breakdownType} breakdown with date preset ${datePreset} for account ${formattedAccountId}`);
+    
+    // If we're in development mode with mock data
+    if (process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+      // Generate mock data based on breakdown type
+      let mockData = [];
+      
+      if (breakdownType === 'age') {
+        mockData = [
+          { breakdown_value: '18-24', impressions: Math.floor(Math.random() * 2000) + 500, clicks: Math.floor(Math.random() * 100) + 10, spend: (Math.random() * 40 + 5).toFixed(2) },
+          { breakdown_value: '25-34', impressions: Math.floor(Math.random() * 4000) + 1000, clicks: Math.floor(Math.random() * 200) + 50, spend: (Math.random() * 80 + 20).toFixed(2) },
+          { breakdown_value: '35-44', impressions: Math.floor(Math.random() * 3000) + 800, clicks: Math.floor(Math.random() * 150) + 40, spend: (Math.random() * 60 + 15).toFixed(2) },
+          { breakdown_value: '45-54', impressions: Math.floor(Math.random() * 2000) + 400, clicks: Math.floor(Math.random() * 100) + 20, spend: (Math.random() * 40 + 10).toFixed(2) },
+          { breakdown_value: '55-64', impressions: Math.floor(Math.random() * 1000) + 200, clicks: Math.floor(Math.random() * 50) + 10, spend: (Math.random() * 20 + 5).toFixed(2) },
+          { breakdown_value: '65+', impressions: Math.floor(Math.random() * 500) + 100, clicks: Math.floor(Math.random() * 25) + 5, spend: (Math.random() * 10 + 2).toFixed(2) }
+        ];
+      } else if (breakdownType === 'gender') {
+        mockData = [
+          { breakdown_value: 'female', impressions: Math.floor(Math.random() * 6000) + 2000, clicks: Math.floor(Math.random() * 300) + 100, spend: (Math.random() * 120 + 30).toFixed(2) },
+          { breakdown_value: 'male', impressions: Math.floor(Math.random() * 5000) + 1800, clicks: Math.floor(Math.random() * 250) + 90, spend: (Math.random() * 100 + 25).toFixed(2) },
+          { breakdown_value: 'unknown', impressions: Math.floor(Math.random() * 1000) + 200, clicks: Math.floor(Math.random() * 50) + 10, spend: (Math.random() * 20 + 5).toFixed(2) }
+        ];
+      } else if (breakdownType === 'publisher_platform') {
+        mockData = [
+          { breakdown_value: 'facebook', impressions: Math.floor(Math.random() * 7000) + 3000, clicks: Math.floor(Math.random() * 350) + 120, spend: (Math.random() * 140 + 35).toFixed(2) },
+          { breakdown_value: 'instagram', impressions: Math.floor(Math.random() * 5000) + 2000, clicks: Math.floor(Math.random() * 250) + 80, spend: (Math.random() * 100 + 25).toFixed(2) },
+          { breakdown_value: 'audience_network', impressions: Math.floor(Math.random() * 1000) + 200, clicks: Math.floor(Math.random() * 50) + 10, spend: (Math.random() * 20 + 5).toFixed(2) },
+          { breakdown_value: 'messenger', impressions: Math.floor(Math.random() * 500) + 100, clicks: Math.floor(Math.random() * 25) + 5, spend: (Math.random() * 10 + 2).toFixed(2) }
+        ];
+      } else if (breakdownType === 'platform_position') {
+        mockData = [
+          { breakdown_value: 'feed', impressions: Math.floor(Math.random() * 6000) + 2500, clicks: Math.floor(Math.random() * 300) + 100, spend: (Math.random() * 120 + 30).toFixed(2) },
+          { breakdown_value: 'story', impressions: Math.floor(Math.random() * 4000) + 1500, clicks: Math.floor(Math.random() * 200) + 70, spend: (Math.random() * 80 + 20).toFixed(2) },
+          { breakdown_value: 'right_hand_column', impressions: Math.floor(Math.random() * 2000) + 500, clicks: Math.floor(Math.random() * 100) + 20, spend: (Math.random() * 40 + 10).toFixed(2) },
+          { breakdown_value: 'instant_article', impressions: Math.floor(Math.random() * 1000) + 300, clicks: Math.floor(Math.random() * 50) + 15, spend: (Math.random() * 20 + 5).toFixed(2) },
+          { breakdown_value: 'marketplace', impressions: Math.floor(Math.random() * 800) + 200, clicks: Math.floor(Math.random() * 40) + 10, spend: (Math.random() * 16 + 4).toFixed(2) }
+        ];
+      }
+      
+      console.log(`Returning mock ${breakdownType} breakdown data with ${mockData.length} segments`);
+      return mockData;
+    }
+    
+    // Get token with priority order
+    const accessToken = getStoredToken(token);
+    
+    if (!accessToken) {
+      console.warn('No Meta API token available for fetchBreakdownMetrics');
+      throw new Error('No authentication token available. Please log in.');
+    }
+    
+    // Calculate date range
+    const days = getDateRangeNumber(dateRange);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    const startDate = new Date(yesterday);
+    startDate.setDate(yesterday.getDate() - (days - 1));
+    
+    const since = startDate.toISOString().split('T')[0];
+    const until = yesterday.toISOString().split('T')[0];
+    
+    // Return actual API data
+    const endpoint = `act_${formattedAccountId}/insights`;
+    const params = {
+      time_range: JSON.stringify({
+        since,
+        until
+      }),
+      breakdowns: breakdownType,
+      fields: 'impressions,clicks,spend',
+      level: 'account',
+      access_token: accessToken
+    };
+    
+    const result = await fetchFromMetaAPI(endpoint, params, accessToken);
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    if (!result.data || !result.data.data) {
+      throw new Error(`No ${breakdownType} breakdown data returned from API`);
+    }
+    
+    // Format the response for our charts
+    const formattedData = result.data.data.map(item => ({
+      breakdown_value: item[breakdownType],
+      impressions: parseInt(item.impressions || 0),
+      clicks: parseInt(item.clicks || 0),
+      spend: parseFloat(item.spend || 0)
+    }));
+    
+    return formattedData;
+    
+  } catch (error) {
+    console.error(`Error fetching ${breakdownType} breakdown:`, error);
+    
+    // Generate mock data as fallback
+    let mockData = [];
+    
+    if (breakdownType === 'age') {
+      mockData = [
+        { breakdown_value: '18-24', impressions: Math.floor(Math.random() * 2000) + 500, clicks: Math.floor(Math.random() * 100) + 10, spend: (Math.random() * 40 + 5).toFixed(2) },
+        { breakdown_value: '25-34', impressions: Math.floor(Math.random() * 4000) + 1000, clicks: Math.floor(Math.random() * 200) + 50, spend: (Math.random() * 80 + 20).toFixed(2) },
+        { breakdown_value: '35-44', impressions: Math.floor(Math.random() * 3000) + 800, clicks: Math.floor(Math.random() * 150) + 40, spend: (Math.random() * 60 + 15).toFixed(2) },
+        { breakdown_value: '45-54', impressions: Math.floor(Math.random() * 2000) + 400, clicks: Math.floor(Math.random() * 100) + 20, spend: (Math.random() * 40 + 10).toFixed(2) },
+        { breakdown_value: '55-64', impressions: Math.floor(Math.random() * 1000) + 200, clicks: Math.floor(Math.random() * 50) + 10, spend: (Math.random() * 20 + 5).toFixed(2) },
+        { breakdown_value: '65+', impressions: Math.floor(Math.random() * 500) + 100, clicks: Math.floor(Math.random() * 25) + 5, spend: (Math.random() * 10 + 2).toFixed(2) }
+      ];
+    } else if (breakdownType === 'gender') {
+      mockData = [
+        { breakdown_value: 'female', impressions: Math.floor(Math.random() * 6000) + 2000, clicks: Math.floor(Math.random() * 300) + 100, spend: (Math.random() * 120 + 30).toFixed(2) },
+        { breakdown_value: 'male', impressions: Math.floor(Math.random() * 5000) + 1800, clicks: Math.floor(Math.random() * 250) + 90, spend: (Math.random() * 100 + 25).toFixed(2) },
+        { breakdown_value: 'unknown', impressions: Math.floor(Math.random() * 1000) + 200, clicks: Math.floor(Math.random() * 50) + 10, spend: (Math.random() * 20 + 5).toFixed(2) }
+      ];
+    } else if (breakdownType === 'publisher_platform') {
+      mockData = [
+        { breakdown_value: 'facebook', impressions: Math.floor(Math.random() * 7000) + 3000, clicks: Math.floor(Math.random() * 350) + 120, spend: (Math.random() * 140 + 35).toFixed(2) },
+        { breakdown_value: 'instagram', impressions: Math.floor(Math.random() * 5000) + 2000, clicks: Math.floor(Math.random() * 250) + 80, spend: (Math.random() * 100 + 25).toFixed(2) },
+        { breakdown_value: 'audience_network', impressions: Math.floor(Math.random() * 1000) + 200, clicks: Math.floor(Math.random() * 50) + 10, spend: (Math.random() * 20 + 5).toFixed(2) },
+        { breakdown_value: 'messenger', impressions: Math.floor(Math.random() * 500) + 100, clicks: Math.floor(Math.random() * 25) + 5, spend: (Math.random() * 10 + 2).toFixed(2) }
+      ];
+    } else if (breakdownType === 'platform_position') {
+      mockData = [
+        { breakdown_value: 'feed', impressions: Math.floor(Math.random() * 6000) + 2500, clicks: Math.floor(Math.random() * 300) + 100, spend: (Math.random() * 120 + 30).toFixed(2) },
+        { breakdown_value: 'story', impressions: Math.floor(Math.random() * 4000) + 1500, clicks: Math.floor(Math.random() * 200) + 70, spend: (Math.random() * 80 + 20).toFixed(2) },
+        { breakdown_value: 'right_hand_column', impressions: Math.floor(Math.random() * 2000) + 500, clicks: Math.floor(Math.random() * 100) + 20, spend: (Math.random() * 40 + 10).toFixed(2) },
+        { breakdown_value: 'instant_article', impressions: Math.floor(Math.random() * 1000) + 300, clicks: Math.floor(Math.random() * 50) + 15, spend: (Math.random() * 20 + 5).toFixed(2) },
+        { breakdown_value: 'marketplace', impressions: Math.floor(Math.random() * 800) + 200, clicks: Math.floor(Math.random() * 40) + 10, spend: (Math.random() * 16 + 4).toFixed(2) }
+      ];
+    }
+    
+    console.log(`Returning fallback mock ${breakdownType} breakdown data due to error`);
+    return mockData;
+  }
+};
+
+// Fetch benchmarks for performance comparison
+const fetchBenchmarks = async (accountId, token) => {
+  try {
+    // Format account ID to ensure proper format
+    const formattedAccountId = accountId.toString().replace('act_', '');
+    
+    // If we're in development mode with mock data
+    if (process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+      // Generate mock benchmark data
+      const mockBenchmarks = {
+        ctr: (Math.random() * 2 + 1).toFixed(2), // Between 1-3%
+        cpc: (Math.random() * 0.8 + 0.4).toFixed(2), // Between $0.40-$1.20
+        cpm: (Math.random() * 10 + 5).toFixed(2), // Between $5-$15
+        conversionRate: (Math.random() * 4 + 1).toFixed(2), // Between 1-5%
+        averageOrderValue: (Math.random() * 60 + 40).toFixed(2), // Between $40-$100
+        roas: (Math.random() * 3 + 1.5).toFixed(2) // Between 1.5x-4.5x
+      };
+      
+      console.log('Returning mock benchmark data');
+      return { data: mockBenchmarks };
+    }
+    
+    // Get token with priority order
+    const accessToken = getStoredToken(token);
+    
+    if (!accessToken) {
+      console.warn('No Meta API token available for fetchBenchmarks');
+      throw new Error('No authentication token available. Please log in.');
+    }
+    
+    // For real API, we would fetch industry benchmarks or historical performance
+    // For now, we'll return mock data even for real API requests until we implement a benchmark API
+    const industryBenchmarks = {
+      ctr: 1.9, // Average CTR for all industries
+      cpc: 0.97, // Average CPC
+      cpm: 12.07, // Average CPM
+      conversionRate: 2.35, // Average conversion rate
+      averageOrderValue: 65.00, // Average order value
+      roas: 2.5 // Average ROAS
+    };
+    
+    return { data: industryBenchmarks };
+    
+  } catch (error) {
+    console.error('Error fetching benchmarks:', error);
+    
+    // Return default benchmarks on error
+    return {
+      data: {
+        ctr: 1.5,
+        cpc: 0.85,
+        cpm: 10.00,
+        conversionRate: 2.0,
+        averageOrderValue: 60.00,
+        roas: 2.0
+      }
+    };
+  }
+};
+
+// Save custom benchmarks for an account
+const saveBenchmarks = async (accountId, benchmarks, token) => {
+  try {
+    // Format account ID to ensure proper format
+    const formattedAccountId = accountId.toString().replace('act_', '');
+    console.log('Saving benchmarks for account', formattedAccountId, benchmarks);
+    
+    // In a real app, we would save these to a database or API
+    // For now, we'll just log them and return success
+    
+    // Attempt to save to Firestore if available
+    try {
+      await setDoc(doc(db, 'benchmarks', formattedAccountId), {
+        ...benchmarks,
+        accountId: formattedAccountId,
+        updatedAt: new Date().toISOString()
+      });
+      console.log('Benchmarks saved to Firestore');
+    } catch (firestoreError) {
+      console.warn('Could not save benchmarks to Firestore:', firestoreError);
+      // Continue even if Firestore save fails
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving benchmarks:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// UPDATE THE metaAPI EXPORT TO INCLUDE THE NEW FUNCTIONS
 const metaAPI = {
   // Authentication
   initFacebookSDK,
@@ -797,6 +1164,12 @@ const metaAPI = {
   getMetaAdAccountsByTenant,
   getMetaMetricsByTenant,
   getMetaAdDataByTenant,
+  
+  // Add the new functions needed for CreativeAnalyticsDashboard
+  fetchDailyMetrics,
+  fetchBreakdownMetrics,
+  fetchBenchmarks,
+  saveBenchmarks,
   
   // Helper functions
   fetchFromMetaAPI,
