@@ -518,8 +518,11 @@ export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days
   }
 }
 
-// Get Meta ad data specific to a tenant
-export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days') {
+// Replace the getMetaMetricsByTenant function with this implementation
+
+export async function getMetaMetricsByTenant(tenantId, dateRange = 'Last 30 Days', accessToken = null) {
+  console.log('getMetaMetricsByTenant called with:', { tenantId, dateRange, hasToken: !!accessToken });
+  
   if (!tenantId) {
     console.error('No tenant ID provided');
     return { error: 'No tenant ID provided' };
@@ -545,50 +548,101 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
       ? metaAdAccountId.substring(4) 
       : metaAdAccountId;
     
-    // Get the date preset based on the provided date range
+    // Use the date range provided
     const datePreset = getMetaDatePreset(dateRange);
+    console.log('Using date preset:', datePreset, 'for date range:', dateRange);
     
-    try {
-      // Attempt to fetch real ad data from Meta API
-      const endpoint = `act_${adAccountId}/ads`;
-      const params = {
-        fields: `id,name,status,created_time,effective_status,insights.date_preset(${datePreset}){impressions,clicks,spend,ctr,cpc}`,
-        limit: 25 // Adjust based on your needs
-      };
-      
-      const result = await fetchFromMetaAPI(endpoint, params);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      // Transform Meta API data to our format
-      const ads = result.data.data.map(ad => {
-        const insights = ad.insights?.data?.[0] || {};
+    // Determine if we should try to fetch real data
+    const shouldAttemptRealApi = !!accessToken;
+    
+    if (shouldAttemptRealApi) {
+      try {
+        console.log('Attempting to fetch real data from Meta API');
         
-        return {
-          id: ad.id,
-          adAccountId: metaAdAccountId,
-          name: ad.name,
-          status: ad.effective_status || ad.status,
-          impressions: parseInt(insights.impressions || 0),
-          clicks: parseInt(insights.clicks || 0),
-          ctr: parseFloat(insights.ctr || 0),
-          spend: parseFloat(insights.spend || 0),
-          cpc: parseFloat(insights.cpc || 0),
-          createdAt: ad.created_time
+        // Attempt to fetch real data from Meta API
+        const endpoint = `act_${adAccountId}/insights`;
+        const params = {
+          access_token: accessToken,
+          fields: 'impressions,clicks,inline_link_clicks,actions',
+          time_increment: 1,
+          date_preset: datePreset,
+          level: 'account'
         };
+        
+        // Create URL with query parameters
+        const url = new URL(`${META_API_BASE_URL}/${META_API_VERSION}/${endpoint}`);
+        Object.keys(params).forEach(key => 
+          url.searchParams.append(key, params[key])
+        );
+        
+        // Make the API request
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        
+        // Check for errors in the response
+        if (data.error) {
+          console.error('Meta API error:', data.error);
+          return { 
+            error: `Meta API Error: ${data.error.message || 'Unknown error'}`,
+            isRealData: true 
+          };
+        }
+        
+        // Transform Meta API data to our format
+        const formattedData = data.data.map(item => {
+          // Extract various conversion metrics from actions array if available
+          const actions = item.actions || [];
+          const landingPageViews = getActionValue(actions, 'landing_page_view');
+          const addToCarts = getActionValue(actions, 'add_to_cart');
+          const purchases = getActionValue(actions, 'purchase');
+          
+          return {
+            date: item.date_start,
+            adAccountId: metaAdAccountId,
+            impressions: parseInt(item.impressions || 0),
+            clicks: parseInt(item.clicks || 0),
+            landingPageViews,
+            addToCarts,
+            purchases
+          };
+        });
+        
+        console.log('Fetched real metrics data:', formattedData.length, 'records');
+        
+        // Return real data regardless of whether it's empty
+        return { 
+          data: formattedData, 
+          isRealData: true,
+          isEmpty: formattedData.length === 0
+        };
+      } catch (error) {
+        console.error('Error fetching real metrics:', error);
+        return { 
+          error: `Error fetching data from Meta API: ${error.message}`, 
+          isRealData: true
+        };
+      }
+    } else if (accessToken === null) {
+      // User explicitly requested mock data (null token)
+      const days = getDateRangeNumber(dateRange);
+      console.log('Generating mock data for', days, 'days');
+      const timeData = generateMockTimeData(days);
+      
+      // Add the tenant's Meta ad account ID to each record
+      timeData.forEach(item => {
+        item.adAccountId = metaAdAccountId;
       });
       
-      return { data: ads };
-    } catch (error) {
-      console.error('Error fetching real ad data, falling back to mock data:', error);
-      
-      // Fallback to mock data if Meta API fails
-      return { data: generateMockAdData(metaAdAccountId, dateRange) };
+      return { data: timeData, isRealData: false };
+    } else {
+      // No token provided
+      return { 
+        error: 'No access token provided for Meta API.', 
+        isRealData: false
+      };
     }
   } catch (error) {
-    console.error('Error in getMetaAdDataByTenant:', error);
+    console.error('Error in getMetaMetricsByTenant:', error);
     return { error: error.message };
   }
 }

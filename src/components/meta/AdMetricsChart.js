@@ -1,4 +1,4 @@
-// src/components/meta/AdMetricsChart.js (fixed version)
+// src/components/meta/AdMetricsChart.js
 import React, { useState, useEffect } from 'react';
 import {
   LineChart,
@@ -20,6 +20,7 @@ const AdMetricsChart = ({ accessToken = null }) => {
   const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState('Last 30 Days');
   const [isRealData, setIsRealData] = useState(false);
+  const [useMockData, setUseMockData] = useState(false);
   const { currentTenant, isAdmin } = useAuth();
   const [metrics, setMetrics] = useState({
     impressions: true,
@@ -36,7 +37,7 @@ const AdMetricsChart = ({ accessToken = null }) => {
     setDateRange(newDateRange);
   };
 
-  // Fetch data when tenant, date range, or accessToken changes
+  // Fetch data when tenant, date range, accessToken, or useMockData changes
   useEffect(() => {
     const fetchData = async () => {
       if (!currentTenant?.id) {
@@ -50,27 +51,48 @@ const AdMetricsChart = ({ accessToken = null }) => {
       setLoading(true);
       setError(null);
 
-      console.log(`Fetching metrics data for tenant: ${currentTenant.id}, date range: ${dateRange}, hasToken: ${!!accessToken}`);
+      console.log(`Fetching metrics data for tenant: ${currentTenant.id}, date range: ${dateRange}, hasToken: ${!!accessToken}, useMockData: ${useMockData}`);
       
       try {
-        // Pass the dateRange and accessToken to the API function
-        const result = await getMetaMetricsByTenant(currentTenant.id, dateRange, accessToken);
-        
-        if (result.error) {
-          console.error('API returned error:', result.error);
-          setError(result.error);
-          setMetricsData([]);
-          setIsRealData(false);
-        } else if (result.data) {
-          console.log('API returned data:', result.data.length, 'records', 'isRealData:', result.isRealData);
-          // Format dates for display
-          const formattedData = result.data.map(item => ({
-            ...item,
-            formattedDate: new Date(item.date).toLocaleDateString()
-          }));
+        // If user has explicitly requested mock data
+        if (useMockData) {
+          console.log('User requested mock data, fetching...');
+          const result = await getMetaMetricsByTenant(currentTenant.id, dateRange, null); // Null token forces mock data
           
-          setMetricsData(formattedData);
-          setIsRealData(result.isRealData || false);
+          if (result.error) {
+            console.error('Error fetching mock data:', result.error);
+            setError(result.error);
+            setMetricsData([]);
+            setIsRealData(false);
+          } else if (result.data) {
+            const formattedData = result.data.map(item => ({
+              ...item,
+              formattedDate: new Date(item.date).toLocaleDateString()
+            }));
+            
+            setMetricsData(formattedData);
+            setIsRealData(false); // Clearly indicate it's mock data
+          }
+        } else {
+          // Normal flow - try to get real data
+          const result = await getMetaMetricsByTenant(currentTenant.id, dateRange, accessToken);
+          
+          if (result.error) {
+            console.error('API returned error:', result.error);
+            setError(result.error);
+            setMetricsData([]);
+            setIsRealData(result.isRealData || false);
+          } else if (result.data) {
+            console.log('API returned data:', result.data.length, 'records', 'isRealData:', result.isRealData);
+            
+            const formattedData = result.data.map(item => ({
+              ...item,
+              formattedDate: new Date(item.date).toLocaleDateString()
+            }));
+            
+            setMetricsData(formattedData);
+            setIsRealData(result.isRealData || false);
+          }
         }
       } catch (err) {
         console.error('Error fetching metrics data:', err);
@@ -83,7 +105,7 @@ const AdMetricsChart = ({ accessToken = null }) => {
     };
 
     fetchData();
-  }, [currentTenant, dateRange, accessToken]); // Include accessToken in dependencies
+  }, [currentTenant, dateRange, accessToken, useMockData]); // Include useMockData in dependencies
 
   // Toggle metrics
   const toggleMetric = (metric) => {
@@ -162,6 +184,16 @@ const AdMetricsChart = ({ accessToken = null }) => {
                 : 'Please contact your administrator to set up a Meta ad account for this tenant.'}
             </p>
           )}
+          {isRealData && (
+            <div className="mt-4">
+              <button
+                onClick={() => setUseMockData(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Use Sample Data For Development
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -172,11 +204,44 @@ const AdMetricsChart = ({ accessToken = null }) => {
     return (
       <div className="p-4 bg-white rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Ad Metrics</h2>
-        <div className="bg-gray-50 border border-gray-200 text-gray-800 px-4 py-12 rounded text-center">
-          <p>No metrics data available for this time period.</p>
+        <div className="bg-gray-50 border border-gray-200 text-gray-800 px-4 py-8 rounded text-center">
+          {isRealData ? (
+            <div>
+              <p className="mb-4">No metrics data available from Meta API for this time period.</p>
+              <p className="text-sm text-gray-600 mb-4">This may occur if:</p>
+              <ul className="text-sm text-gray-600 list-disc list-inside mb-4">
+                <li>There is no ad data for the selected date range</li>
+                <li>The Meta API token doesn't have sufficient permissions</li>
+                <li>The ad account is new or has no campaigns</li>
+              </ul>
+              <button
+                onClick={() => setUseMockData(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Use Sample Data For Development
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p>No metrics data available for this time period.</p>
+              {accessToken && !useMockData && (
+                <button
+                  onClick={() => setUseMockData(true)}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Use Sample Data For Development
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
+  }
+
+  // Reset mock data mode if we're viewing real data
+  if (useMockData && isRealData && metricsData.length > 0) {
+    setUseMockData(false);
   }
 
   // Define colors for each stage
@@ -224,8 +289,26 @@ const AdMetricsChart = ({ accessToken = null }) => {
               backgroundColor: isRealData ? '#059669' : '#9ca3af',
               marginRight: '4px'
             }}></div>
-            {isRealData ? 'Real API Data' : 'Mock Data'}
+            {isRealData ? 'Real API Data' : 'Sample Data'}
           </div>
+          
+          {useMockData && (
+            <button
+              onClick={() => setUseMockData(false)}
+              style={{
+                marginLeft: '10px',
+                padding: '2px 8px',
+                fontSize: '12px',
+                backgroundColor: 'transparent',
+                border: '1px solid #6b7280',
+                borderRadius: '4px',
+                color: '#6b7280',
+                cursor: 'pointer'
+              }}
+            >
+              Try Real Data
+            </button>
+          )}
         </div>
         
         <div style={{display: 'flex', alignItems: 'center'}}>
