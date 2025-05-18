@@ -1,4 +1,4 @@
-// src/components/meta/AdMetricsChart.js
+// src/components/meta/AdMetricsChart.js (fixed version)
 import React, { useState, useEffect } from 'react';
 import {
   LineChart,
@@ -13,12 +13,13 @@ import {
 import { getMetaMetricsByTenant } from './metaAPI';
 import { useAuth } from '../../context/AuthContext';
 
-const AdMetricsChart = () => {
+const AdMetricsChart = ({ accessToken = null }) => {
   const [viewType, setViewType] = useState('funnel'); // 'funnel' or 'timeSeries'
   const [metricsData, setMetricsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState('Last 30 Days');
+  const [isRealData, setIsRealData] = useState(false);
   const { currentTenant, isAdmin } = useAuth();
   const [metrics, setMetrics] = useState({
     impressions: true,
@@ -28,7 +29,14 @@ const AdMetricsChart = () => {
     purchases: true
   });
 
-  // Fetch data when tenant or date range changes
+  // Handle date range change
+  const handleDateRangeChange = (e) => {
+    const newDateRange = e.target.value;
+    console.log('Date range changed from', dateRange, 'to', newDateRange);
+    setDateRange(newDateRange);
+  };
+
+  // Fetch data when tenant, date range, or accessToken changes
   useEffect(() => {
     const fetchData = async () => {
       if (!currentTenant?.id) {
@@ -42,18 +50,19 @@ const AdMetricsChart = () => {
       setLoading(true);
       setError(null);
 
-      console.log(`Fetching metrics data for tenant: ${currentTenant.id}, date range: ${dateRange}`);
+      console.log(`Fetching metrics data for tenant: ${currentTenant.id}, date range: ${dateRange}, hasToken: ${!!accessToken}`);
       
       try {
-        // Pass the dateRange to the API function
-        const result = await getMetaMetricsByTenant(currentTenant.id, dateRange);
+        // Pass the dateRange and accessToken to the API function
+        const result = await getMetaMetricsByTenant(currentTenant.id, dateRange, accessToken);
         
         if (result.error) {
           console.error('API returned error:', result.error);
           setError(result.error);
           setMetricsData([]);
+          setIsRealData(false);
         } else if (result.data) {
-          console.log('API returned data:', result.data.length, 'records');
+          console.log('API returned data:', result.data.length, 'records', 'isRealData:', result.isRealData);
           // Format dates for display
           const formattedData = result.data.map(item => ({
             ...item,
@@ -61,25 +70,20 @@ const AdMetricsChart = () => {
           }));
           
           setMetricsData(formattedData);
+          setIsRealData(result.isRealData || false);
         }
       } catch (err) {
         console.error('Error fetching metrics data:', err);
         setError('Failed to load metrics data');
         setMetricsData([]);
+        setIsRealData(false);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [currentTenant, dateRange]); // Include dateRange in dependencies to trigger refresh
-
-  // Handle date range change
-  const handleDateRangeChange = (e) => {
-    const newDateRange = e.target.value;
-    console.log('Date range changed from', dateRange, 'to', newDateRange);
-    setDateRange(newDateRange);
-  };
+  }, [currentTenant, dateRange, accessToken]); // Include accessToken in dependencies
 
   // Toggle metrics
   const toggleMetric = (metric) => {
@@ -119,6 +123,17 @@ const AdMetricsChart = () => {
       // For 60/90 days, show fewer labels to avoid crowding
       if (date.getDate() % 5 !== 0) return '';
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
+
+  // Helper function to get date range number
+  const getDateRangeNumber = (dateRange) => {
+    switch(dateRange) {
+      case 'Last 7 Days': return 7;
+      case 'Last 30 Days': return 30;
+      case 'Last 60 Days': return 60;
+      case 'Last 90 Days': return 90;
+      default: return 30;
     }
   };
 
@@ -182,186 +197,36 @@ const AdMetricsChart = () => {
     { name: 'Purchases', value: metricsData.reduce((sum, item) => sum + (item.purchases || 0), 0), key: 'purchases' }
   ];
 
-  // Helper function to get date range number
-  const getDateRangeNumber = (dateRange) => {
-    switch(dateRange) {
-      case 'Last 7 Days': return 7;
-      case 'Last 30 Days': return 30;
-      case 'Last 60 Days': return 60;
-      case 'Last 90 Days': return 90;
-      default: return 30;
-    }
-  };
-  
-  // Statistics helper functions
-  const calculateAverage = (metric) => {
-    if (!metricsData || !metricsData.length) return 0;
-    return metricsData.reduce((sum, day) => sum + (day[metric] || 0), 0) / metricsData.length;
-  };
-
-  const calculateTotal = (metric) => {
-    if (!metricsData || !metricsData.length) return 0;
-    return metricsData.reduce((sum, day) => sum + (day[metric] || 0), 0);
-  };
-
-  const findPeak = (metric) => {
-    if (!metricsData || !metricsData.length) return {value: 0, date: null};
-    const maxItem = metricsData.reduce((max, current) => 
-      (current[metric] > max[metric]) ? current : max, metricsData[0]);
-    return {value: maxItem[metric], date: maxItem.date};
-  };
-
-  const formatShortDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-  };
-  
-  // Format single metric summary
-  const renderMetricSummary = (metric) => {
-    if (!metrics[metric]) return null;
-    
-    const activeMetricsCount = Object.values(metrics).filter(Boolean).length;
-    if (activeMetricsCount !== 1) return null;
-    
-    const average = calculateAverage(metric);
-    const total = calculateTotal(metric);
-    const peak = findPeak(metric);
-    
-    return (
-      <div style={{
-        marginBottom: '10px', 
-        padding: '12px', 
-        backgroundColor: '#f9fafb', 
-        borderRadius: '6px',
-        border: '1px solid #e5e7eb'
-      }}>
-        <div style={{fontWeight: 'bold', marginBottom: '8px', fontSize: '14px'}}>
-          {getMetricName(metric)} Summary:
-        </div>
-        <div style={{display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '14px'}}>
-          <div>
-            <span style={{color: '#6b7280'}}>Average:</span> 
-            <span style={{fontWeight: 'bold', marginLeft: '4px'}}>{formatValue(average)}/day</span>
-          </div>
-          <div>
-            <span style={{color: '#6b7280'}}>Total:</span> 
-            <span style={{fontWeight: 'bold', marginLeft: '4px'}}>{formatValue(total)}</span>
-          </div>
-          <div>
-            <span style={{color: '#6b7280'}}>Peak:</span> 
-            <span style={{fontWeight: 'bold', marginLeft: '4px'}}>{formatValue(peak.value)}</span>
-            <span style={{marginLeft: '4px', color: '#6b7280'}}>({formatShortDate(peak.date)})</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  // Format value for display
-  const formatValue = (value) => {
-    if (value === undefined || value === null) return '0';
-    if (value >= 1000000) {
-      return (value / 1000000).toFixed(1) + 'M';
-    } else if (value >= 1000) {
-      return (value / 1000).toFixed(1) + 'K';
-    }
-    return Math.round(value).toLocaleString();
-  };
-
-  // Get metric name
-  const getMetricName = (key) => {
-    switch (key) {
-      case 'impressions': return 'Impressions';
-      case 'clicks': return 'Clicks';
-      case 'landingPageViews': return 'Landing Page Views';
-      case 'addToCarts': return 'Add to Carts';
-      case 'purchases': return 'Purchases';
-      default: return key;
-    }
-  };
-
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const date = new Date(label);
-      const formattedDate = date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-      
-      // Group metrics
-      const filteredPayload = payload.filter(p => metrics[p.dataKey]);
-      
-      // Calculate rates if we have necessary metrics
-      const impressions = getValueByKey(payload, 'impressions');
-      const clicks = getValueByKey(payload, 'clicks');
-      const landingPageViews = getValueByKey(payload, 'landingPageViews');
-      const addToCarts = getValueByKey(payload, 'addToCarts');
-      const purchases = getValueByKey(payload, 'purchases');
-      
-      const ctr = impressions && clicks ? (clicks / impressions * 100).toFixed(2) : null;
-      const viewRate = clicks && landingPageViews ? (landingPageViews / clicks * 100).toFixed(2) : null;
-      const addToCartRate = landingPageViews && addToCarts ? (addToCarts / landingPageViews * 100).toFixed(2) : null;
-      const purchaseRate = addToCarts && purchases ? (purchases / addToCarts * 100).toFixed(2) : null;
-      
-      return (
-        <div style={{
-          backgroundColor: 'white', 
-          padding: '12px', 
-          border: '1px solid #e5e7eb',
-          borderRadius: '6px',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-          minWidth: '200px'
-        }}>
-          <div style={{fontWeight: 'bold', marginBottom: '8px', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px'}}>
-            {formattedDate}
-          </div>
-          
-          {filteredPayload.map((entry, index) => (
-            <div key={index} style={{
-              color: entry.color, 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              padding: '4px 0'
-            }}>
-              <span style={{marginRight: '12px'}}>{entry.name}:</span>
-              <span style={{fontWeight: 'bold'}}>{entry.value.toLocaleString()}</span>
-            </div>
-          ))}
-          
-          {/* Show conversion rates if applicable */}
-          {(ctr || viewRate || addToCartRate || purchaseRate) && (
-            <div style={{marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb', fontSize: '13px'}}>
-              <div style={{fontWeight: 'medium', marginBottom: '4px'}}>Conversion Rates:</div>
-              {ctr && <div style={{display: 'flex', justifyContent: 'space-between'}}><span>CTR:</span> <span>{ctr}%</span></div>}
-              {viewRate && <div style={{display: 'flex', justifyContent: 'space-between'}}><span>View Rate:</span> <span>{viewRate}%</span></div>}
-              {addToCartRate && <div style={{display: 'flex', justifyContent: 'space-between'}}><span>Add to Cart Rate:</span> <span>{addToCartRate}%</span></div>}
-              {purchaseRate && <div style={{display: 'flex', justifyContent: 'space-between'}}><span>Purchase Rate:</span> <span>{purchaseRate}%</span></div>}
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Helper function to get value by key from payload
-  const getValueByKey = (payload, key) => {
-    if (!payload) return 0;
-    const item = payload.find(p => p.dataKey === key);
-    return item ? item.value : 0;
-  };
-
   return (
     <div style={{padding: '20px', backgroundColor: 'white', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'}}>
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
-        <h3 style={{fontSize: '18px', fontWeight: 'bold', margin: 0}}>
-          Conversion Funnel 
-          {currentTenant && <span style={{fontSize: '14px', color: '#6b7280', marginLeft: '8px'}}>({currentTenant.name})</span>}
-        </h3>
+        <div>
+          <h3 style={{fontSize: '18px', fontWeight: 'bold', margin: 0}}>
+            Conversion Funnel 
+            {currentTenant && <span style={{fontSize: '14px', color: '#6b7280', marginLeft: '8px'}}>({currentTenant.name})</span>}
+          </h3>
+          
+          {/* Data source indicator */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            marginTop: '4px',
+            fontSize: '12px',
+            color: isRealData ? '#059669' : '#9ca3af',
+            backgroundColor: isRealData ? 'rgba(5, 150, 105, 0.1)' : 'rgba(156, 163, 175, 0.1)',
+            padding: '2px 8px',
+            borderRadius: '12px'
+          }}>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              backgroundColor: isRealData ? '#059669' : '#9ca3af',
+              marginRight: '4px'
+            }}></div>
+            {isRealData ? 'Real API Data' : 'Mock Data'}
+          </div>
+        </div>
         
         <div style={{display: 'flex', alignItems: 'center'}}>
           {/* Date range selector */}
@@ -502,13 +367,7 @@ const AdMetricsChart = () => {
             ))}
           </div>
           
-          {/* Metric summary for single metric view */}
-          {renderMetricSummary('impressions')}
-          {renderMetricSummary('clicks')}
-          {renderMetricSummary('landingPageViews')}
-          {renderMetricSummary('addToCarts')}
-          {renderMetricSummary('purchases')}
-          
+          {/* Time series chart */}
           <div style={{height: '320px'}}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
@@ -519,7 +378,6 @@ const AdMetricsChart = () => {
                 <XAxis 
                   dataKey="date" 
                   tickFormatter={formatXAxisDate}
-                  // Adjust angle for longer date ranges to prevent overlap
                   tick={{ 
                     angle: getDateRangeNumber(dateRange) >= 60 ? -45 : 0, 
                     textAnchor: 'end',
@@ -532,7 +390,6 @@ const AdMetricsChart = () => {
                 <YAxis 
                   yAxisId="impressions"
                   domain={['dataMin', 'dataMax']}
-                  tickFormatter={value => formatValue(value)}
                   orientation="left"
                   hide={!metrics.impressions}
                 />
@@ -541,12 +398,11 @@ const AdMetricsChart = () => {
                 <YAxis 
                   yAxisId="lowerFunnel"
                   domain={[0, 'auto']}
-                  tickFormatter={value => formatValue(value)}
                   orientation="right"
                   hide={!(metrics.clicks || metrics.landingPageViews || metrics.addToCarts || metrics.purchases)}
                 />
                 
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip />
                 <Legend verticalAlign="top" height={36} />
                 
                 {metrics.impressions && (
@@ -615,29 +471,6 @@ const AdMetricsChart = () => {
                 )}
               </LineChart>
             </ResponsiveContainer>
-          </div>
-          
-          {/* Metrics summary cards */}
-          <div className="mt-4 grid grid-cols-3 gap-4 text-center" style={{marginTop: '20px'}}>
-            <div style={{backgroundColor: '#ebf5ff', padding: '12px', borderRadius: '8px'}}>
-              <h3 style={{fontSize: '18px', fontWeight: 'bold', color: '#3b82f6', margin: '0 0 4px 0'}}>
-                {metricsData.reduce((sum, item) => sum + item.impressions, 0).toLocaleString()}
-              </h3>
-              <p style={{fontSize: '14px', color: '#6b7280', margin: 0}}>Total Impressions</p>
-            </div>
-            <div style={{backgroundColor: '#ecfdf5', padding: '12px', borderRadius: '8px'}}>
-              <h3 style={{fontSize: '18px', fontWeight: 'bold', color: '#10b981', margin: '0 0 4px 0'}}>
-                {metricsData.reduce((sum, item) => sum + item.clicks, 0).toLocaleString()}
-              </h3>
-              <p style={{fontSize: '14px', color: '#6b7280', margin: 0}}>Total Clicks</p>
-            </div>
-            <div style={{backgroundColor: '#fffbeb', padding: '12px', borderRadius: '8px'}}>
-              <h3 style={{fontSize: '18px', fontWeight: 'bold', color: '#f59e0b', margin: '0 0 4px 0'}}>
-                {((metricsData.reduce((sum, item) => sum + item.clicks, 0) / 
-                  metricsData.reduce((sum, item) => sum + item.impressions, 0)) * 100).toFixed(2)}%
-              </h3>
-              <p style={{fontSize: '14px', color: '#6b7280', margin: 0}}>Average CTR</p>
-            </div>
           </div>
         </div>
       )}

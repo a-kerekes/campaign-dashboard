@@ -39,7 +39,8 @@ const CreativeAnalyticsDashboard = () => {
   
   // Benchmark state
   const [benchmarks, setBenchmarks] = useState({});
-  const [selectedCreative, setSelectedCreative] = useState(null);
+  // Remove unused selectedCreative state variable
+  // const [selectedCreative, setSelectedCreative] = useState(null);
 
   // Initialize Facebook SDK on component mount
   useEffect(() => {
@@ -321,11 +322,7 @@ const CreativeAnalyticsDashboard = () => {
         creativePerformance,
         topCreatives,
         campaigns: campaignsResponse.data.data,
-        accountInsights: insightsResponse.data.data,
-        account: {
-          id: selectedAccountId,
-          name: accounts.find(a => a.id === selectedAccountId)?.name || 'Meta Ad Account'
-        }
+        accountInsights: insightsResponse.data.data
       });
       
       console.log('Performance data and time series data loaded successfully');
@@ -336,7 +333,7 @@ const CreativeAnalyticsDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange, accounts]);
+  }, [accessToken, selectedAccountId, dateRange]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
@@ -769,7 +766,7 @@ const CreativeAnalyticsDashboard = () => {
                   <option value="Last 60 Days">Last 60 Days</option>
                   <option value="Last 90 Days">Last 90 Days</option>
                 </select>
-              </div>
+                </div>
               
               <div className="mb-2 flex space-x-2">
                 <button
@@ -794,24 +791,16 @@ const CreativeAnalyticsDashboard = () => {
             )}
             
             {analyticsData && (
-              <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  <AdMetricsChart 
-                    analyticsData={analyticsData} 
-                    dateRange={dateRange}
-                    timeSeriesData={timeSeriesData} 
-                  />
-                  <AiAdvisor 
-                    analyticsData={analyticsData}
-                    audienceInsightsData={{
-                      age: ageBreakdown,
-                      gender: genderBreakdown,
-                      platform: platformBreakdown,
-                      placement: placementBreakdown
-                    }}
-                    creativePerformanceData={analyticsData?.creativePerformance || []}
-                  />
-                </div>
+  <>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <AdMetricsChart 
+        analyticsData={analyticsData} 
+        dateRange={dateRange}
+        timeSeriesData={timeSeriesData} 
+        accessToken={accessToken} // Pass the access token here
+      />
+      <AiAdvisor analyticsData={analyticsData} />
+    </div>
                 
                 {/* Add the Breakdown Chart */}
                 <div className="mb-6">
@@ -829,7 +818,11 @@ const CreativeAnalyticsDashboard = () => {
                     analyticsData={analyticsData}
                     selectedAccountId={selectedAccountId}
                     benchmarks={benchmarks}
-                    onCreativeSelect={setSelectedCreative}
+                    onCreativeSelect={(creative) => {
+                      // Handle creative selection, but don't set it to the removed state variable
+                      console.log("Selected creative:", creative);
+                      // We could implement additional functionality here if needed
+                    }}
                   />
                 </div>
               </>

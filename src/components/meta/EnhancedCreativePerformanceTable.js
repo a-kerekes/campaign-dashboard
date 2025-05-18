@@ -309,19 +309,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Format value according to format
-  const formatValue = (value, format) => {
-    if (value === null || value === undefined) return 'N/A';
-    
-    switch (format) {
-      case 'percentage':
-        return `${value.toFixed(2)}%`;
-      case 'currency':
-        return `$${value.toFixed(2)}`;
-      default:
-        return value.toFixed(2).toString();
-    }
-  };
+  // Removed formatValue function as it's declared but never used
+  // This fixes the ESLint warning: 'formatValue' is assigned a value but never used
 
   // Get benchmark status class with better handling
   const getBenchmarkStatusClass = (metric, value) => {
