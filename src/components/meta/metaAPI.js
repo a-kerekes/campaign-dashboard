@@ -1,5 +1,5 @@
 // src/components/meta/metaAPI.js
-import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import axios from 'axios';
 
@@ -10,6 +10,53 @@ const META_API_VERSION = 'v22.0';
 const META_API_BASE_URL = 'https://graph.facebook.com';
 
 console.log('Using Facebook App ID:', FACEBOOK_APP_ID);
+
+// ==== UTILITY FUNCTIONS ====
+
+/**
+ * Determines whether to use mock data based on localStorage and environment variables
+ * @returns {boolean} True if mock data should be used
+ */
+const shouldUseMockData = () => {
+  // Priority 1: Check localStorage setting (user preference)
+  const localStorageSetting = localStorage.getItem('USE_MOCK_DATA');
+  if (localStorageSetting !== null) {
+    return localStorageSetting === 'true';
+  }
+  
+  // Priority 2: Check environment variable
+  return process.env.REACT_APP_USE_MOCK_DATA === 'true';
+};
+
+/**
+ * Marks data as mock data by adding metadata
+ * @param {Array} data - The data array to mark
+ * @returns {Array} The marked data array
+ */
+const markAsMockData = (data) => {
+  if (!data || !Array.isArray(data)) return data;
+  
+  return data.map(item => ({
+    ...item,
+    _isMock: true,
+    source: 'mock'
+  }));
+};
+
+/**
+ * Creates a custom event to notify about mock data changes
+ * @param {boolean} useMock - Whether to use mock data
+ */
+const notifyMockDataChange = (useMock) => {
+  localStorage.setItem('USE_MOCK_DATA', useMock ? 'true' : 'false');
+  
+  const event = new CustomEvent('mockDataChanged', { 
+    detail: { useMock } 
+  });
+  window.dispatchEvent(event);
+  
+  console.log(`Mock data preference changed to: ${useMock}`);
+};
 
 // Simplified Facebook SDK initialization that avoids ethereum conflicts
 export const initFacebookSDK = () => {
@@ -784,6 +831,7 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
     return { error: error.message };
   }
 }
+
 // Fetch daily metrics for time series charts
 const fetchDailyMetrics = async (dateRange, accountId, token) => {
   try {
@@ -794,11 +842,8 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     const datePreset = getMetaDatePreset(dateRange);
     console.log(`Fetching daily metrics with date preset ${datePreset} for account ${formattedAccountId}`);
     
-    // Always enable mock data for development
-    const useMockData = process.env.REACT_APP_USE_MOCK_DATA === 'true' || true; // Force to true to fix current issue
-    
-    // If we're in development mode with mock data
-    if (useMockData) {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
       // Generate mock data for the date range
       const days = getDateRangeNumber(dateRange);
       console.log(`Generating ${days} days of mock time series data`);
@@ -827,7 +872,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       }
       
       console.log(`Returning ${mockData.length} days of mock time series data`);
-      return mockData;
+      return markAsMockData(mockData);
     }
     
     // Get token with priority order
@@ -859,8 +904,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
         until
       }),
       fields: 'impressions,clicks,spend,ctr,cpc,date_start',
-      level: 'account',
-      access_token: accessToken
+      level: 'account'
     };
     
     const result = await fetchFromMetaAPI(endpoint, params, accessToken);
@@ -914,7 +958,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     }
     
     console.log(`Returning ${mockData.length} days of fallback mock time series data due to error`);
-    return mockData;
+    return markAsMockData(mockData);
   }
 };
 
@@ -931,17 +975,17 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
     // IMPORTANT: Handle platform_position specially since it's causing API errors
     if (breakdownType === 'platform_position') {
       console.log('Using mock data for platform_position due to Meta API limitations');
-      return [
+      const mockPlatformData = [
         { breakdown_value: 'feed', impressions: Math.floor(Math.random() * 6000) + 2500, clicks: Math.floor(Math.random() * 300) + 100, spend: (Math.random() * 120 + 30).toFixed(2) },
         { breakdown_value: 'story', impressions: Math.floor(Math.random() * 4000) + 1500, clicks: Math.floor(Math.random() * 200) + 70, spend: (Math.random() * 80 + 20).toFixed(2) },
         { breakdown_value: 'right_hand_column', impressions: Math.floor(Math.random() * 2000) + 500, clicks: Math.floor(Math.random() * 100) + 20, spend: (Math.random() * 40 + 10).toFixed(2) },
         { breakdown_value: 'instant_article', impressions: Math.floor(Math.random() * 1000) + 300, clicks: Math.floor(Math.random() * 50) + 15, spend: (Math.random() * 20 + 5).toFixed(2) },
         { breakdown_value: 'marketplace', impressions: Math.floor(Math.random() * 800) + 200, clicks: Math.floor(Math.random() * 40) + 10, spend: (Math.random() * 16 + 4).toFixed(2) }
       ];
+      return markAsMockData(mockPlatformData);
     }
     
-    // If we're in development mode with mock data
-    if (process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+    if (shouldUseMockData()) {
       // Generate mock data based on breakdown type
       let mockData = [];
       
@@ -978,7 +1022,7 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
       }
       
       console.log(`Returning mock ${breakdownType} breakdown data with ${mockData.length} segments`);
-      return mockData;
+      return markAsMockData(mockData);
     }
     
     // Get token with priority order
@@ -1010,8 +1054,7 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
       }),
       breakdowns: breakdownType,
       fields: 'impressions,clicks,spend',
-      level: 'account',
-      access_token: accessToken
+      level: 'account'
     };
     
     const result = await fetchFromMetaAPI(endpoint, params, accessToken);
@@ -1073,7 +1116,7 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
     }
     
     console.log(`Returning fallback mock ${breakdownType} breakdown data due to error`);
-    return mockData;
+    return markAsMockData(mockData);
   }
 };
 
@@ -1084,7 +1127,7 @@ const fetchBenchmarks = async (accountId, token) => {
     const formattedAccountId = accountId.toString().replace('act_', '');
     
     // If we're in development mode with mock data
-    if (process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+    if (shouldUseMockData()) {
       // Generate mock benchmark data
       const mockBenchmarks = {
         ctr: (Math.random() * 2 + 1).toFixed(2), // Between 1-3%
@@ -1194,6 +1237,11 @@ const metaAPI = {
   getCategoryFromBreakdown,
   getAccountStatusLabel,
   getDateRangeNumber,
+  
+  // Mock data utilities
+  shouldUseMockData,
+  markAsMockData,
+  notifyMockDataChange,
   
   // Mock data generation
   generateMockTimeData,

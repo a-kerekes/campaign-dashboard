@@ -19,7 +19,7 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isRealData, setIsRealData] = useState(false);
-  const [useMockData, setUseMockData] = useState(false);
+  const [useMockData, setUseMockData] = useState(localStorage.getItem('USE_MOCK_DATA') === 'true');
   const { currentTenant, isAdmin } = useAuth();
   const [metrics, setMetrics] = useState({
     impressions: true,
@@ -36,14 +36,49 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
       analyticsDataSummary: analyticsData?.summary,
       hasTimeSeriesData: !!timeSeriesData,
       timeSeriesDataLength: timeSeriesData ? timeSeriesData.length : 0,
-      dateRange
+      dateRange,
+      useMockData
     });
-  }, [analyticsData, timeSeriesData, dateRange]);
+  }, [analyticsData, timeSeriesData, dateRange, useMockData]);
+
+  // Determine if we're using real data
+  useEffect(() => {
+    // Check for mock data by checking for specific properties or patterns
+    // For instance, mock data often has very regular patterns or specific values
+    const checkIfMockData = (data) => {
+      if (!data || data.length === 0) return true;
+      
+      // If the environment variable is explicitly set to use mock data
+      if (process.env.REACT_APP_USE_MOCK_DATA === 'true') return true;
+      
+      // If localStorage is set to use mock data
+      if (localStorage.getItem('USE_MOCK_DATA') === 'true') return true;
+      
+      // Check if there's a "Using mock data" log in the console (indicating a fallback)
+      const mockDataIndicator = data.some(item => 
+        item.hasOwnProperty('_isMock') || 
+        (item.source && item.source === 'mock')
+      );
+      
+      return mockDataIndicator;
+    };
+    
+    // Determine data source
+    if (timeSeriesData && timeSeriesData.length > 0) {
+      const isMock = checkIfMockData(timeSeriesData);
+      setIsRealData(!isMock);
+      setUseMockData(isMock);
+      
+      // Update localStorage to match current state
+      localStorage.setItem('USE_MOCK_DATA', isMock ? 'true' : 'false');
+    }
+  }, [timeSeriesData]);
 
   // Use timeSeriesData passed as prop when available
   useEffect(() => {
     if (timeSeriesData && timeSeriesData.length > 0) {
       console.log("Using timeSeriesData passed from parent component:", timeSeriesData.length, "records");
+      console.log("Data source:", isRealData ? "Real API Data" : "Mock Data");
       
       // Format the data if needed
       const formattedData = timeSeriesData.map(item => ({
@@ -54,10 +89,8 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
       setMetricsData(formattedData);
       setLoading(false);
       setError(null);
-      // Assume it's mock data if process.env.REACT_APP_USE_MOCK_DATA is true or if analyticsData flag indicates it
-      setIsRealData(false);
     }
-  }, [timeSeriesData]);
+  }, [timeSeriesData, isRealData]);
 
   // Handle date range change
   const handleDateRangeChange = (e) => {
@@ -70,23 +103,38 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
   const handleUseSampleData = () => {
     console.log("Using sample data for development");
     setUseMockData(true);
+    localStorage.setItem('USE_MOCK_DATA', 'true');
     
-    // Generate empty data array to force the chart to re-render
-    // The parent component should handle the actual data generation
-    const emptyDataArray = [];
-    for (let i = 0; i < 30; i++) {
-      emptyDataArray.push({
-        date: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
-        impressions: 0,
-        clicks: 0,
-        landingPageViews: 0,
-        addToCarts: 0,
-        purchases: 0
-      });
-    }
+    // Instead of reloading the page, we should emit an event or call a callback
+    // to inform the parent component to switch to mock data
+    // For now, we can use a custom event
+    const event = new CustomEvent('useMockDataRequested', { 
+      detail: { useMock: true } 
+    });
+    window.dispatchEvent(event);
     
-    setMetricsData(emptyDataArray);
-    window.location.reload(); // Force reload to apply mock data setting
+    // If there's a direct callback prop, use that instead
+    // if (typeof onUseMockDataChange === 'function') {
+    //   onUseMockDataChange(true);
+    // }
+  };
+
+  // Handler for "Try Real Data" button
+  const handleUseRealData = () => {
+    console.log("Attempting to use real data");
+    setUseMockData(false);
+    localStorage.setItem('USE_MOCK_DATA', 'false');
+    
+    // Emit event to parent
+    const event = new CustomEvent('useMockDataRequested', { 
+      detail: { useMock: false } 
+    });
+    window.dispatchEvent(event);
+    
+    // If there's a direct callback prop, use that instead
+    // if (typeof onUseMockDataChange === 'function') {
+    //   onUseMockDataChange(false);
+    // }
   };
 
   // Toggle metrics
@@ -262,9 +310,9 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
             {isRealData ? 'Real API Data' : 'Sample Data'}
           </div>
           
-          {useMockData && (
+          {useMockData ? (
             <button
-              onClick={() => setUseMockData(false)}
+              onClick={handleUseRealData}
               style={{
                 marginLeft: '10px',
                 padding: '2px 8px',
@@ -277,6 +325,22 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
               }}
             >
               Try Real Data
+            </button>
+          ) : (
+            <button
+              onClick={handleUseSampleData}
+              style={{
+                marginLeft: '10px',
+                padding: '2px 8px',
+                fontSize: '12px',
+                backgroundColor: 'transparent',
+                border: '1px solid #6b7280',
+                borderRadius: '4px',
+                color: '#6b7280',
+                cursor: 'pointer'
+              }}
+            >
+              Use Sample Data
             </button>
           )}
         </div>
