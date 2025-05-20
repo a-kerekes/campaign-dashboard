@@ -835,46 +835,43 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
 // Fetch daily metrics for time series charts
 const fetchDailyMetrics = async (dateRange, accountId, token) => {
   try {
-    console.log(`======= DEBUG: FETCH DAILY METRICS CALLED =======`);
-    console.log(`Date Range Selected: "${dateRange}"`);
-    console.log(`Account ID: "${accountId}"`);
-    console.log(`Has Token: ${!!token}`);
+    console.log(`======= FETCH DAILY METRICS: ${dateRange} =======`);
     
-    // Calculate the actual date range that should be used
+    // Format account ID to ensure proper format
+    const formattedAccountId = accountId.toString().replace('act_', '');
+    
+    // Get the number of days from date range selection
     const days = getDateRangeNumber(dateRange);
-    console.log(`Number of days for "${dateRange}": ${days}`);
     
-    // Calculate the precise dates
+    // Calculate dates exactly like Facebook's UI:
+    // End date is always yesterday
     const today = new Date();
-    console.log(`Today's date: ${today.toISOString().split('T')[0]}`);
-    
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    console.log(`Yesterday's date: ${yesterday.toISOString().split('T')[0]}`);
     
+    // Start date is (days-1) days before yesterday
+    // We use (days-1) because the range includes yesterday
     const startDate = new Date(yesterday);
     startDate.setDate(startDate.getDate() - (days - 1));
-    console.log(`Start date for "${dateRange}": ${startDate.toISOString().split('T')[0]}`);
     
-    // Format dates for API
+    // Format dates as strings for API and logging
     const since = startDate.toISOString().split('T')[0];
     const until = yesterday.toISOString().split('T')[0];
-    console.log(`Final date range: ${since} to ${until} (${days} days)`);
     
-    // Generate mock data without using datePreset
+    console.log(`Date range for ${dateRange}: ${since} to ${until} (${days} days)`);
+    
+    // Generate mock data or fetch real data using the same date range logic
     if (shouldUseMockData()) {
       console.log(`Using mock data for date range: ${since} to ${until}`);
       
       const mockData = [];
-      const dates = [];
       let currentDate = new Date(startDate);
       
-      // Generate data for each day in the range
+      // Generate one data point for each day in the range
       while (currentDate <= yesterday) {
         const dateStr = currentDate.toISOString().split('T')[0];
-        dates.push(dateStr);
         
-        // Calculate mock metrics
+        // Generate realistic metrics with proper funnel drop-off rates
         const impressions = Math.floor(Math.random() * 10000) + 1000;
         const clicks = Math.floor(Math.random() * 500) + 50;
         const clickRate = clicks / impressions;
@@ -898,28 +895,24 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
         currentDate.setDate(currentDate.getDate() + 1);
       }
       
-      console.log(`Generated ${mockData.length} days of mock data`);
-      console.log(`Mock data dates: ${dates.join(', ')}`);
-      const markedData = markAsMockData(mockData);
+      // Log the date range in the generated data
+      if (mockData.length > 0) {
+        console.log(`Generated mock data from ${mockData[0].date} to ${mockData[mockData.length-1].date}`);
+      }
       
-      // Sort data by date for consistent display
-      markedData.sort((a, b) => new Date(a.date) - new Date(b.date));
-      
-      return markedData;
+      return markAsMockData(mockData);
     }
     
-    // Get token with priority order for real API calls
+    // Get token for real API call
     const accessToken = getStoredToken(token);
     if (!accessToken) {
-      console.warn('No Meta API token available for fetchDailyMetrics');
       throw new Error('No authentication token available. Please log in.');
     }
     
-    // Prepare API parameters with explicit date range
+    // Make the API request with explicit date range
     const endpoint = `act_${formattedAccountId}/insights`;
     const params = {
       time_increment: 1,
-      // IMPORTANT: Use explicit time_range with the calculated dates
       time_range: JSON.stringify({
         since: since,
         until: until
@@ -928,26 +921,21 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       level: 'account'
     };
     
-    console.log(`API request parameters: ${JSON.stringify(params)}`);
+    console.log(`Fetching real API data using date range: ${since} to ${until}`);
     
-    // Make the API call
     const result = await fetchFromMetaAPI(endpoint, params, accessToken);
     
     if (result.error) {
-      console.error(`API error: ${result.error}`);
       throw new Error(result.error);
     }
     
     if (!result.data || !result.data.data) {
-      console.error('No time series data returned from API');
       throw new Error('No time series data returned from API');
     }
     
-    console.log(`API returned ${result.data.data.length} days of data`);
-    
-    // Process and format the data
+    // Process the API response
     const formattedData = result.data.data.map(day => {
-      // Extract conversion metrics
+      // Extract conversion metrics from actions
       const actions = day.actions || [];
       const landingPageViews = actions.find(a => a.action_type === 'landing_page_view')?.value || 0;
       const addToCarts = actions.find(a => a.action_type === 'add_to_cart')?.value || 0;
@@ -966,19 +954,17 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       };
     });
     
-    // Log the actual dates in the returned data
-    const dates = formattedData.map(item => item.date);
-    console.log(`API data dates: ${dates.join(', ')}`);
-    
-    // Sort data by date for consistent display
-    formattedData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Log the date range in the returned data
+    if (formattedData.length > 0) {
+      console.log(`Received API data from ${formattedData[0].date} to ${formattedData[formattedData.length-1].date}`);
+    }
     
     return formattedData;
     
   } catch (error) {
     console.error('Error fetching daily metrics:', error);
     
-    // Fall back to mock data with explicit date range
+    // Fall back to mock data with the same date logic
     const days = getDateRangeNumber(dateRange);
     
     const today = new Date();
@@ -994,12 +980,10 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     console.log(`Generating fallback mock data for range: ${since} to ${until}`);
     
     const mockData = [];
-    const dates = [];
     let currentDate = new Date(startDate);
     
     while (currentDate <= yesterday) {
       const dateStr = currentDate.toISOString().split('T')[0];
-      dates.push(dateStr);
       
       const impressions = Math.floor(Math.random() * 10000) + 1000;
       const clicks = Math.floor(Math.random() * 500) + 50;
@@ -1023,11 +1007,10 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       currentDate.setDate(currentDate.getDate() + 1);
     }
     
-    console.log(`Generated ${mockData.length} days of fallback mock data`);
-    console.log(`Fallback data dates: ${dates.join(', ')}`);
+    if (mockData.length > 0) {
+      console.log(`Generated fallback mock data from ${mockData[0].date} to ${mockData[mockData.length-1].date}`);
+    }
     
-    // Sort and mark as mock data
-    mockData.sort((a, b) => new Date(a.date) - new Date(b.date));
     return markAsMockData(mockData);
   }
 };
