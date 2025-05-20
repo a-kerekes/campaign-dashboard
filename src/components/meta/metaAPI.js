@@ -859,13 +859,24 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       let currentDate = new Date(startDate);
       
       while (currentDate <= endDate) {
+        // Create more realistic mock data with conversion metrics
+        const impressions = Math.floor(Math.random() * 10000) + 1000;
+        const clicks = Math.floor(Math.random() * 500) + 50;
+        const clickRate = clicks / impressions;
+        const landingPageViews = Math.floor(clicks * (0.8 + Math.random() * 0.15)); // 80-95% of clicks
+        const addToCarts = Math.floor(landingPageViews * (0.15 + Math.random() * 0.15)); // 15-30% of landing page views
+        const purchases = Math.floor(addToCarts * (0.2 + Math.random() * 0.2)); // 20-40% of add to carts
+        
         mockData.push({
           date: new Date(currentDate).toISOString().split('T')[0],
-          impressions: Math.floor(Math.random() * 10000) + 1000,
-          clicks: Math.floor(Math.random() * 500) + 50,
+          impressions: impressions,
+          clicks: clicks,
           spend: parseFloat((Math.random() * 200 + 20).toFixed(2)),
-          ctr: parseFloat((Math.random() * 5 + 0.5).toFixed(2)),
-          cpc: parseFloat((Math.random() * 2 + 0.1).toFixed(2))
+          ctr: parseFloat((clickRate * 100).toFixed(2)),
+          cpc: parseFloat((Math.random() * 2 + 0.1).toFixed(2)),
+          landingPageViews: landingPageViews,
+          addToCarts: addToCarts,
+          purchases: purchases
         });
         
         currentDate.setDate(currentDate.getDate() + 1);
@@ -903,7 +914,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
         since,
         until
       }),
-      fields: 'impressions,clicks,spend,ctr,cpc,date_start',
+      fields: 'impressions,clicks,spend,ctr,cpc,date_start,actions,action_values,cost_per_action_type',
       level: 'account'
     };
     
@@ -918,14 +929,25 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     }
     
     // Format the response for our charts
-    const formattedData = result.data.data.map(day => ({
-      date: day.date_start,
-      impressions: parseInt(day.impressions || 0),
-      clicks: parseInt(day.clicks || 0),
-      spend: parseFloat(day.spend || 0),
-      ctr: parseFloat(day.ctr || 0) * 100, // Convert to percentage
-      cpc: parseFloat(day.cpc || 0)
-    }));
+    const formattedData = result.data.data.map(day => {
+      // Extract conversion metrics from actions
+      const actions = day.actions || [];
+      const landingPageViews = actions.find(a => a.action_type === 'landing_page_view')?.value || 0;
+      const addToCarts = actions.find(a => a.action_type === 'add_to_cart')?.value || 0;
+      const purchases = actions.find(a => a.action_type === 'purchase')?.value || 0;
+      
+      return {
+        date: day.date_start,
+        impressions: parseInt(day.impressions || 0),
+        clicks: parseInt(day.clicks || 0),
+        spend: parseFloat(day.spend || 0),
+        ctr: parseFloat(day.ctr || 0) * 100, // Convert to percentage
+        cpc: parseFloat(day.cpc || 0),
+        landingPageViews: parseInt(landingPageViews),
+        addToCarts: parseInt(addToCarts),
+        purchases: parseInt(purchases)
+      };
+    });
     
     return formattedData;
     
@@ -945,13 +967,24 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     let currentDate = new Date(startDate);
     
     while (currentDate <= endDate) {
+      // Create fallback mock data with conversion metrics
+      const impressions = Math.floor(Math.random() * 10000) + 1000;
+      const clicks = Math.floor(Math.random() * 500) + 50;
+      const clickRate = clicks / impressions;
+      const landingPageViews = Math.floor(clicks * (0.8 + Math.random() * 0.15));
+      const addToCarts = Math.floor(landingPageViews * (0.15 + Math.random() * 0.15));
+      const purchases = Math.floor(addToCarts * (0.2 + Math.random() * 0.2));
+      
       mockData.push({
         date: new Date(currentDate).toISOString().split('T')[0],
-        impressions: Math.floor(Math.random() * 10000) + 1000,
-        clicks: Math.floor(Math.random() * 500) + 50,
+        impressions: impressions,
+        clicks: clicks,
         spend: parseFloat((Math.random() * 200 + 20).toFixed(2)),
-        ctr: parseFloat((Math.random() * 5 + 0.5).toFixed(2)),
-        cpc: parseFloat((Math.random() * 2 + 0.1).toFixed(2))
+        ctr: parseFloat((clickRate * 100).toFixed(2)),
+        cpc: parseFloat((Math.random() * 2 + 0.1).toFixed(2)),
+        landingPageViews: landingPageViews,
+        addToCarts: addToCarts,
+        purchases: purchases
       });
       
       currentDate.setDate(currentDate.getDate() + 1);
