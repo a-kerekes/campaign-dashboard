@@ -11,8 +11,9 @@ import EnhancedCreativePerformanceTable from './EnhancedCreativePerformanceTable
 // Meta API version constant
 const META_API_VERSION = 'v22.0';
 
-// REMOVE THIS LINE - This is causing the errors:
+// IMPORTANT: Do NOT destructure metaAPI functions like this:
 // const { fetchDailyMetrics, fetchBreakdownMetrics } = metaAPI;
+// Instead, use metaAPI.fetchDailyMetrics and metaAPI.fetchBreakdownMetrics directly
 
 const CreativeAnalyticsDashboard = () => {
   // Dashboard state
@@ -25,6 +26,7 @@ const CreativeAnalyticsDashboard = () => {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [timeSeriesData, setTimeSeriesData] = useState(null);
   const [error, setError] = useState(null);
+  const [isRealData, setIsRealData] = useState(true); // Assume true by default
   
   // Breakdown data state
   const [ageBreakdown, setAgeBreakdown] = useState(null);
@@ -39,8 +41,6 @@ const CreativeAnalyticsDashboard = () => {
   
   // Benchmark state
   const [benchmarks, setBenchmarks] = useState({});
-  // Remove unused selectedCreative state variable
-  // const [selectedCreative, setSelectedCreative] = useState(null);
 
   // Initialize Facebook SDK on component mount
   useEffect(() => {
@@ -53,14 +53,14 @@ const CreativeAnalyticsDashboard = () => {
     if (!selectedAccountId) return;
     
     try {
-      const response = await metaAPI.fetchBenchmarks(selectedAccountId);
+      const response = await metaAPI.fetchBenchmarks(selectedAccountId, accessToken);
       if (response.data) {
         setBenchmarks(response.data);
       }
     } catch (error) {
       console.error('Error fetching benchmarks:', error);
     }
-  }, [selectedAccountId]);
+  }, [selectedAccountId, accessToken]);
 
   // Load benchmarks when account changes
   useEffect(() => {
@@ -105,33 +105,38 @@ const CreativeAnalyticsDashboard = () => {
       
       console.log(`Date range: ${dateRange}, from ${since} to ${until}`);
       
-      // FETCH DAILY TIME SERIES DATA
+      // FETCH DAILY TIME SERIES DATA - FIX: Use metaAPI.fetchDailyMetrics directly
       try {
-        // Use metaAPI.fetchDailyMetrics instead of destructured function
-        const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId);
+        console.log(`Fetching daily metrics for account ID: ${selectedAccountId}, date range: ${dateRange}`);
+        const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId, accessToken);
+        
+        // Check if data contains mock flags (you might need to adjust this based on your implementation)
+        const isMockData = dailyData && dailyData.some(item => item._isMock === true || item.source === 'mock');
+        setIsRealData(!isMockData);
+        
+        console.log(`Received ${dailyData.length} days of time series data (${isMockData ? 'MOCK' : 'REAL'} data)`);
         setTimeSeriesData(dailyData);
-        console.log(`Successfully loaded ${dailyData.length} days of time series data`);
       } catch (timeSeriesError) {
         console.error('Error loading time series data:', timeSeriesError);
         // Continue with other data loading even if time series fails
       }
       
-      // FETCH BREAKDOWN DATA
+      // FETCH BREAKDOWN DATA - FIX: Use metaAPI.fetchBreakdownMetrics directly
       try {
-        // Fetch age breakdown - use metaAPI.fetchBreakdownMetrics instead
-        const ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId);
+        // Fetch age breakdown
+        const ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
         setAgeBreakdown(ageData);
         
         // Fetch gender breakdown
-        const genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId);
+        const genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId, accessToken);
         setGenderBreakdown(genderData);
         
         // Fetch platform breakdown
-        const platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId);
+        const platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId, accessToken);
         setPlatformBreakdown(platformData);
         
         // Fetch placement breakdown
-        const placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId);
+        const placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId, accessToken);
         setPlacementBreakdown(placementData);
         
         console.log('Successfully loaded all breakdown data');
@@ -350,6 +355,26 @@ const CreativeAnalyticsDashboard = () => {
 
   const toggleDiagnostic = () => {
     setShowDiagnostic(!showDiagnostic);
+  };
+
+  // Handle toggling between real and mock data
+  const handleToggleDataSource = () => {
+    // Since we don't have access to shouldUseMockData or notifyMockDataChange,
+    // we'll just toggle the isRealData state and refresh the data
+    setIsRealData(!isRealData);
+    
+    // Let other components know about this change
+    const event = new CustomEvent('dataSourceChanged', { 
+      detail: { isRealData: !isRealData }
+    });
+    window.dispatchEvent(event);
+    
+    // Force refresh
+    setTimeout(() => {
+      if (isConnected && selectedAccountId && accessToken) {
+        loadPerformanceData();
+      }
+    }, 100);
   };
 
   const runDiagnostics = async (token = accessToken) => {
@@ -735,7 +760,9 @@ const CreativeAnalyticsDashboard = () => {
               <p className="text-red-500 mt-4">{error}</p>
             )}
             
-            <p className="text-sm text-gray-500 mt-4">Note: Currently using mock data for development.</p>
+            <p className="text-sm text-gray-500 mt-4">
+              Note: Currently using mock data for development.
+            </p>
           </div>
         ) : (
           <div>
@@ -767,7 +794,17 @@ const CreativeAnalyticsDashboard = () => {
                   <option value="Last 60 Days">Last 60 Days</option>
                   <option value="Last 90 Days">Last 90 Days</option>
                 </select>
-                </div>
+              </div>
+              
+              {/* Add Data Source Toggle */}
+              <div className="mr-4 mb-2">
+                <button
+                  onClick={handleToggleDataSource}
+                  className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded border border-blue-300"
+                >
+                  {isRealData ? 'Switch to Sample Data' : 'Try Real Data'}
+                </button>
+              </div>
               
               <div className="mb-2 flex space-x-2">
                 <button
@@ -785,6 +822,14 @@ const CreativeAnalyticsDashboard = () => {
               )}
             </div>
             
+            {/* Data Source Indicator */}
+            <div className="mb-4">
+              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${isRealData ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                <div className={`w-2 h-2 rounded-full mr-2 ${isRealData ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+                {isRealData ? 'Using Live API Data' : 'Using Sample Data'}
+              </div>
+            </div>
+            
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
                 <p>{error}</p>
@@ -792,17 +837,18 @@ const CreativeAnalyticsDashboard = () => {
             )}
             
             {analyticsData && (
-  <>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <AdMetricsChart 
-        analyticsData={analyticsData} 
-        dateRange={dateRange}
-        timeSeriesData={timeSeriesData} 
-        accessToken={accessToken} // Pass the access token here
-      />
-      <AiAdvisor analyticsData={analyticsData} />
-    </div>
-                
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  <AdMetricsChart 
+                    analyticsData={analyticsData} 
+                    dateRange={dateRange}
+                    timeSeriesData={timeSeriesData} 
+                    accessToken={accessToken}
+                    isRealData={isRealData} // Pass isRealData to AdMetricsChart
+                  />
+                  <AiAdvisor analyticsData={analyticsData} />
+                </div>
+                            
                 {/* Add the Breakdown Chart */}
                 <div className="mb-6">
                   <BreakdownChart 
@@ -810,19 +856,19 @@ const CreativeAnalyticsDashboard = () => {
                     genderData={genderBreakdown}
                     platformData={platformBreakdown}
                     placementData={placementBreakdown}
+                    isRealData={isRealData} // Pass isRealData to BreakdownChart
                   />
                 </div>
-                
+                            
                 {/* Enhanced Creative Performance Table with built-in benchmarks */}
                 <div className="mb-6">
                   <EnhancedCreativePerformanceTable 
                     analyticsData={analyticsData}
                     selectedAccountId={selectedAccountId}
                     benchmarks={benchmarks}
+                    isRealData={isRealData} // Pass isRealData to EnhancedCreativePerformanceTable
                     onCreativeSelect={(creative) => {
-                      // Handle creative selection, but don't set it to the removed state variable
                       console.log("Selected creative:", creative);
-                      // We could implement additional functionality here if needed
                     }}
                   />
                 </div>
