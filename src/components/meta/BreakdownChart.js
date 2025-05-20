@@ -10,6 +10,7 @@ const BreakdownChart = ({
   genderData, 
   platformData, 
   placementData,
+  isRealData = true,
   initialBreakdown = 'age'
 }) => {
   const [breakdown, setBreakdown] = useState(initialBreakdown);
@@ -51,7 +52,7 @@ const BreakdownChart = ({
         rawData = [];
     }
     
-    // Generate mock data if no data is available (for development only)
+    // Generate mock data if no data is available
     if (!rawData || rawData.length === 0) {
       console.log(`Using mock data for ${breakdown} breakdown`);
       rawData = generateMockData(breakdown);
@@ -66,25 +67,33 @@ const BreakdownChart = ({
       // Set a display value based on the data structure
       let displayValue;
       
-      console.log(`Processing item for ${breakdown}:`, processedItem);
-      
-      // Check for different potential property names based on breakdown type
-      if (breakdown === 'platform') {
+      // First check for the breakdown_value property (standard from Meta API)
+      if (processedItem.breakdown_value) {
+        displayValue = processedItem.breakdown_value;
+      }
+      // Then check for specific breakdown fields based on type
+      else if (breakdown === 'age') {
+        if (processedItem.age) {
+          displayValue = processedItem.age;
+        }
+      }
+      else if (breakdown === 'gender') {
+        if (processedItem.gender) {
+          displayValue = processedItem.gender;
+        }
+      }
+      else if (breakdown === 'platform') {
         if (processedItem.publisher_platform) {
           displayValue = processedItem.publisher_platform;
-        } else if (processedItem.platform) {
-          displayValue = processedItem.platform;
         }
-      } 
+      }
       else if (breakdown === 'placement') {
         if (processedItem.platform_position) {
           displayValue = processedItem.platform_position;
-        } else if (processedItem.placement) {
-          displayValue = processedItem.placement;
         }
       }
       
-      // Try common property names
+      // Check other common property names
       if (!displayValue) {
         if (processedItem.category) {
           displayValue = processedItem.category;
@@ -92,6 +101,31 @@ const BreakdownChart = ({
           displayValue = processedItem.name;
         } else if (processedItem.breakdownValue) {
           displayValue = processedItem.breakdownValue;
+        }
+      }
+      
+      // Format values for better display
+      if (displayValue) {
+        // Format gender values
+        if (breakdown === 'gender') {
+          if (displayValue.toLowerCase() === 'male') displayValue = 'Male';
+          else if (displayValue.toLowerCase() === 'female') displayValue = 'Female';
+          else if (displayValue.toLowerCase() === 'unknown') displayValue = 'Unknown';
+        }
+        // Format platform values
+        else if (breakdown === 'platform') {
+          if (displayValue.toLowerCase() === 'facebook') displayValue = 'Facebook';
+          else if (displayValue.toLowerCase() === 'instagram') displayValue = 'Instagram';
+          else if (displayValue.toLowerCase() === 'audience_network') displayValue = 'Audience Network';
+          else if (displayValue.toLowerCase() === 'messenger') displayValue = 'Messenger';
+        }
+        // Format placement values
+        else if (breakdown === 'placement') {
+          if (displayValue.toLowerCase() === 'feed') displayValue = 'Feed';
+          else if (displayValue.toLowerCase() === 'story') displayValue = 'Stories';
+          else if (displayValue.toLowerCase() === 'right_hand_column') displayValue = 'Right Column';
+          else if (displayValue.toLowerCase() === 'instant_article') displayValue = 'Instant Articles';
+          else if (displayValue.toLowerCase() === 'marketplace') displayValue = 'Marketplace';
         }
       }
       
@@ -131,15 +165,41 @@ const BreakdownChart = ({
         displayValue = 'Unknown';
       }
       
+      // Determine if purchases need to be calculated from actions
+      let purchases = 0;
+      if (processedItem.actions && Array.isArray(processedItem.actions)) {
+        const purchaseAction = processedItem.actions.find(a => a.action_type === 'purchase');
+        if (purchaseAction) {
+          purchases = parseFloat(purchaseAction.value) || 0;
+        }
+      } else {
+        purchases = processedItem.purchases || 0;
+      }
+
+      // Ensure CTR is a percentage
+      let ctr = processedItem.ctr || 0;
+      if (ctr > 0 && ctr < 1) {
+        // If CTR is decimal (0.0123) convert to percentage (1.23)
+        ctr = ctr * 100;
+      }
+      
       return {
         ...processedItem,
-        breakdownValue: displayValue
+        breakdownValue: displayValue,
+        // Ensure all important metrics are present
+        impressions: parseInt(processedItem.impressions || 0),
+        clicks: parseInt(processedItem.clicks || 0),
+        spend: parseFloat(processedItem.spend || 0),
+        ctr: ctr,
+        cpc: parseFloat(processedItem.cpc || 0),
+        cpm: parseFloat(processedItem.cpm || 0),
+        purchases: purchases
       };
     });
     
     console.log(`Final processed ${breakdown} data:`, transformedData);
     setProcessedData(transformedData);
-  }, [breakdown, ageData, genderData, platformData, placementData]);
+  }, [breakdown, ageData, genderData, platformData, placementData, isRealData]);
   
   // Generate mock data for development
   const generateMockData = (type) => {
@@ -195,6 +255,7 @@ const BreakdownChart = ({
           {metric !== 'impressions' && <p style={{ margin: 0 }}>{`Impressions: ${formatMetric(dataPoint.impressions || 0)}`}</p>}
           {metric !== 'clicks' && <p style={{ margin: 0 }}>{`Clicks: ${dataPoint.clicks || 0}`}</p>}
           {metric !== 'ctr' && <p style={{ margin: 0 }}>{`CTR: ${((dataPoint.ctr || 0)).toFixed(2)}%`}</p>}
+          {metric !== 'purchases' && <p style={{ margin: 0 }}>{`Purchases: ${dataPoint.purchases || 0}`}</p>}
         </div>
       );
     }
@@ -210,7 +271,22 @@ const BreakdownChart = ({
       marginBottom: '20px'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>Audience Insights</h3>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>
+          Audience Insights
+          {!isRealData && (
+            <span style={{ 
+              fontSize: '12px', 
+              fontWeight: 'normal', 
+              marginLeft: '10px',
+              padding: '3px 6px',
+              backgroundColor: '#f3f4f6',
+              color: '#6b7280',
+              borderRadius: '4px'
+            }}>
+              Sample Data
+            </span>
+          )}
+        </h3>
         
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
