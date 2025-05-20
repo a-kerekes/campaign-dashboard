@@ -1053,7 +1053,7 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
         until
       }),
       breakdowns: breakdownType,
-      fields: 'impressions,clicks,spend',
+      fields: 'impressions,clicks,spend,ctr,cpc,cpm,actions,action_values,cost_per_action_type',
       level: 'account'
     };
     
@@ -1068,12 +1068,42 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
     }
     
     // Format the response for our charts
-    const formattedData = result.data.data.map(item => ({
-      breakdown_value: item[breakdownType],
-      impressions: parseInt(item.impressions || 0),
-      clicks: parseInt(item.clicks || 0),
-      spend: parseFloat(item.spend || 0)
-    }));
+const formattedData = result.data.data.map(item => {
+  // Extract purchase actions if available
+  const actions = item.actions || [];
+  const purchases = actions.find(a => a.action_type === 'purchase')?.value || 0;
+  const landingPageViews = actions.find(a => a.action_type === 'landing_page_view')?.value || 0;
+  const addToCarts = actions.find(a => a.action_type === 'add_to_cart')?.value || 0;
+  
+  // Extract purchase values if available
+  const actionValues = item.action_values || [];
+  const purchaseValue = actionValues.find(a => a.action_type === 'purchase')?.value || 0;
+  
+  // Extract cost per purchase if available
+  const costPerActionType = item.cost_per_action_type || [];
+  const costPerPurchase = costPerActionType.find(c => c.action_type === 'purchase')?.value || 0;
+  
+  // Calculate CTR if not provided
+  let ctr = parseFloat(item.ctr || 0);
+  if (!ctr && item.impressions > 0) {
+    ctr = (item.clicks / item.impressions) * 100;
+  }
+  
+  return {
+    breakdown_value: item[breakdownType],
+    impressions: parseInt(item.impressions || 0),
+    clicks: parseInt(item.clicks || 0),
+    spend: parseFloat(item.spend || 0),
+    ctr: ctr,
+    cpc: parseFloat(item.cpc || 0),
+    cpm: parseFloat(item.cpm || 0),
+    purchases: parseInt(purchases),
+    purchaseValue: parseFloat(purchaseValue),
+    costPerPurchase: parseFloat(costPerPurchase),
+    landingPageViews: parseInt(landingPageViews),
+    addToCarts: parseInt(addToCarts)
+  };
+});
     
     return formattedData;
     
