@@ -925,6 +925,7 @@ try {
                     timeSeriesData={timeSeriesData} 
                     accessToken={accessToken}
                     isRealData={isRealData} // Pass isRealData to AdMetricsChart
+                    onDateRangeChange={(newDateRange) => setDateRange(newDateRange)}
                   />
                   <AiAdvisor analyticsData={analyticsData} />
                 </div>

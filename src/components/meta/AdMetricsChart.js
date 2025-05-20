@@ -13,12 +13,18 @@ import {
 import { getMetaMetricsByTenant } from './metaAPI';
 import { useAuth } from '../../context/AuthContext';
 
-const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken = null }) => {
+const AdMetricsChart = ({ 
+  analyticsData, 
+  dateRange, 
+  timeSeriesData, 
+  accessToken = null, 
+  isRealData = false,
+  onDateRangeChange 
+}) => {
   const [viewType, setViewType] = useState('funnel'); // 'funnel' or 'timeSeries'
   const [metricsData, setMetricsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isRealData, setIsRealData] = useState(false);
   const [useMockData, setUseMockData] = useState(localStorage.getItem('USE_MOCK_DATA') === 'true');
   const { currentTenant, isAdmin } = useAuth();
   const [metrics, setMetrics] = useState({
@@ -66,13 +72,16 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
     // Determine data source
     if (timeSeriesData && timeSeriesData.length > 0) {
       const isMock = checkIfMockData(timeSeriesData);
-      setIsRealData(!isMock);
-      setUseMockData(isMock);
+      if (typeof isRealData !== 'undefined') {
+        setUseMockData(!isRealData);
+      } else {
+        setUseMockData(isMock);
+      }
       
       // Update localStorage to match current state
       localStorage.setItem('USE_MOCK_DATA', isMock ? 'true' : 'false');
     }
-  }, [timeSeriesData]);
+  }, [timeSeriesData, isRealData]);
 
   // Use timeSeriesData passed as prop when available
   useEffect(() => {
@@ -96,7 +105,17 @@ const AdMetricsChart = ({ analyticsData, dateRange, timeSeriesData, accessToken 
   const handleDateRangeChange = (e) => {
     const newDateRange = e.target.value;
     console.log('Date range changed from', dateRange, 'to', newDateRange);
-    // This might need to call a prop function if you want to pass the change up to the parent
+    
+    // Pass the change up to the parent if prop is provided
+    if (typeof onDateRangeChange === 'function') {
+      onDateRangeChange(newDateRange);
+    } else {
+      // Fallback: Use custom event
+      const event = new CustomEvent('dateRangeChanged', { 
+        detail: { dateRange: newDateRange } 
+      });
+      window.dispatchEvent(event);
+    }
   };
 
   // For "Use Sample Data" button - should generate and pass up to parent
