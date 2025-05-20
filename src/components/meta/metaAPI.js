@@ -838,6 +838,9 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     // Format account ID to ensure proper format
     const formattedAccountId = accountId.toString().replace('act_', '');
     
+    // Log the request details
+    console.log(`${dateRange} requested for account ${formattedAccountId}`);
+    
     // Get date range
     const datePreset = getMetaDatePreset(dateRange);
     console.log(`Fetching daily metrics with date preset ${datePreset} for account ${formattedAccountId}`);
@@ -854,7 +857,9 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       endDate.setDate(today.getDate() - 1); // Yesterday
       
       const startDate = new Date(endDate);
-      startDate.setDate(endDate.getDate() - days + 1);
+      startDate.setDate(endDate.getDate() - (days - 1));
+      
+      console.log(`Mock data date range: from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
       
       let currentDate = new Date(startDate);
       
@@ -868,7 +873,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
         const purchases = Math.floor(addToCarts * (0.2 + Math.random() * 0.2)); // 20-40% of add to carts
         
         mockData.push({
-          date: new Date(currentDate).toISOString().split('T')[0],
+          date: new Date(currentDate).toISOString().split('T')[0], // Ensure consistent date format
           impressions: impressions,
           clicks: clicks,
           spend: parseFloat((Math.random() * 200 + 20).toFixed(2)),
@@ -905,6 +910,8 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     
     const since = startDate.toISOString().split('T')[0];
     const until = yesterday.toISOString().split('T')[0];
+    
+    console.log(`API request date range: from ${since} to ${until} for ${dateRange} (${days} days)`);
     
     // Return real API data
     const endpoint = `act_${formattedAccountId}/insights`;
@@ -949,6 +956,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       };
     });
     
+    console.log(`Returning ${formattedData.length} days of real API data from ${formattedData[0]?.date} to ${formattedData[formattedData.length-1]?.date}`);
     return formattedData;
     
   } catch (error) {
@@ -962,7 +970,9 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     endDate.setDate(today.getDate() - 1);
     
     const startDate = new Date(endDate);
-    startDate.setDate(endDate.getDate() - days + 1);
+    startDate.setDate(endDate.getDate() - (days - 1));
+    
+    console.log(`Fallback mock data date range: from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
     let currentDate = new Date(startDate);
     
@@ -976,7 +986,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       const purchases = Math.floor(addToCarts * (0.2 + Math.random() * 0.2));
       
       mockData.push({
-        date: new Date(currentDate).toISOString().split('T')[0],
+        date: new Date(currentDate).toISOString().split('T')[0], // Ensure consistent date format
         impressions: impressions,
         clicks: clicks,
         spend: parseFloat((Math.random() * 200 + 20).toFixed(2)),
