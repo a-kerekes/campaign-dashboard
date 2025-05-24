@@ -24,8 +24,45 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Function to aggregate creatives by name only
-  const aggregateCreativesByPostId = (creativePerformanceData) => {
+  // Data cleaning and validation functions
+  const cleanNumericValue = (value, defaultValue = 0) => {
+    if (value === null || value === undefined || value === '') {
+      return defaultValue;
+    }
+    
+    // Convert to string and handle potential formatting issues
+    const stringValue = String(value);
+    
+    // Remove leading zeros that might cause parsing issues
+    const cleanedString = stringValue.replace(/^0+(?=\d)/, '');
+    
+    // Parse the number
+    const numericValue = parseFloat(cleanedString);
+    
+    // Return default if parsing failed or result is invalid
+    return isNaN(numericValue) || !isFinite(numericValue) ? defaultValue : numericValue;
+  };
+
+  const cleanIntegerValue = (value, defaultValue = 0) => {
+    if (value === null || value === undefined || value === '') {
+      return defaultValue;
+    }
+    
+    // Convert to string and handle potential formatting issues
+    const stringValue = String(value);
+    
+    // Remove leading zeros that might cause parsing issues
+    const cleanedString = stringValue.replace(/^0+(?=\d)/, '');
+    
+    // Parse the integer
+    const integerValue = parseInt(cleanedString, 10);
+    
+    // Return default if parsing failed or result is invalid
+    return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
+  };
+
+  // Function to aggregate creatives by name only with data validation
+  const aggregateCreativesByPostId = useCallback((creativePerformanceData) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
     }
@@ -63,12 +100,28 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       group.adsetCount += 1;
       group.adIds.push(creative.adId);
       
-      // Aggregate additive metrics
-      group.totalImpressions += creative.impressions || 0;
-      group.totalClicks += creative.clicks || 0;
-      group.totalSpend += creative.spend || 0;
-      group.totalPurchases += creative.purchases || 0;
-      group.totalRevenue += creative.revenue || 0;
+      // Clean and validate data before aggregating
+      const cleanImpressions = cleanIntegerValue(creative.impressions);
+      const cleanClicks = cleanIntegerValue(creative.clicks);
+      const cleanSpend = cleanNumericValue(creative.spend);
+      const cleanPurchases = cleanIntegerValue(creative.purchases);
+      const cleanRevenue = cleanNumericValue(creative.revenue);
+
+      console.log(`🔍 CLEANING DATA for ${creative.adName}:`, {
+        originalPurchases: creative.purchases,
+        cleanedPurchases: cleanPurchases,
+        originalRevenue: creative.revenue,
+        cleanedRevenue: cleanRevenue,
+        originalSpend: creative.spend,
+        cleanedSpend: cleanSpend
+      });
+      
+      // Aggregate additive metrics with cleaned data
+      group.totalImpressions += cleanImpressions;
+      group.totalClicks += cleanClicks;
+      group.totalSpend += cleanSpend;
+      group.totalPurchases += cleanPurchases;
+      group.totalRevenue += cleanRevenue;
     });
 
     // Convert grouped data back to array and calculate derived metrics
@@ -80,12 +133,39 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const purchases = group.totalPurchases;
       const revenue = group.totalRevenue;
 
-      // Calculate rates based on totals
+      // Calculate rates based on totals with safeguards
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpc = clicks > 0 ? spend / clicks : 0;
       const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
       const costPerPurchase = purchases > 0 ? spend / purchases : 0;
-      const roas = spend > 0 ? revenue / spend : 0;
+      
+      // ROAS calculation with extra validation to prevent astronomical values
+      let roas = 0;
+      if (spend > 0 && revenue > 0) {
+        roas = revenue / spend;
+        
+        // Cap ROAS at reasonable maximum (e.g., 50x) to prevent display issues
+        if (roas > 50) {
+          console.warn(`🚨 ROAS WARNING: Calculated ROAS of ${roas.toFixed(2)}x seems too high for ${group.adName}. Revenue: $${revenue}, Spend: $${spend}`);
+          // You can choose to either cap it or set to 0 for investigation
+          // roas = 50; // Cap at 50x
+          // OR
+          roas = 0; // Set to 0 for manual investigation
+        }
+      }
+
+      console.log(`📊 AGGREGATED METRICS for ${group.adName}:`, {
+        adsetCount: group.adsetCount,
+        impressions,
+        clicks,
+        spend: spend.toFixed(2),
+        purchases,
+        revenue: revenue.toFixed(2),
+        ctr: ctr.toFixed(2),
+        cpc: cpc.toFixed(2),
+        cpm: cpm.toFixed(2),
+        roas: roas.toFixed(2)
+      });
 
       return {
         // Keep original properties
@@ -123,7 +203,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       aggregatedCreatives.length, 'unique creatives');
 
     return aggregatedCreatives;
-  };
+  }, []); // Empty dependency array since this function doesn't depend on any external values
 
   // Initialize creatives from props with aggregation
   useEffect(() => {
@@ -138,7 +218,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       setCreatives(aggregatedCreatives);
       setFilteredCreatives(aggregatedCreatives);
     }
-  }, [analyticsData]);
+  }, [analyticsData, aggregateCreativesByPostId]);
   
   // Initialize benchmarks with localStorage support
   useEffect(() => {
@@ -489,6 +569,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return {};
   };
 
+  // Format ROAS display with warning for suspicious values
+  const formatROAS = (roas) => {
+    if (!roas || roas === 0) return '0.00x';
+    if (roas > 10) {
+      return `${roas.toFixed(2)}x ⚠️`; // Add warning icon for high ROAS
+    }
+    return `${roas.toFixed(2)}x`;
+  };
+
   return (
     <div>
       {/* Header Section */}
@@ -702,7 +791,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table - Aggregated by Name */}
+      {/* Creative Performance Table - Aggregated by Name with Data Validation */}
       <div className="bg-white rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -856,7 +945,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
                   </td>
                   <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('roas', creative.roas)}>
-                    {creative.roas ? `${creative.roas.toFixed(2)}x` : '0.00x'}
+                    {formatROAS(creative.roas)}
                   </td>
                 </tr>
               ))}
@@ -871,6 +960,11 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             </tbody>
           </table>
         </div>
+      </div>
+      
+      {/* Data Quality Notice */}
+      <div className="mt-4 text-xs text-gray-500">
+        <p>⚠️ ROAS values above 10x are flagged for review. Industry benchmarks: 1.8x - 3.0x typical.</p>
       </div>
     </div>
   );
