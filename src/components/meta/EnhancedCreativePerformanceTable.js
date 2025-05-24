@@ -24,11 +24,122 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Initialize creatives from props
+  // Function to aggregate creatives by Post ID/Creative ID
+  const aggregateCreativesByPostId = (creativePerformanceData) => {
+    if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
+      return [];
+    }
+
+    console.log('🔧 AGGREGATION: Starting creative aggregation', creativePerformanceData.length, 'total ads');
+
+    // Group creatives by creative identifier
+    // We'll use creativeId as the primary identifier, falling back to adName if needed
+    const groupedCreatives = {};
+
+    creativePerformanceData.forEach((creative) => {
+      // Create a unique identifier for grouping
+      // Priority: creativeId > combination of adName + thumbnailUrl
+      const groupKey = creative.creativeId || 
+                      `${creative.adName || 'unknown'}_${creative.thumbnailUrl || 'no-image'}`;
+
+      if (!groupedCreatives[groupKey]) {
+        // Initialize the group with the first creative's data
+        groupedCreatives[groupKey] = {
+          // Keep original creative data for reference
+          ...creative,
+          // Initialize counters
+          adsetCount: 0,
+          adIds: [],
+          // Initialize metrics for aggregation
+          totalImpressions: 0,
+          totalClicks: 0,
+          totalSpend: 0,
+          totalPurchases: 0,
+          totalRevenue: 0,
+          // We'll calculate rates after aggregation
+        };
+      }
+
+      const group = groupedCreatives[groupKey];
+      
+      // Add to counters
+      group.adsetCount += 1;
+      group.adIds.push(creative.adId);
+      
+      // Aggregate additive metrics
+      group.totalImpressions += creative.impressions || 0;
+      group.totalClicks += creative.clicks || 0;
+      group.totalSpend += creative.spend || 0;
+      group.totalPurchases += creative.purchases || 0;
+      group.totalRevenue += creative.revenue || 0;
+    });
+
+    // Convert grouped data back to array and calculate derived metrics
+    const aggregatedCreatives = Object.values(groupedCreatives).map((group) => {
+      // Calculate weighted averages and derived metrics
+      const impressions = group.totalImpressions;
+      const clicks = group.totalClicks;
+      const spend = group.totalSpend;
+      const purchases = group.totalPurchases;
+      const revenue = group.totalRevenue;
+
+      // Calculate rates based on totals
+      const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+      const cpc = clicks > 0 ? spend / clicks : 0;
+      const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+      const costPerPurchase = purchases > 0 ? spend / purchases : 0;
+      const roas = spend > 0 ? revenue / spend : 0;
+
+      return {
+        // Keep original properties
+        adId: group.adIds[0], // Use first ad ID as representative
+        adName: group.adName,
+        adsetName: group.adsetName,
+        creativeId: group.creativeId,
+        thumbnailUrl: group.thumbnailUrl,
+        objectStorySpec: group.objectStorySpec,
+        accountId: group.accountId,
+        
+        // Aggregated data
+        adsetCount: group.adsetCount,
+        adIds: group.adIds,
+        
+        // Aggregated metrics
+        impressions: impressions,
+        clicks: clicks,
+        spend: spend,
+        purchases: purchases,
+        revenue: revenue,
+        
+        // Calculated rates
+        ctr: ctr,
+        cpc: cpc,
+        cpm: cpm,
+        costPerPurchase: costPerPurchase,
+        roas: roas,
+        conversionRate: clicks > 0 && purchases > 0 ? (purchases / clicks) * 100 : 0,
+      };
+    });
+
+    console.log('🔧 AGGREGATION: Completed aggregation', 
+      creativePerformanceData.length, 'ads →', 
+      aggregatedCreatives.length, 'unique creatives');
+
+    return aggregatedCreatives;
+  };
+
+  // Initialize creatives from props with aggregation
   useEffect(() => {
     if (analyticsData && analyticsData.creativePerformance) {
-      setCreatives(analyticsData.creativePerformance);
-      setFilteredCreatives(analyticsData.creativePerformance);
+      console.log('📊 PROCESSING: Raw creative performance data', analyticsData.creativePerformance.length, 'items');
+      
+      // Aggregate the creatives by Post ID
+      const aggregatedCreatives = aggregateCreativesByPostId(analyticsData.creativePerformance);
+      
+      console.log('📊 PROCESSING: Setting aggregated creatives', aggregatedCreatives.length, 'unique creatives');
+      
+      setCreatives(aggregatedCreatives);
+      setFilteredCreatives(aggregatedCreatives);
     }
   }, [analyticsData]);
   
@@ -261,6 +372,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Generate CSV content
       const headers = [
         'Creative Name',
+        'Ad Sets',
         'Impressions',
         'Clicks',
         'CTR (%)',
@@ -274,6 +386,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       
       const rows = filteredCreatives.map(creative => [
         creative.adName,
+        creative.adsetCount || 1,
         creative.impressions,
         creative.clicks,
         creative.ctr?.toFixed(2) || '0.00',
@@ -295,7 +408,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `creative_performance_${selectedAccountId || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `creative_performance_aggregated_${selectedAccountId || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -308,9 +421,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       setTimeout(() => setStatusMessage(''), 3000);
     }
   };
-
-  // Removed formatValue function as it's declared but never used
-  // This fixes the ESLint warning: 'formatValue' is assigned a value but never used
 
   // Get benchmark status class with better handling
   const getBenchmarkStatusClass = (metric, value) => {
@@ -386,11 +496,11 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     <div>
       {/* Header Section */}
       <div className="mb-4">
-        <h3 className="text-lg font-semibold mb-2">Creative Performance</h3>
+        <h3 className="text-lg font-semibold mb-2">Creative Performance (Aggregated by Post ID)</h3>
         
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center">
-            <span className="text-sm text-gray-500 mr-2">{filteredCreatives.length} creatives</span>
+            <span className="text-sm text-gray-500 mr-2">{filteredCreatives.length} unique creatives</span>
             <button
               onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
               className="text-sm text-blue-600 hover:text-blue-800 underline mr-4"
@@ -595,7 +705,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table - Cleaner UI similar to Image 2 */}
+      {/* Creative Performance Table - Aggregated by Post ID */}
       <div className="bg-white rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -609,8 +719,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('adsetCount')}
+                  style={{cursor: 'pointer'}}
                 >
-                  Ad Sets
+                  Ad Sets {sortColumn === 'adsetCount' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -623,43 +737,75 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('clicks')}
+                  style={{cursor: 'pointer'}}
                 >
-                  Clicks
+                  Clicks {sortColumn === 'clicks' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('ctr')}
+                  style={{cursor: 'pointer'}}
                 >
-                  CTR
+                  CTR {sortColumn === 'ctr' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('cpc')}
+                  style={{cursor: 'pointer'}}
                 >
-                  CPC
+                  CPC {sortColumn === 'cpc' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('cpm')}
+                  style={{cursor: 'pointer'}}
                 >
-                  CPM
+                  CPM {sortColumn === 'cpm' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('purchases')}
+                  style={{cursor: 'pointer'}}
                 >
-                  Purchases
+                  Purchases {sortColumn === 'purchases' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('costPerPurchase')}
+                  style={{cursor: 'pointer'}}
                 >
-                  Cost/Purchase
+                  Cost/Purchase {sortColumn === 'costPerPurchase' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('spend')}
+                  style={{cursor: 'pointer'}}
                 >
-                  Spend
+                  Spend {sortColumn === 'spend' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
                 <th 
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  onClick={() => handleSort('roas')}
+                  style={{cursor: 'pointer'}}
                 >
-                  ROAS
+                  ROAS {sortColumn === 'roas' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
                 </th>
               </tr>
             </thead>
