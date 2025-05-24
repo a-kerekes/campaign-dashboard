@@ -11,7 +11,8 @@ const BreakdownChart = ({
   platformData, 
   placementData,
   isRealData = true,
-  initialBreakdown = 'age'
+  initialBreakdown = 'age',
+  dateRange
 }) => {
   const [breakdown, setBreakdown] = useState(initialBreakdown);
   const [metric, setMetric] = useState('impressions');
@@ -199,7 +200,7 @@ const BreakdownChart = ({
     
     console.log(`Final processed ${breakdown} data:`, transformedData);
     setProcessedData(transformedData);
-  }, [breakdown, ageData, genderData, platformData, placementData, isRealData]);
+  }, [breakdown, ageData, genderData, platformData, placementData, isRealData, dateRange]);
   
   // Generate mock data for development
   const generateMockData = (type) => {

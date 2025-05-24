@@ -932,27 +932,29 @@ try {
                             
                 {/* Add the Breakdown Chart */}
                 <div className="mb-6">
-                  <BreakdownChart 
-                    ageData={ageBreakdown}
-                    genderData={genderBreakdown}
-                    platformData={platformBreakdown}
-                    placementData={placementBreakdown}
-                    isRealData={isRealData} // Pass isRealData to BreakdownChart
-                  />
-                </div>
+  <BreakdownChart 
+    ageData={ageBreakdown}
+    genderData={genderBreakdown}
+    platformData={platformBreakdown}
+    placementData={placementBreakdown}
+    isRealData={isRealData}
+    dateRange={dateRange}
+  />
+</div>
                             
                 {/* Enhanced Creative Performance Table with built-in benchmarks */}
                 <div className="mb-6">
-                  <EnhancedCreativePerformanceTable 
-                    analyticsData={analyticsData}
-                    selectedAccountId={selectedAccountId}
-                    benchmarks={benchmarks}
-                    isRealData={isRealData} // Pass isRealData to EnhancedCreativePerformanceTable
-                    onCreativeSelect={(creative) => {
-                      console.log("Selected creative:", creative);
-                    }}
-                  />
-                </div>
+  <EnhancedCreativePerformanceTable 
+    analyticsData={analyticsData}
+    selectedAccountId={selectedAccountId}
+    benchmarks={benchmarks}
+    isRealData={isRealData}
+    dateRange={dateRange}
+    onCreativeSelect={(creative) => {
+      console.log("Selected creative:", creative);
+    }}
+  />
+</div>
               </>
             )}
             
