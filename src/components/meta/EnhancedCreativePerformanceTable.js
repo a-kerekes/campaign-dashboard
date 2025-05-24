@@ -12,7 +12,7 @@ const metricsConfig = [
   { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 }
 ];
 
-const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect }) => {
+const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
   const [sortColumn, setSortColumn] = useState('impressions');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -284,7 +284,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Check date range and account info
       console.log('🔍 ACCOUNT & DATE INFO:');
       console.log('Selected Account ID:', selectedAccountId);
-      console.log('Date Range:', dateRange);
+      console.log('Date Range:', dateRange || 'Not provided');
       
       // Aggregate the creatives by name
       const aggregatedCreatives = aggregateCreativesByPostId(analyticsData.creativePerformance);
