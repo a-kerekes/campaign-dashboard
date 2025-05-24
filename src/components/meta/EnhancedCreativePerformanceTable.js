@@ -24,7 +24,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Function to aggregate creatives by Post ID/Creative ID
+  // Function to aggregate creatives by name only
   const aggregateCreativesByPostId = (creativePerformanceData) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
@@ -32,15 +32,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
 
     console.log('🔧 AGGREGATION: Starting creative aggregation', creativePerformanceData.length, 'total ads');
 
-    // Group creatives by creative identifier
-    // We'll use creativeId as the primary identifier, falling back to adName if needed
+    // Group creatives by name only
     const groupedCreatives = {};
 
     creativePerformanceData.forEach((creative) => {
-      // Create a unique identifier for grouping
-      // Priority: creativeId > combination of adName + thumbnailUrl
-      const groupKey = creative.creativeId || 
-                      `${creative.adName || 'unknown'}_${creative.thumbnailUrl || 'no-image'}`;
+      // Create a unique identifier for grouping by name only
+      const groupKey = creative.adName || 'unknown';
 
       if (!groupedCreatives[groupKey]) {
         // Initialize the group with the first creative's data
@@ -133,7 +130,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     if (analyticsData && analyticsData.creativePerformance) {
       console.log('📊 PROCESSING: Raw creative performance data', analyticsData.creativePerformance.length, 'items');
       
-      // Aggregate the creatives by Post ID
+      // Aggregate the creatives by name
       const aggregatedCreatives = aggregateCreativesByPostId(analyticsData.creativePerformance);
       
       console.log('📊 PROCESSING: Setting aggregated creatives', aggregatedCreatives.length, 'unique creatives');
@@ -496,7 +493,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     <div>
       {/* Header Section */}
       <div className="mb-4">
-        <h3 className="text-lg font-semibold mb-2">Creative Performance (Aggregated by Post ID)</h3>
+        <h3 className="text-lg font-semibold mb-2">Creative Performance (Aggregated by Name)</h3>
         
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center">
@@ -705,7 +702,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
       
-      {/* Creative Performance Table - Aggregated by Post ID */}
+      {/* Creative Performance Table - Aggregated by Name */}
       <div className="bg-white rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
