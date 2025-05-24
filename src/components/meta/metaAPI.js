@@ -832,7 +832,7 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
   }
 }
 
-// Fetch daily metrics for time series charts
+// Fetch daily metrics for time series charts - FIXED VERSION
 const fetchDailyMetrics = async (dateRange, accountId, token) => {
   try {
     console.log(`======= FETCH DAILY METRICS: ${dateRange} =======`);
@@ -858,6 +858,10 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
     const since = startDate.toISOString().split('T')[0];
     const until = yesterday.toISOString().split('T')[0];
     
+    console.log(`🐛 DEBUG: Today's date: ${today}`);
+    console.log(`🐛 DEBUG: Yesterday: ${yesterday}`);
+    console.log(`🐛 DEBUG: Start date: ${startDate}`);
+    console.log(`🐛 DEBUG: Since: ${since}, Until: ${until}`);
     console.log(`Date range for ${dateRange}: ${since} to ${until} (${days} days)`);
     
     // Generate mock data or fetch real data using the same date range logic
@@ -909,29 +913,41 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       throw new Error('No authentication token available. Please log in.');
     }
     
-    // Make the API request with explicit date range
+    // FIX: Make the API request with EXPLICIT date range parameters
+    // Remove time_increment and use explicit time_range like the working breakdown calls
     const endpoint = `act_${formattedAccountId}/insights`;
     const params = {
-      time_increment: 1,
+      // CRITICAL FIX: Ensure explicit time range format
       time_range: JSON.stringify({
         since: since,
         until: until
       }),
+      // Add time_increment for daily data
+      time_increment: 1,
       fields: 'impressions,clicks,spend,ctr,cpc,date_start,actions,action_values,cost_per_action_type',
-      level: 'account'
+      level: 'account',
+      // ADDITIONAL FIX: Add limit to ensure we get all data
+      limit: 1000
     };
     
+    console.log(`🐛 DEBUG: API params being sent:`, params);
     console.log(`Fetching real API data using date range: ${since} to ${until}`);
     
     const result = await fetchFromMetaAPI(endpoint, params, accessToken);
     
     if (result.error) {
+      console.error(`🐛 DEBUG: API returned error:`, result.error);
       throw new Error(result.error);
     }
     
     if (!result.data || !result.data.data) {
+      console.error(`🐛 DEBUG: No data returned from API`);
       throw new Error('No time series data returned from API');
     }
+    
+    console.log(`🐛 DEBUG: Raw API response data length:`, result.data.data.length);
+    console.log(`🐛 DEBUG: Raw API response first item:`, result.data.data[0]);
+    console.log(`🐛 DEBUG: Raw API response last item:`, result.data.data[result.data.data.length - 1]);
     
     // Process the API response
     const formattedData = result.data.data.map(day => {
@@ -954,8 +970,14 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       };
     });
     
+    // Sort data by date to ensure correct order
+    formattedData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
     // Log the date range in the returned data
     if (formattedData.length > 0) {
+      console.log(`🐛 DEBUG: Formatted data length:`, formattedData.length);
+      console.log(`🐛 DEBUG: Expected date range: ${since} to ${until}`);
+      console.log(`🐛 DEBUG: Actual date range: ${formattedData[0].date} to ${formattedData[formattedData.length-1].date}`);
       console.log(`Received API data from ${formattedData[0].date} to ${formattedData[formattedData.length-1].date}`);
     }
     
