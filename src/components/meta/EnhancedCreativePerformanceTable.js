@@ -234,10 +234,57 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return aggregatedCreatives;
   }, []); // Empty dependency array since this function doesn't depend on any external values
 
-  // Initialize creatives from props with aggregation
+  // Initialize creatives from props with aggregation and detailed data inspection
   useEffect(() => {
     if (analyticsData && analyticsData.creativePerformance) {
       console.log('📊 PROCESSING: Raw creative performance data', analyticsData.creativePerformance.length, 'items');
+      
+      // DETAILED DATA INSPECTION - Let's see exactly what we're getting
+      console.log('🔍 RAW DATA INSPECTION:');
+      console.log('Total ads received:', analyticsData.creativePerformance.length);
+      
+      // Look for "Pockets High Rise" specifically
+      const pocketsAds = analyticsData.creativePerformance.filter(ad => 
+        ad.adName && ad.adName.includes('Pockets High Rise')
+      );
+      console.log(`🔍 "Pockets High Rise" ads found: ${pocketsAds.length}`);
+      
+      if (pocketsAds.length > 0) {
+        console.log('🔍 POCKETS HIGH RISE ADS DETAILS:');
+        pocketsAds.forEach((ad, index) => {
+          console.log(`Ad ${index + 1}:`, {
+            adName: ad.adName,
+            adId: ad.adId,
+            creativeId: ad.creativeId,
+            spend: ad.spend,
+            impressions: ad.impressions,
+            clicks: ad.clicks,
+            purchases: ad.purchases,
+            accountId: ad.accountId
+          });
+        });
+        
+        // Check if names are actually identical
+        const uniqueNames = [...new Set(pocketsAds.map(ad => ad.adName))];
+        console.log(`🔍 Unique "Pockets High Rise" names: ${uniqueNames.length}`);
+        uniqueNames.forEach((name, index) => {
+          console.log(`Unique name ${index + 1}: "${name}"`);
+          console.log(`Character codes:`, name.split('').map(char => char.charCodeAt(0)));
+        });
+      } else {
+        console.log('❌ NO "Pockets High Rise" ads found in dashboard data!');
+        console.log('🔍 All ad names received:');
+        analyticsData.creativePerformance.forEach((ad, index) => {
+          if (index < 10) { // Show first 10 for debugging
+            console.log(`Ad ${index + 1}: "${ad.adName}"`);
+          }
+        });
+      }
+      
+      // Check date range and account info
+      console.log('🔍 ACCOUNT & DATE INFO:');
+      console.log('Selected Account ID:', selectedAccountId);
+      console.log('Date Range:', dateRange);
       
       // Aggregate the creatives by name
       const aggregatedCreatives = aggregateCreativesByPostId(analyticsData.creativePerformance);
@@ -247,7 +294,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       setCreatives(aggregatedCreatives);
       setFilteredCreatives(aggregatedCreatives);
     }
-  }, [analyticsData, aggregateCreativesByPostId]);
+  }, [analyticsData, aggregateCreativesByPostId, selectedAccountId, dateRange]);
   
   // Initialize benchmarks with localStorage support
   useEffect(() => {
