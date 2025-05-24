@@ -69,8 +69,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       .toLowerCase()                    // Convert to lowercase
       .trim()                          // Remove leading/trailing whitespace
       .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
-      .replace(/[^\w\s-|]/g, '')      // Remove special characters except word chars, spaces, hyphens, pipes
-      .trim();                        // Trim again after cleanup
+      
   };
 
   // Function to aggregate creatives by name only with data validation
