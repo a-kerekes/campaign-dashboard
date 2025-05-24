@@ -61,6 +61,18 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
+  // Function to normalize ad names for better grouping
+  const normalizeAdName = (adName) => {
+    if (!adName) return 'unknown';
+    
+    return adName
+      .toLowerCase()                    // Convert to lowercase
+      .trim()                          // Remove leading/trailing whitespace
+      .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+      .replace(/[^\w\s-|]/g, '')      // Remove special characters except word chars, spaces, hyphens, pipes
+      .trim();                        // Trim again after cleanup
+  };
+
   // Function to aggregate creatives by name only with data validation
   const aggregateCreativesByPostId = useCallback((creativePerformanceData) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
@@ -69,21 +81,34 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
 
     console.log('🔧 AGGREGATION: Starting creative aggregation', creativePerformanceData.length, 'total ads');
 
-    // Group creatives by name only
+    // Group creatives by normalized name
     const groupedCreatives = {};
 
-    creativePerformanceData.forEach((creative) => {
-      // Create a unique identifier for grouping by name only
-      const groupKey = creative.adName || 'unknown';
+    creativePerformanceData.forEach((creative, index) => {
+      // Create a unique identifier for grouping by normalized name
+      const originalName = creative.adName || 'unknown';
+      const normalizedName = normalizeAdName(originalName);
+      const groupKey = normalizedName;
+
+      console.log(`🔍 PROCESSING AD ${index + 1}:`, {
+        originalName,
+        normalizedName,
+        groupKey,
+        creativeId: creative.creativeId,
+        adId: creative.adId
+      });
 
       if (!groupedCreatives[groupKey]) {
         // Initialize the group with the first creative's data
         groupedCreatives[groupKey] = {
-          // Keep original creative data for reference
+          // Keep original creative data for reference (use first occurrence)
           ...creative,
+          // Use original name for display (not normalized)
+          adName: originalName,
           // Initialize counters
           adsetCount: 0,
           adIds: [],
+          originalNames: [], // Track all original names for debugging
           // Initialize metrics for aggregation
           totalImpressions: 0,
           totalClicks: 0,
@@ -99,6 +124,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Add to counters
       group.adsetCount += 1;
       group.adIds.push(creative.adId);
+      group.originalNames.push(originalName); // Track all variations
       
       // Clean and validate data before aggregating
       const cleanImpressions = cleanIntegerValue(creative.impressions);
@@ -107,7 +133,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const cleanPurchases = cleanIntegerValue(creative.purchases);
       const cleanRevenue = cleanNumericValue(creative.revenue);
 
-      console.log(`🔍 CLEANING DATA for ${creative.adName}:`, {
+      console.log(`🔍 CLEANING DATA for ${originalName}:`, {
         originalPurchases: creative.purchases,
         cleanedPurchases: cleanPurchases,
         originalRevenue: creative.revenue,
@@ -146,7 +172,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         
         // Cap ROAS at reasonable maximum (e.g., 50x) to prevent display issues
         if (roas > 50) {
-          console.warn(`🚨 ROAS WARNING: Calculated ROAS of ${roas.toFixed(2)}x seems too high for ${group.adName}. Revenue: $${revenue}, Spend: $${spend}`);
+          console.warn(`🚨 ROAS WARNING: Calculated ROAS of ${roas.toFixed(2)}x seems too high for ${group.adName}. Revenue: ${revenue}, Spend: ${spend}`);
           // You can choose to either cap it or set to 0 for investigation
           // roas = 50; // Cap at 50x
           // OR
@@ -164,13 +190,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         ctr: ctr.toFixed(2),
         cpc: cpc.toFixed(2),
         cpm: cpm.toFixed(2),
-        roas: roas.toFixed(2)
+        roas: roas.toFixed(2),
+        originalNamesCount: group.originalNames.length,
+        uniqueOriginalNames: [...new Set(group.originalNames)]
       });
 
       return {
         // Keep original properties
         adId: group.adIds[0], // Use first ad ID as representative
-        adName: group.adName,
+        adName: group.adName, // Use first original name for display
         adsetName: group.adsetName,
         creativeId: group.creativeId,
         thumbnailUrl: group.thumbnailUrl,
@@ -180,6 +208,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         // Aggregated data
         adsetCount: group.adsetCount,
         adIds: group.adIds,
+        originalNames: group.originalNames, // For debugging
         
         // Aggregated metrics
         impressions: impressions,
