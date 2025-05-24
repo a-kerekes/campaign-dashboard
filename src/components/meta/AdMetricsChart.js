@@ -18,8 +18,7 @@ const AdMetricsChart = ({
   dateRange, 
   timeSeriesData, 
   accessToken = null, 
-  isRealData = false,
-  onDateRangeChange 
+  isRealData = false
 }) => {
   const [viewType, setViewType] = useState('funnel'); // 'funnel' or 'timeSeries'
   const [metricsData, setMetricsData] = useState([]);
@@ -101,23 +100,6 @@ const AdMetricsChart = ({
     }
   }, [timeSeriesData, isRealData]);
 
-  // Handle date range change
-  const handleDateRangeChange = (e) => {
-    const newDateRange = e.target.value;
-    console.log('Date range changed from', dateRange, 'to', newDateRange);
-    
-    // Pass the change up to the parent if prop is provided
-    if (typeof onDateRangeChange === 'function') {
-      onDateRangeChange(newDateRange);
-    } else {
-      // Fallback: Use custom event
-      const event = new CustomEvent('dateRangeChanged', { 
-        detail: { dateRange: newDateRange } 
-      });
-      window.dispatchEvent(event);
-    }
-  };
-
   // For "Use Sample Data" button - should generate and pass up to parent
   const handleUseSampleData = () => {
     console.log("Using sample data for development");
@@ -131,11 +113,6 @@ const AdMetricsChart = ({
       detail: { useMock: true } 
     });
     window.dispatchEvent(event);
-    
-    // If there's a direct callback prop, use that instead
-    // if (typeof onUseMockDataChange === 'function') {
-    //   onUseMockDataChange(true);
-    // }
   };
 
   // Handler for "Try Real Data" button
@@ -149,11 +126,6 @@ const AdMetricsChart = ({
       detail: { useMock: false } 
     });
     window.dispatchEvent(event);
-    
-    // If there's a direct callback prop, use that instead
-    // if (typeof onUseMockDataChange === 'function') {
-    //   onUseMockDataChange(false);
-    // }
   };
 
   // Toggle metrics
@@ -365,23 +337,7 @@ const AdMetricsChart = ({
         </div>
         
         <div style={{display: 'flex', alignItems: 'center'}}>
-          {/* Date range selector */}
-          <select
-            value={dateRange}
-            onChange={handleDateRangeChange}
-            style={{
-              marginRight: '12px',
-              padding: '6px 12px',
-              border: '1px solid #e5e7eb',
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-          >
-            <option>Last 7 Days</option>
-            <option>Last 30 Days</option>
-            <option>Last 60 Days</option>
-            <option>Last 90 Days</option>
-          </select>
+          {/* REMOVED: Date range selector - now handled by parent component only */}
           
           {/* View type toggle */}
           <div>
