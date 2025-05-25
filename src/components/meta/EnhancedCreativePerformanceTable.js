@@ -426,13 +426,28 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const currentMetrics = getMetricsForMode(aggregationMode);
 
   return (
-    <div className="w-full">
+    <div style={{ width: '100%', padding: '24px' }}>
       {/* Header Section */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-4">Creative Performance Analysis</h3>
+      <div style={{ marginBottom: '24px' }}>
+        <h3 style={{ 
+          fontSize: '18px', 
+          fontWeight: '600', 
+          marginBottom: '16px',
+          color: '#1f2937'
+        }}>
+          Creative Performance Analysis
+        </h3>
         
         {/* Aggregation Mode Tabs */}
-        <div className="flex space-x-1 mb-4 bg-gray-100 p-1 rounded-lg inline-flex">
+        <div style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '16px',
+          backgroundColor: '#f3f4f6',
+          padding: '4px',
+          borderRadius: '8px',
+          width: 'fit-content'
+        }}>
           {Object.entries(AGGREGATION_MODES).map(([key, mode]) => (
             <button
               key={mode}
@@ -440,11 +455,18 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 console.log('🔄 Switching to mode:', mode);
                 setAggregationMode(mode);
               }}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                aggregationMode === mode
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              style={{
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                backgroundColor: aggregationMode === mode ? 'white' : 'transparent',
+                color: aggregationMode === mode ? '#2563eb' : '#6b7280',
+                boxShadow: aggregationMode === mode ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+              }}
             >
               {key === 'CREATIVE' ? 'By Creative' : key === 'COPY' ? 'By Copy' : 'Combined'}
             </button>
@@ -452,22 +474,44 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
         
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-500">{filteredCreatives.length} items</span>
+        <div style={{
+          display: 'flex',
+          flexDirection: window.innerWidth < 640 ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: window.innerWidth < 640 ? 'flex-start' : 'center',
+          marginBottom: '16px',
+          gap: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '14px', color: '#6b7280' }}>
+              {filteredCreatives.length} items
+            </span>
             <button
               onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
+              style={{
+                fontSize: '14px',
+                color: '#2563eb',
+                textDecoration: 'underline',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer'
+              }}
             >
               {isEditingBenchmarks ? 'Close' : 'Set Benchmarks'}
             </button>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="text"
               placeholder="Search..."
-              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              style={{
+                padding: '4px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '14px',
+                outline: 'none'
+              }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -479,7 +523,13 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 setSortColumn(column);
                 setSortDirection(direction);
               }}
-              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              style={{
+                padding: '4px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '14px',
+                outline: 'none'
+              }}
             >
               <option value="spend-desc">Spend (High to Low)</option>
               <option value="roas-desc">ROAS (High to Low)</option>
@@ -490,7 +540,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             
             <button
               onClick={exportToCSV}
-              className="p-1 bg-gray-100 rounded hover:bg-gray-200 text-gray-700"
+              style={{
+                padding: '4px',
+                backgroundColor: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
               title="Export to CSV"
             >
               <Download size={16} />
@@ -581,71 +639,118 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       )}
 
       {/* Creative Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '16px',
+        width: '100%'
+      }}>
         {filteredCreatives.map((creative) => (
           <div
             key={creative.id || creative.creativeId || Math.random()}
-            className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-pointer p-4 ${
-              selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''
-            }`}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+              padding: '16px',
+              cursor: 'pointer',
+              transition: 'box-shadow 0.2s',
+              minHeight: '400px',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            className={selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''}
             onClick={() => handleCreativeSelect(creative.creativeId)}
+            onMouseEnter={(e) => {
+              e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+            }}
           >
             {/* Creative Thumbnail (for Creative and Combined modes) */}
             {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
              creative.thumbnailUrl && (
-              <div className="mb-3">
+              <div style={{ marginBottom: '12px' }}>
                 <img 
                   src={creative.thumbnailUrl} 
                   alt={creative.adName}
-                  className="w-full h-32 object-cover rounded"
+                  style={{
+                    width: '100%',
+                    height: '120px',
+                    objectFit: 'cover',
+                    borderRadius: '6px'
+                  }}
                 />
               </div>
             )}
             
             {/* Copy Text */}
-            <div className="mb-4">
-              <div className="text-sm text-gray-800 leading-relaxed min-h-[4rem]">
+            <div style={{ marginBottom: '16px', flex: '1' }}>
+              <div style={{
+                fontSize: '14px',
+                color: '#374151',
+                lineHeight: '1.5',
+                minHeight: '60px'
+              }}>
                 {creative.extractedCopy.split('\n').map((line, index) => (
-                  <div key={index} className="mb-1">{line}</div>
+                  <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
                 ))}
               </div>
             </div>
             
             {/* Metrics Grid */}
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {currentMetrics.map((metric, index) => {
                 if (index % 2 === 0) {
                   const nextMetric = currentMetrics[index + 1];
                   return (
-                    <div key={metric} className="flex justify-between text-sm">
-                      <div className="flex-1 pr-2">
-                        <div className="text-gray-600 uppercase text-xs font-medium">
+                    <div key={metric} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '12px'
+                    }}>
+                      <div style={{ flex: '1', paddingRight: '8px' }}>
+                        <div style={{
+                          color: '#6b7280',
+                          fontSize: '10px',
+                          fontWeight: '500',
+                          textTransform: 'uppercase',
+                          marginBottom: '2px'
+                        }}>
                           {metric === 'thumbstopRate' ? 'Thumbstop' : 
                            metric === 'seeMoreRate' ? 'See More' :
                            metric === 'adsetCount' ? '# Ad Sets' :
                            metric === 'creativeCount' ? '# Creatives' :
                            metric.replace(/([A-Z])/g, ' $1').toUpperCase()}
                         </div>
-                        <div 
-                          className="font-semibold"
-                          style={{ color: getBenchmarkColor(metric, creative[metric]) }}
-                        >
+                        <div style={{
+                          fontWeight: '600',
+                          color: getBenchmarkColor(metric, creative[metric])
+                        }}>
                           {formatMetricValue(metric, creative[metric])}
                         </div>
                       </div>
                       {nextMetric && (
-                        <div className="flex-1 text-right pl-2">
-                          <div className="text-gray-600 uppercase text-xs font-medium">
+                        <div style={{ flex: '1', textAlign: 'right', paddingLeft: '8px' }}>
+                          <div style={{
+                            color: '#6b7280',
+                            fontSize: '10px',
+                            fontWeight: '500',
+                            textTransform: 'uppercase',
+                            marginBottom: '2px'
+                          }}>
                             {nextMetric === 'thumbstopRate' ? 'Thumbstop' : 
                              nextMetric === 'seeMoreRate' ? 'See More' :
                              nextMetric === 'adsetCount' ? '# Ad Sets' :
                              nextMetric === 'creativeCount' ? '# Creatives' :
                              nextMetric.replace(/([A-Z])/g, ' $1').toUpperCase()}
                           </div>
-                          <div 
-                            className="font-semibold"
-                            style={{ color: getBenchmarkColor(nextMetric, creative[nextMetric]) }}
-                          >
+                          <div style={{
+                            fontWeight: '600',
+                            color: getBenchmarkColor(nextMetric, creative[nextMetric])
+                          }}>
                             {formatMetricValue(nextMetric, creative[nextMetric])}
                           </div>
                         </div>
@@ -660,7 +765,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         ))}
         
         {filteredCreatives.length === 0 && (
-          <div className="col-span-full text-center py-12 text-gray-500">
+          <div style={{
+            gridColumn: '1 / -1',
+            textAlign: 'center',
+            padding: '48px 0',
+            color: '#6b7280'
+          }}>
             No creatives found matching your criteria.
           </div>
         )}
