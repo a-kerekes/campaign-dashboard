@@ -260,11 +260,11 @@ try {
         {
           params: {
             access_token: accessToken,
-            fields: 'name,creative{id,image_url,object_story_spec},adset{name}',
+            fields: 'name,creative{id,image_url,thumbnail_url,video_thumbnail_url,object_story_spec},adset{name}',
             limit: 100 // Increased from 50 to get more ads
           }
         }
-      );
+      )
       
       // Get all the ad IDs to use for filtering insights
       const ads = adsResponse.data.data;
@@ -329,8 +329,14 @@ try {
               adName: ad.name,
               adsetName: ad.adset ? ad.adset.name : 'Unknown',
               creativeId: ad.creative.id,
-              thumbnailUrl: ad.creative.image_url || ad.creative.thumbnail_url || null,
-              objectStorySpec: ad.creative.effective_object_story_spec || ad.creative.object_story_spec || null,
+  // Enhanced thumbnail logic for both images and videos
+  thumbnailUrl: ad.creative.image_url || 
+                ad.creative.thumbnail_url || 
+                ad.creative.video_thumbnail_url ||
+                (ad.creative.object_story_spec?.video_data?.image_url) ||
+                (ad.creative.object_story_spec?.link_data?.picture) ||
+                null,
+  objectStorySpec: ad.creative.object_story_spec || null,
             accountId: selectedAccountId, // Add this to track which account each creative belongs to
             impressions: insight ? parseInt(insight.impressions || 0) : 0,
             clicks: insight ? parseInt(insight.clicks || 0) : 0,
