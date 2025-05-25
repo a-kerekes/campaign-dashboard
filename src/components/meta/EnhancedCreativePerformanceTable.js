@@ -329,7 +329,7 @@ const extractAdCopy = (creative) => {
       // Determine group key based on aggregation mode
       switch (mode) {
         case AGGREGATION_MODES.CREATIVE:
-          groupKey = creative.creativeId || creative.thumbnailUrl || `unknown-creative-${index}`;
+          groupKey = creative.creativeId || `unknown-creative-${index}`;
           break;
         case AGGREGATION_MODES.COPY:
           groupKey = extractAdCopy(creative);
