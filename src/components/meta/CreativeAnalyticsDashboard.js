@@ -260,7 +260,7 @@ try {
         {
           params: {
             access_token: accessToken,
-            fields: 'name,creative{id,image_url,image_crops,object_story_spec,effective_object_story_spec},adset{name}',
+            fields: 'name,creative{id,image_url,object_story_spec},adset{name}',
             limit: 100 // Increased from 50 to get more ads
           }
         }
