@@ -867,11 +867,11 @@ const extractAdCopy = (creative) => {
         </div>
       )}
 
-      {/* Creative Cards Grid */}
+      {/* Creative Cards Grid - 5 CARDS PER ROW */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '16px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', // Reduced from 280px to 220px for 5 cards
+        gap: '12px', // Reduced from 16px
         width: '100%'
       }}>
         {filteredCreatives.map((creative) => (
@@ -882,10 +882,10 @@ const extractAdCopy = (creative) => {
               borderRadius: '8px',
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              padding: '12px', // Reduced from 16px to minimize white space
+              padding: '8px', // Reduced from 12px to 8px
               cursor: 'pointer',
               transition: 'box-shadow 0.2s',
-              minHeight: '360px', // Reduced from 400px
+              minHeight: '320px', // Reduced from 360px
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -898,11 +898,11 @@ const extractAdCopy = (creative) => {
               e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
-            {/* Creative Thumbnail (for Creative and Combined modes) - OPTIMIZED SIZING */}
+            {/* Creative Thumbnail (for Creative and Combined modes) - SMALLER IMAGES */}
             {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
              creative.thumbnailUrl && (
               <div style={{ 
-                marginBottom: '8px',
+                marginBottom: '6px', // Reduced from 8px
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -915,7 +915,7 @@ const extractAdCopy = (creative) => {
                   alt="Creative"
                   style={{
                     maxWidth: '100%',
-                    maxHeight: '180px', // Reduced from 300px to match video thumbnail size
+                    maxHeight: '140px', // Reduced from 180px to 140px
                     width: 'auto',      
                     height: 'auto',     
                     objectFit: 'contain',
@@ -971,23 +971,23 @@ const extractAdCopy = (creative) => {
             
             {/* Copy Text - Only show in Copy and Combined modes */}
             {aggregationMode !== AGGREGATION_MODES.CREATIVE && (
-              <div style={{ marginBottom: '12px', flex: '1' }}> {/* Reduced from 16px */}
+              <div style={{ marginBottom: '8px', flex: '1' }}>
                 <div style={{
-                  fontSize: '14px',
+                  fontSize: '13px',
                   color: '#374151',
-                  lineHeight: '1.5',
-                  minHeight: '60px',
+                  lineHeight: '1.4',
+                  minHeight: '50px',
                   fontWeight: '400'
                 }}>
                   {creative.extractedCopy.split('\n').map((line, index) => (
-                    <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
+                    <div key={index} style={{ marginBottom: '3px' }}>{line}</div>
                   ))}
                 </div>
               </div>
             )}
             
-            {/* Metrics Grid */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Metrics Grid - TIGHTER SPACING */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {currentMetrics.map((metric, index) => {
                 if (index % 2 === 0) {
                   const nextMetric = currentMetrics[index + 1];
@@ -995,15 +995,15 @@ const extractAdCopy = (creative) => {
                     <div key={metric} style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      fontSize: '12px'
+                      fontSize: '11px'
                     }}>
-                      <div style={{ flex: '1', paddingRight: '8px' }}>
+                      <div style={{ flex: '1', paddingRight: '6px' }}>
                         <div style={{
                           color: '#6b7280',
-                          fontSize: '10px',
+                          fontSize: '9px',
                           fontWeight: '500',
                           textTransform: 'uppercase',
-                          marginBottom: '2px'
+                          marginBottom: '1px'
                         }}>
                           {metric === 'thumbstopRate' ? 'Thumbstop' : 
                            metric === 'seeMoreRate' ? 'See More' :
@@ -1019,13 +1019,13 @@ const extractAdCopy = (creative) => {
                         </div>
                       </div>
                       {nextMetric && (
-                        <div style={{ flex: '1', textAlign: 'right', paddingLeft: '8px' }}>
+                        <div style={{ flex: '1', textAlign: 'right', paddingLeft: '6px' }}>
                           <div style={{
                             color: '#6b7280',
-                            fontSize: '10px',
+                            fontSize: '9px',
                             fontWeight: '500',
                             textTransform: 'uppercase',
-                            marginBottom: '2px'
+                            marginBottom: '1px'
                           }}>
                             {nextMetric === 'thumbstopRate' ? 'Thumbstop' : 
                              nextMetric === 'seeMoreRate' ? 'See More' :
