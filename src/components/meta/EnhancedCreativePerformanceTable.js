@@ -95,7 +95,27 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           { pattern: /These leggings/i, extract: /These leggings[^|]+/ },
           { pattern: /Pushing my daughter/i, extract: /Pushing my daughter[^|]+/ },
           { pattern: /Did you know/i, extract: /Did you know[^|]+/ },
-          { pattern: /I absolutely love/i, extract: /I absolutely love[^|]+/ }
+          { pattern: /I absolutely love/i, extract: /I absolutely love[^|]+/ },
+          { pattern: /One of the other moms/i, extract: /One of the other moms[^|]+/ },
+          { pattern: /I'm a mother/i, extract: /I'm a mother[^|]+/ },
+          { pattern: /That's right/i, extract: /That's right[^|]+/ },
+          { pattern: /Tested at the prestigious/i, extract: /Tested at the prestigious[^|]+/ },
+          { pattern: /Meet the Sweetflexx/i, extract: /Meet the Sweetflexx[^|]+/ },
+          { pattern: /Yale-tested/i, extract: /Yale-tested[^|]+/ },
+          { pattern: /resistance technology/i, extract: /[^|]*resistance technology[^|]*/ },
+          { pattern: /game changer/i, extract: /[^|]*game changer[^|]*/ },
+          { pattern: /built-in resistance/i, extract: /[^|]*built-in resistance[^|]*/ },
+          { pattern: /burn up to \d+/i, extract: /[^|]*burn up to \d+[^|]*/ },
+          { pattern: /255 more calories/i, extract: /[^|]*255 more calories[^|]*/ },
+          { pattern: /firmed up/i, extract: /[^|]*firmed up[^|]*/ },
+          { pattern: /changing nothing else/i, extract: /[^|]*changing nothing else[^|]*/ },
+          { pattern: /sneak in a workout/i, extract: /[^|]*sneak in a workout[^|]*/ },
+          { pattern: /easy way to/i, extract: /[^|]*easy way to[^|]*/ },
+          { pattern: /amazing quality/i, extract: /[^|]*amazing quality[^|]*/ },
+          { pattern: /helped shape my legs/i, extract: /[^|]*helped shape my legs[^|]*/ },
+          { pattern: /skeptical at first/i, extract: /[^|]*skeptical at first[^|]*/ },
+          { pattern: /worth it/i, extract: /[^|]*worth it[^|]*/ },
+          { pattern: /GAME CHANGER/i, extract: /[^|]*GAME CHANGER[^|]*/ }
         ];
         
         for (const { pattern, extract } of testimonialPatterns) {
@@ -110,9 +130,37 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         }
       }
       
-      // Pattern 5: If contains common testimonial keywords, extract the meaningful part
+      // Pattern 5: Extract multi-sentence testimonials
       if (!copyText) {
-        const testimonialKeywords = ['amazing quality', 'helped shape', 'worth it', 'love them', 'transformed', 'skeptical'];
+        // Look for sentences that span across the ad name
+        const sentences = adName.split(/[.!?]+/).filter(s => s.trim().length > 10);
+        if (sentences.length >= 2) {
+          const meaningfulSentences = sentences.filter(s => 
+            s.toLowerCase().includes('leggings') ||
+            s.toLowerCase().includes('amazing') ||
+            s.toLowerCase().includes('love') ||
+            s.toLowerCase().includes('workout') ||
+            s.toLowerCase().includes('resistance') ||
+            s.toLowerCase().includes('quality') ||
+            s.toLowerCase().includes('helped') ||
+            s.toLowerCase().includes('transformed')
+          );
+          
+          if (meaningfulSentences.length > 0) {
+            copyText = meaningfulSentences.slice(0, 2).join('. ').trim() + '.';
+            console.log('🔍 Found multi-sentence testimonial:', copyText);
+          }
+        }
+      }
+      
+      // Pattern 6: If contains common testimonial keywords, extract the meaningful part
+      if (!copyText) {
+        const testimonialKeywords = [
+          'amazing quality', 'helped shape', 'worth it', 'love them', 'transformed', 
+          'skeptical', 'resistance', 'workout', 'calories', 'firmed up', 'easy way',
+          'sneak in', 'game changer', 'built-in', 'yale-tested', 'prestigious'
+        ];
+        
         const hasTestimonialKeyword = testimonialKeywords.some(keyword => 
           adName.toLowerCase().includes(keyword)
         );
@@ -121,7 +169,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           // Extract everything before the first | or technical marker
           let meaningfulPart = adName
             .split(/\s*\|\s*(VID|IMG|GIF|24_|25_|Homepage)/)[0]
-            .replace(/^.*?(⭐+.*|".*|I was.*|Not only.*|These.*|Pushing.*)/i, '$1')
+            .replace(/^.*?(⭐+.*|".*|I was.*|Not only.*|These.*|Pushing.*|One of.*|That's.*|Meet.*)/i, '$1')
             .trim();
             
           if (meaningfulPart.length > 15) {
@@ -828,11 +876,42 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     borderRadius: '6px',
                     backgroundColor: '#f9fafb',
                     display: 'block',
-                    imageRendering: 'auto'
+                    imageRendering: 'auto',
+                    imageRendering: '-webkit-optimize-contrast',
+                    WebkitImageSmoothing: 'high',
+                    msInterpolationMode: 'bicubic'
                   }}
                   onLoad={(e) => {
-                    // Apply sharpening after load
-                    e.target.style.filter = 'contrast(1.05) saturate(1.1) brightness(1.02)';
+                    // Try to get higher resolution version
+                    const originalSrc = e.target.src;
+                    
+                    // If it's a Facebook image, try to get a higher resolution version
+                    if (originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net')) {
+                      // Try common high-res patterns
+                      const highResSrc = originalSrc
+                        .replace(/\/s\d+x\d+\//, '/s600x600/')  // Increase size
+                        .replace(/\/\d+x\d+\//, '/600x600/')     // Increase size
+                        .replace(/_s\.jpg/, '_n.jpg')           // Normal size instead of small
+                        .replace(/_t\.jpg/, '_n.jpg')           // Normal size instead of thumbnail
+                        .replace(/quality=\d+/, 'quality=95');  // Higher quality
+                      
+                      if (highResSrc !== originalSrc) {
+                        const testImg = new Image();
+                        testImg.onload = () => {
+                          e.target.src = highResSrc;
+                          e.target.style.filter = 'contrast(1.05) saturate(1.05) brightness(1.01)';
+                        };
+                        testImg.onerror = () => {
+                          // Fallback to original with enhancement
+                          e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                        };
+                        testImg.src = highResSrc;
+                      } else {
+                        e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                      }
+                    } else {
+                      e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                    }
                   }}
                   onError={(e) => {
                     e.target.style.backgroundColor = '#e5e7eb';
