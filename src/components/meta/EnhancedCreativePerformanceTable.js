@@ -31,48 +31,88 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Copy extraction function
+  // Copy extraction function - FIXED to get actual ad copy
   const extractAdCopy = (creative) => {
     let copyText = null;
     
-    // Extract from object_story_spec
+    // First priority: Extract from object_story_spec (actual ad copy)
     if (creative.objectStorySpec) {
       copyText = 
         creative.objectStorySpec.page_post?.message ||
         creative.objectStorySpec.link_data?.message ||
+        creative.objectStorySpec.link_data?.description ||
         creative.objectStorySpec.video_data?.message ||
-        creative.objectStorySpec.photo_data?.message;
+        creative.objectStorySpec.photo_data?.message ||
+        creative.objectStorySpec.text_data?.message;
     }
     
-    // Fallback to ad name
-    if (!copyText) {
+    // If no actual copy found, try to extract from ad name parts
+    if (!copyText && creative.adName) {
+      // Try to extract meaningful copy from ad name by removing technical parts
+      const adName = creative.adName;
+      
+      // Remove common technical suffixes and prefixes
+      let cleanedName = adName
+        .replace(/\s*\|\s*(VID|IMG|24_|25_|mof\d+).*$/i, '') // Remove everything after | VID/IMG/technical codes
+        .replace(/^.*Homepage\s*\|\s*/i, '') // Remove Homepage prefix
+        .replace(/\s*-\s*(NVT|UN|HMP).*$/i, '') // Remove technical suffixes
+        .replace(/\s*\|\s*Copy.*$/i, '') // Remove Copy suffixes
+        .trim();
+      
+      // If we got something meaningful, use it
+      if (cleanedName.length > 10) {
+        copyText = cleanedName;
+      }
+    }
+    
+    // Final fallback
+    if (!copyText || copyText.length < 10) {
       copyText = creative.adName || 'No copy available';
     }
     
-    // Extract exactly 3 lines
+    // Process the copy text to extract 3 lines
     const lines = copyText
       .split(/[\n\r]+/)
       .filter(line => line.trim())
       .slice(0, 3);
     
-    // Join with newlines and truncate if needed
-    let result = lines.join('\n');
-    
-    // If no line breaks, try sentences and limit to 3 lines worth of text
-    if (lines.length === 1 && copyText.length > 150) {
-      const sentences = copyText
-        .split(/[.!?]+/)
-        .filter(s => s.trim())
-        .slice(0, 2)
-        .join('. ')
-        .trim();
-      
-      result = sentences.length > 150 ? sentences.substring(0, 150) + '...' : sentences;
-    } else if (result.length > 150) {
-      result = result.substring(0, 150) + '...';
+    // If we have multiple lines, join them
+    if (lines.length > 1) {
+      return lines.join('\n');
     }
     
-    return result;
+    // If single line, try to break it into sentences and limit to ~150 chars for 3 lines
+    const singleLine = lines[0] || copyText;
+    if (singleLine.length > 150) {
+      // Try to break at sentence boundaries
+      const sentences = singleLine
+        .split(/[.!?]+/)
+        .filter(s => s.trim())
+        .slice(0, 2);
+      
+      if (sentences.length > 1) {
+        const result = sentences.join('. ').trim();
+        return result.length > 150 ? result.substring(0, 150) + '...' : result + '.';
+      } else {
+        // Break at word boundaries for long single sentence
+        const words = singleLine.split(' ');
+        let result = '';
+        let lineCount = 0;
+        
+        for (const word of words) {
+          if ((result + word).length > 50 * (lineCount + 1)) {
+            result += '\n';
+            lineCount++;
+            if (lineCount >= 3) break;
+          }
+          result += (result.endsWith('\n') ? '' : ' ') + word;
+        }
+        
+        return result.length > 150 ? result.substring(0, 150) + '...' : result;
+      }
+    }
+    
+    return singleLine;
   };
 
   // Data cleaning functions
@@ -122,7 +162,9 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           groupKey = creative.creativeId || `unknown-${index}`;
       }
 
-      console.log(`Processing ad ${index + 1}: ${creative.adName} -> Group: ${groupKey.substring(0, 50)}...`);
+      console.log(`Processing ad ${index + 1}: ${creative.adName}`);
+      console.log(`Extracted copy: "${extractAdCopy(creative).substring(0, 100)}..."`);
+      console.log(`Group key: ${groupKey.substring(0, 50)}...`);
 
       if (!groupedCreatives[groupKey]) {
         groupedCreatives[groupKey] = {
@@ -426,7 +468,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const currentMetrics = getMetricsForMode(aggregationMode);
 
   return (
-    <div style={{ width: '100%', padding: '24px' }}>
+    <div style={{ width: '100%', padding: '24px', paddingRight: '48px' }}>
       {/* Header Section */}
       <div style={{ marginBottom: '24px' }}>
         <h3 style={{ 
@@ -680,7 +722,9 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     width: '100%',
                     height: '120px',
                     objectFit: 'cover',
-                    borderRadius: '6px'
+                    borderRadius: '6px',
+                    imageRendering: 'auto',
+                    filter: 'none'
                   }}
                 />
               </div>
