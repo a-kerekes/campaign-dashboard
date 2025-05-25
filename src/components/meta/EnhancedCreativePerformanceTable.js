@@ -31,76 +31,114 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Copy extraction function - ENHANCED to get more actual ad copy
+  // Copy extraction function - COMPLETELY REWRITTEN for actual ad copy
   const extractAdCopy = (creative) => {
     let copyText = null;
     
-    // First priority: Extract from object_story_spec (actual ad copy)
+    console.log('🔍 Extracting copy for:', creative.adName);
+    console.log('🔍 objectStorySpec:', creative.objectStorySpec);
+    
+    // PRIORITY 1: Real ad copy from object_story_spec
     if (creative.objectStorySpec) {
+      const spec = creative.objectStorySpec;
+      
+      // Try all possible message fields
       copyText = 
-        creative.objectStorySpec.page_post?.message ||
-        creative.objectStorySpec.link_data?.message ||
-        creative.objectStorySpec.link_data?.description ||
-        creative.objectStorySpec.link_data?.call_to_action?.value?.text ||
-        creative.objectStorySpec.video_data?.message ||
-        creative.objectStorySpec.video_data?.description ||
-        creative.objectStorySpec.photo_data?.message ||
-        creative.objectStorySpec.text_data?.message ||
-        creative.objectStorySpec.template_data?.message;
+        spec.page_post?.message ||
+        spec.link_data?.message ||
+        spec.link_data?.description ||
+        spec.link_data?.call_to_action?.value?.text ||
+        spec.video_data?.message ||
+        spec.video_data?.description ||
+        spec.photo_data?.message ||
+        spec.text_data?.message ||
+        spec.template_data?.message ||
+        spec.call_to_action?.value?.text;
+        
+      console.log('🔍 Found objectStorySpec copy:', copyText);
     }
     
-    // Second priority: Look for common copy patterns in ad name
+    // PRIORITY 2: Extract testimonials and reviews from ad name
     if (!copyText && creative.adName) {
       const adName = creative.adName;
       
-      // Extract meaningful copy patterns from ad names
-      let cleanedName = adName;
-      
-      // Pattern 1: Remove everything after | and technical codes
-      cleanedName = cleanedName.replace(/\s*\|\s*(VID|IMG|GIF|24_|25_|mof\d+).*$/i, '');
-      
-      // Pattern 2: Remove Homepage prefix
-      cleanedName = cleanedName.replace(/^.*Homepage\s*\|\s*/i, '');
-      
-      // Pattern 3: Remove technical suffixes
-      cleanedName = cleanedName.replace(/\s*-\s*(NVT|UN|HMP|PRF|PA).*$/i, '');
-      
-      // Pattern 4: Remove Copy Customer/Satisfaction suffixes
-      cleanedName = cleanedName.replace(/\s*\|\s*Copy\s+(Customer|Satisfaction).*$/i, '');
-      
-      // Pattern 5: Extract customer review/testimonial patterns
-      const reviewMatch = adName.match(/(customer review|review)\s+(.+?)(?:\s*\|\s*|$)/i);
-      if (reviewMatch && reviewMatch[2]) {
-        copyText = reviewMatch[2].trim();
+      // Pattern 1: Extract star ratings with quotes
+      const starQuoteMatch = adName.match(/⭐+\s*"([^"]+)"/);
+      if (starQuoteMatch && starQuoteMatch[1].length > 15) {
+        copyText = starQuoteMatch[1];
+        console.log('🔍 Found star quote pattern:', copyText);
       }
       
-      // Pattern 6: Extract star rating + text patterns
-      const starMatch = adName.match(/⭐+\s*"?([^"]+)"?/);
-      if (starMatch && starMatch[1]) {
-        copyText = starMatch[1].trim();
+      // Pattern 2: Extract customer review content
+      if (!copyText) {
+        const reviewMatch = adName.match(/customer review\s+(.+?)(?:\s*\|\s*Homepage|$)/i);
+        if (reviewMatch && reviewMatch[1].length > 15) {
+          copyText = reviewMatch[1];
+          console.log('🔍 Found review pattern:', copyText);
+        }
       }
       
-      // If we got something meaningful from cleaning, use it
-      if (!copyText && cleanedName.length > 10 && cleanedName !== adName) {
-        copyText = cleanedName.trim();
+      // Pattern 3: Extract quoted testimonials
+      if (!copyText) {
+        const quoteMatch = adName.match(/"([^"]{20,})"/);
+        if (quoteMatch && quoteMatch[1]) {
+          copyText = quoteMatch[1];
+          console.log('🔍 Found quote pattern:', copyText);
+        }
+      }
+      
+      // Pattern 4: Look for testimonial indicators
+      if (!copyText) {
+        const testimonialPatterns = [
+          /I was shocked/i,
+          /Not only do these/i,
+          /These leggings/i,
+          /Pushing my daughter/i,
+          /Did you know/i,
+          /I absolutely love/i
+        ];
+        
+        for (const pattern of testimonialPatterns) {
+          if (pattern.test(adName)) {
+            // Extract the testimonial part
+            const cleanedName = adName
+              .replace(/\s*\|\s*(VID|IMG|GIF).*$/i, '')
+              .replace(/^.*Homepage\s*\|\s*/i, '')
+              .replace(/\s*-\s*(NVT|UN|HMP).*$/i, '')
+              .trim();
+            
+            if (cleanedName.length > 20) {
+              copyText = cleanedName;
+              console.log('🔍 Found testimonial pattern:', copyText);
+              break;
+            }
+          }
+        }
       }
     }
     
-    // Third priority: Try to extract quoted text from ad name
+    // PRIORITY 3: Clean product name extraction  
     if (!copyText && creative.adName) {
-      const quotedMatch = creative.adName.match(/"([^"]+)"/);
-      if (quotedMatch && quotedMatch[1].length > 10) {
-        copyText = quotedMatch[1];
+      const adName = creative.adName;
+      
+      // Extract clean product name (first part before |)
+      const firstPart = adName.split('|')[0].trim();
+      if (firstPart.length > 5 && !firstPart.includes('24_') && !firstPart.includes('25_')) {
+        copyText = firstPart;
+        console.log('🔍 Using clean product name:', copyText);
       }
     }
     
-    // Final fallback
+    // FALLBACK
     if (!copyText || copyText.length < 5) {
-      copyText = creative.adName || 'No copy available';
+      copyText = creative.adName?.split('|')[0]?.trim() || 'No copy available';
+      console.log('🔍 Using fallback:', copyText);
     }
     
-    // Process the copy text to format as 3 lines
-    return formatCopyText(copyText);
+    // Format the final copy
+    const formatted = formatCopyText(copyText);
+    console.log('🔍 Final formatted copy:', formatted);
+    return formatted;
   };
   
   // Helper function to format copy text into 3 lines
@@ -202,7 +240,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       }
 
       console.log(`Processing ad ${index + 1}: ${creative.adName}`);
-      console.log(`Extracted copy: "${extractAdCopy(creative).substring(0, 100)}..."`);
+      const extractedCopy = extractAdCopy(creative);
+      console.log(`Extracted copy: "${extractedCopy.substring(0, 100)}..."`);
       console.log(`Group key: ${groupKey.substring(0, 50)}...`);
 
       if (!groupedCreatives[groupKey]) {
@@ -761,16 +800,24 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               <div style={{ marginBottom: '12px' }}>
                 <img 
                   src={creative.thumbnailUrl} 
-                  alt={creative.adName}
+                  alt="Creative"
                   style={{
                     width: '100%',
-                    height: '120px',
+                    height: '200px',
                     objectFit: 'cover',
                     borderRadius: '6px',
-                    imageRendering: 'crisp-edges',
+                    imageRendering: 'high-quality',
                     imageRendering: '-webkit-optimize-contrast',
-                    filter: 'contrast(1.1) brightness(1.02)',
-                    backgroundColor: '#f9fafb'
+                    imageRendering: 'crisp-edges',
+                    imageRendering: 'pixelated',
+                    filter: 'none',
+                    backgroundColor: '#f9fafb',
+                    display: 'block'
+                  }}
+                  onLoad={(e) => {
+                    // Ensure high quality rendering
+                    e.target.style.imageRendering = 'high-quality';
+                    e.target.style.imageRendering = '-webkit-optimize-contrast';
                   }}
                   onError={(e) => {
                     e.target.style.backgroundColor = '#e5e7eb';
@@ -783,13 +830,14 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               </div>
             )}
             
-            {/* Copy Text */}
+            {/* Copy Text - NO AD NAME SHOWN */}
             <div style={{ marginBottom: '16px', flex: '1' }}>
               <div style={{
                 fontSize: '14px',
                 color: '#374151',
                 lineHeight: '1.5',
-                minHeight: '60px'
+                minHeight: '60px',
+                fontWeight: '400'
               }}>
                 {creative.extractedCopy.split('\n').map((line, index) => (
                   <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
