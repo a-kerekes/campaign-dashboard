@@ -882,10 +882,10 @@ const extractAdCopy = (creative) => {
               borderRadius: '8px',
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              padding: '16px',
+              padding: '12px', // Reduced from 16px to minimize white space
               cursor: 'pointer',
               transition: 'box-shadow 0.2s',
-              minHeight: '400px',
+              minHeight: '360px', // Reduced from 400px
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -898,11 +898,11 @@ const extractAdCopy = (creative) => {
               e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
-            {/* Creative Thumbnail (for Creative and Combined modes) - UPDATED FOR NATIVE DIMENSIONS */}
+            {/* Creative Thumbnail (for Creative and Combined modes) - OPTIMIZED SIZING */}
             {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
              creative.thumbnailUrl && (
               <div style={{ 
-                marginBottom: '12px',
+                marginBottom: '8px',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -915,10 +915,10 @@ const extractAdCopy = (creative) => {
                   alt="Creative"
                   style={{
                     maxWidth: '100%',
-                    maxHeight: '300px', // Set a reasonable max height to prevent cards from becoming too tall
-                    width: 'auto',      // Let width adjust naturally based on aspect ratio
-                    height: 'auto',     // Let height adjust naturally based on aspect ratio
-                    objectFit: 'contain', // Changed from 'cover' to 'contain' to preserve aspect ratio
+                    maxHeight: '180px', // Reduced from 300px to match video thumbnail size
+                    width: 'auto',      
+                    height: 'auto',     
+                    objectFit: 'contain',
                     borderRadius: '6px',
                     display: 'block',
                     imageRendering: 'auto',
@@ -971,7 +971,7 @@ const extractAdCopy = (creative) => {
             
             {/* Copy Text - Only show in Copy and Combined modes */}
             {aggregationMode !== AGGREGATION_MODES.CREATIVE && (
-              <div style={{ marginBottom: '16px', flex: '1' }}>
+              <div style={{ marginBottom: '12px', flex: '1' }}> {/* Reduced from 16px */}
                 <div style={{
                   fontSize: '14px',
                   color: '#374151',
