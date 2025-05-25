@@ -313,7 +313,7 @@ const extractAdCopy = (creative) => {
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
-  // Aggregation function with multiple modes
+  // Aggregation function with multiple modes - FIXED CREATIVE AGGREGATION
   const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
@@ -329,7 +329,18 @@ const extractAdCopy = (creative) => {
       // Determine group key based on aggregation mode
       switch (mode) {
         case AGGREGATION_MODES.CREATIVE:
-          groupKey = creative.creativeId || `unknown-creative-${index}`;
+          // FIXED: Use a more robust grouping strategy for creatives
+          // Group by thumbnailUrl if creativeId is missing or inconsistent
+          if (creative.creativeId && creative.creativeId !== 'unknown') {
+            groupKey = creative.creativeId;
+          } else if (creative.thumbnailUrl) {
+            // Extract a stable identifier from thumbnail URL
+            groupKey = creative.thumbnailUrl.split('?')[0]; // Remove query params for consistent grouping
+          } else {
+            // Fallback: group by ad name pattern (remove technical suffixes)
+            const cleanAdName = creative.adName?.split('|')[0]?.trim() || `unknown-creative-${index}`;
+            groupKey = cleanAdName;
+          }
           break;
         case AGGREGATION_MODES.COPY:
           groupKey = extractAdCopy(creative);
@@ -344,8 +355,7 @@ const extractAdCopy = (creative) => {
       }
 
       console.log(`Processing ad ${index + 1}: ${creative.adName}`);
-      const extractedCopy = extractAdCopy(creative);
-      console.log(`Extracted copy: "${extractedCopy.substring(0, 100)}..."`);
+      console.log(`Creative ID: ${creative.creativeId}, Thumbnail: ${creative.thumbnailUrl?.substring(0, 50)}...`);
       console.log(`Group key: ${groupKey.substring(0, 50)}...`);
 
       if (!groupedCreatives[groupKey]) {
