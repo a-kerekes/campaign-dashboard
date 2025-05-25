@@ -313,13 +313,25 @@ const extractAdCopy = (creative) => {
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
-  // Aggregation function with multiple modes - FIXED CREATIVE AGGREGATION
+  // Aggregation function with multiple modes - ENHANCED DEBUG VERSION
   const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
     }
 
     console.log(`🔧 AGGREGATION: Starting ${mode} aggregation with`, creativePerformanceData.length, 'total ads');
+    
+    // DEBUG: Log all creative data first
+    console.log('🔍 DEBUG: All creative data:');
+    creativePerformanceData.forEach((creative, index) => {
+      console.log(`Ad ${index + 1}:`, {
+        adId: creative.adId,
+        adName: creative.adName,
+        creativeId: creative.creativeId,
+        thumbnailUrl: creative.thumbnailUrl?.substring(0, 100),
+        hasThumb: !!creative.thumbnailUrl
+      });
+    });
 
     const groupedCreatives = {};
 
@@ -329,34 +341,51 @@ const extractAdCopy = (creative) => {
       // Determine group key based on aggregation mode
       switch (mode) {
         case AGGREGATION_MODES.CREATIVE:
-          // FIXED: Use a more robust grouping strategy for creatives
-          // Group by thumbnailUrl if creativeId is missing or inconsistent
-          if (creative.creativeId && creative.creativeId !== 'unknown') {
-            groupKey = creative.creativeId;
-          } else if (creative.thumbnailUrl) {
-            // Extract a stable identifier from thumbnail URL
-            groupKey = creative.thumbnailUrl.split('?')[0]; // Remove query params for consistent grouping
-          } else {
-            // Fallback: group by ad name pattern (remove technical suffixes)
-            const cleanAdName = creative.adName?.split('|')[0]?.trim() || `unknown-creative-${index}`;
-            groupKey = cleanAdName;
+          // ENHANCED: Use more aggressive grouping for identical visuals
+          
+          // Strategy 1: If we have a thumbnail URL, use that as the primary grouping key
+          if (creative.thumbnailUrl) {
+            // Clean the thumbnail URL to remove query parameters and focus on the core image
+            let cleanUrl = creative.thumbnailUrl.split('?')[0]; // Remove query params
+            cleanUrl = cleanUrl.split('&')[0]; // Remove additional params
+            // Extract the key part of the URL (usually the image hash/ID)
+            const urlParts = cleanUrl.split('/');
+            const imageId = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
+            groupKey = `image_${imageId}`;
+            console.log(`🎯 Using thumbnail-based grouping: ${groupKey}`);
+          }
+          // Strategy 2: If no thumbnail, use creative ID if available
+          else if (creative.creativeId && creative.creativeId !== 'unknown') {
+            groupKey = `creative_${creative.creativeId}`;
+            console.log(`🎯 Using creativeId-based grouping: ${groupKey}`);
+          }
+          // Strategy 3: Fallback to ad name pattern matching
+          else {
+            // Extract the base ad name (before any | separator)
+            const baseAdName = creative.adName?.split('|')[0]?.trim() || `unknown-${index}`;
+            // Further clean by removing common suffixes like VID, IMG, etc.
+            const cleanName = baseAdName.replace(/\s+(VID|IMG|GIF|24_|25_).*$/i, '').trim();
+            groupKey = `name_${cleanName}`;
+            console.log(`🎯 Using name-based grouping: ${groupKey}`);
           }
           break;
+          
         case AGGREGATION_MODES.COPY:
           groupKey = extractAdCopy(creative);
           break;
+          
         case AGGREGATION_MODES.COMBINED:
           const creativeId = creative.creativeId || creative.thumbnailUrl || `unknown-creative-${index}`;
           const copyText = extractAdCopy(creative);
           groupKey = `${creativeId}__${copyText}`;
           break;
+          
         default:
           groupKey = creative.creativeId || `unknown-${index}`;
       }
 
-      console.log(`Processing ad ${index + 1}: ${creative.adName}`);
-      console.log(`Creative ID: ${creative.creativeId}, Thumbnail: ${creative.thumbnailUrl?.substring(0, 50)}...`);
-      console.log(`Group key: ${groupKey.substring(0, 50)}...`);
+      console.log(`📊 Processing ad ${index + 1}: "${creative.adName}"`);
+      console.log(`📊 Final group key: "${groupKey}"`);
 
       if (!groupedCreatives[groupKey]) {
         groupedCreatives[groupKey] = {
@@ -365,6 +394,7 @@ const extractAdCopy = (creative) => {
           adsetCount: 0,
           adIds: [],
           creativeIds: new Set(),
+          adNames: [], // Track all ad names in this group
           totalImpressions: 0,
           totalClicks: 0,
           totalSpend: 0,
@@ -372,13 +402,17 @@ const extractAdCopy = (creative) => {
           totalRevenue: 0,
           extractedCopy: extractAdCopy(creative)
         };
+        console.log(`✨ Created new group: "${groupKey}"`);
+      } else {
+        console.log(`🔄 Adding to existing group: "${groupKey}"`);
       }
 
       const group = groupedCreatives[groupKey];
       
-      // Add to counters
+      // Add to counters and tracking
       group.adsetCount += 1;
       group.adIds.push(creative.adId);
+      group.adNames.push(creative.adName);
       if (creative.creativeId) {
         group.creativeIds.add(creative.creativeId);
       }
@@ -395,6 +429,8 @@ const extractAdCopy = (creative) => {
       group.totalSpend += cleanSpend;
       group.totalPurchases += cleanPurchases;
       group.totalRevenue += cleanRevenue;
+      
+      console.log(`📈 Group "${groupKey}" now has ${group.adsetCount} ads, ${group.totalSpend.toFixed(2)} spend`);
     });
 
     // Convert to array and calculate metrics
@@ -424,6 +460,8 @@ const extractAdCopy = (creative) => {
       const seeMoreRate = impressions > 0 ? Math.random() * 3 + 0.5 : 0;
       const thumbstopRate = impressions > 0 ? Math.random() * 5 + 1 : 0;
 
+      console.log(`🏁 Final group "${group.groupKey}": ${group.adsetCount} ads, ${spend.toFixed(2)} total spend`);
+
       return {
         id: `${group.groupKey}-${index}`, // Unique ID for React keys
         adId: group.adIds[0],
@@ -438,6 +476,7 @@ const extractAdCopy = (creative) => {
         adsetCount: group.adsetCount,
         creativeCount: group.creativeIds.size || 1,
         adIds: group.adIds,
+        adNames: group.adNames, // All ad names in this group
         
         // Metrics
         impressions,
@@ -459,9 +498,13 @@ const extractAdCopy = (creative) => {
       };
     });
 
-    console.log(`🔧 AGGREGATION: Completed ${mode} aggregation:`, 
-      creativePerformanceData.length, 'ads →', 
-      aggregatedCreatives.length, 'unique items');
+    console.log(`🔧 AGGREGATION SUMMARY: ${creativePerformanceData.length} ads → ${aggregatedCreatives.length} unique items`);
+    console.log('🔧 Final groups:', aggregatedCreatives.map(item => ({
+      groupKey: item.id,
+      adCount: item.adsetCount,
+      spend: item.spend.toFixed(2),
+      adName: item.adName
+    })));
 
     return aggregatedCreatives;
   }, []);
