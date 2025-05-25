@@ -278,42 +278,69 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return text;
   };
 
-  // Enhanced image quality function
+  // Enhanced image quality function with 403 error handling
   const enhanceImageQuality = (originalSrc, imgElement) => {
-    // Facebook/Meta URL patterns and their high-res equivalents
-    let enhancedSrc = originalSrc;
-    
-    // Try progressively higher resolutions
-    enhancedSrc = enhancedSrc
-      .replace(/\/s\d+x\d+\//, '/s1080x1080/')
-      .replace(/\/\d+x\d+\//, '/1080x1080/')
-      .replace(/_s\.jpg/, '_o.jpg')      // Original size
-      .replace(/_t\.jpg/, '_o.jpg')      // Original instead of thumbnail
-      .replace(/_m\.jpg/, '_o.jpg')      // Original instead of medium
-      .replace(/_n\.jpg/, '_o.jpg')      // Try original if normal doesn't work
-      .replace(/quality=\d+/, 'quality=100')
-      .replace(/&width=\d+/, '')
-      .replace(/&height=\d+/, '')
-      .replace(/&crop/, '');
+    // Handle Facebook 403 errors by using fallback approaches
+    if (!originalSrc || originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net')) {
+      // Facebook images often get 403 errors, try different approaches
+      let enhancedSrc = originalSrc;
+      
+      // Try different Facebook URL modifications
+      if (originalSrc) {
+        enhancedSrc = originalSrc
+          .replace(/\/s\d+x\d+\//, '/s720x720/')  // More modest size increase
+          .replace(/\/\d+x\d+\//, '/720x720/')
+          .replace(/_s\.jpg/, '_n.jpg')          // Normal instead of small
+          .replace(/_t\.jpg/, '_n.jpg')          // Normal instead of thumbnail
+          .replace(/quality=\d+/, 'quality=85') // Reasonable quality
+          .replace(/&oh=[^&]*/, '')             // Remove hash
+          .replace(/&oe=[^&]*/, '');            // Remove expiry
+      }
 
-    // If URL was modified, try loading the enhanced version
-    if (enhancedSrc !== originalSrc) {
-      const testImg = new Image();
-      testImg.crossOrigin = 'anonymous';
-      
-      testImg.onload = () => {
-        imgElement.src = enhancedSrc;
-        applyImageSharpening(imgElement);
-      };
-      
-      testImg.onerror = () => {
-        applyImageSharpening(imgElement);
-      };
-      
-      testImg.src = enhancedSrc;
+      // Try the enhanced URL first
+      if (enhancedSrc !== originalSrc) {
+        const testImg = new Image();
+        testImg.onload = () => {
+          imgElement.src = enhancedSrc;
+          applyImageSharpening(imgElement);
+        };
+        
+        testImg.onerror = () => {
+          // If enhanced fails, try original with proxy/cache busting
+          tryOriginalWithFallback(originalSrc, imgElement);
+        };
+        
+        testImg.src = enhancedSrc;
+      } else {
+        tryOriginalWithFallback(originalSrc, imgElement);
+      }
     } else {
+      // Non-Facebook images, use original enhancement logic
       applyImageSharpening(imgElement);
     }
+  };
+
+  const tryOriginalWithFallback = (originalSrc, imgElement) => {
+    const fallbackImg = new Image();
+    fallbackImg.onload = () => {
+      imgElement.src = originalSrc;
+      applyImageSharpening(imgElement);
+    };
+    
+    fallbackImg.onerror = () => {
+      // Final fallback - show placeholder
+      imgElement.style.backgroundColor = '#f3f4f6';
+      imgElement.style.display = 'flex';
+      imgElement.style.alignItems = 'center';
+      imgElement.style.justifyContent = 'center';
+      imgElement.style.color = '#9ca3af';
+      imgElement.style.fontSize = '14px';
+      imgElement.style.fontWeight = '500';
+      imgElement.innerHTML = '🖼️ Creative Preview';
+      imgElement.style.border = '2px dashed #e5e7eb';
+    };
+    
+    fallbackImg.src = originalSrc;
   };
 
   const applyImageSharpening = (imgElement) => {
@@ -956,14 +983,20 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     msInterpolationMode: 'bicubic'
                   }}
                   onLoad={(e) => {
+                    // Enhanced image loading with 403 error handling
                     enhanceImageQuality(e.target.src, e.target);
                   }}
                   onError={(e) => {
-                    e.target.style.backgroundColor = '#e5e7eb';
+                    // Enhanced error handling with better placeholder
+                    e.target.style.backgroundColor = '#f3f4f6';
                     e.target.style.display = 'flex';
                     e.target.style.alignItems = 'center';
                     e.target.style.justifyContent = 'center';
-                    e.target.innerHTML = '🖼️';
+                    e.target.style.color = '#9ca3af';
+                    e.target.style.fontSize = '14px';
+                    e.target.style.fontWeight = '500';
+                    e.target.innerHTML = '🖼️ Creative Preview';
+                    e.target.style.border = '2px dashed #e5e7eb';
                   }}
                 />
               </div>
