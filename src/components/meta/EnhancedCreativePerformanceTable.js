@@ -1,7 +1,6 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download } from 'lucide-react';
-import metaAPI from './metaAPI';
 
 // Aggregation modes
 const AGGREGATION_MODES = {
@@ -19,13 +18,7 @@ const metricsConfig = [
   { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 }
 ];
 
-const EnhancedCreativePerformanceTable = ({ 
-  selectedAccountId, 
-  benchmarks: propBenchmarks, 
-  onCreativeSelect, 
-  dateRange = 'Last 30 Days',
-  tenantId 
-}) => {
+const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
   const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.CREATIVE);
   const [sortColumn, setSortColumn] = useState('spend');
@@ -37,221 +30,222 @@ const EnhancedCreativePerformanceTable = ({
   const [isEditingBenchmarks, setIsEditingBenchmarks] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [authRequired, setAuthRequired] = useState(false);
 
-  // Fetch creative performance data from Meta API
-  const fetchCreativePerformanceData = useCallback(async () => {
-    if (!selectedAccountId) {
-      console.log('No account ID selected');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setAuthRequired(false);
-
-    try {
-      console.log('Fetching creative performance data for account:', selectedAccountId, 'dateRange:', dateRange);
-
-      // Get access token from session storage
-      const accessToken = sessionStorage.getItem('metaAccessToken');
-      
-      // Format account ID for Meta API
-      const formattedAccountId = selectedAccountId.toString().replace('act_', '');
-
-      // Calculate date range for Meta API
-      const days = metaAPI.getDateRangeNumber(dateRange);
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      
-      const startDate = new Date(yesterday);
-      startDate.setDate(yesterday.getDate() - (days - 1));
-      
-      const since = startDate.toISOString().split('T')[0];
-      const until = yesterday.toISOString().split('T')[0];
-
-      // Fetch creative insights from Meta API
-      const endpoint = `act_${formattedAccountId}/insights`;
-      const params = {
-        time_range: JSON.stringify({
-          since,
-          until
-        }),
-        fields: 'impressions,clicks,spend,ctr,cpc,cpm,actions,action_values,cost_per_action_type,ad_id,ad_name,adset_name',
-        level: 'ad',
-        limit: 1000,
-        breakdowns: 'ad_format_asset'
-      };
-
-      console.log('Meta API request params:', params);
-
-      const result = await metaAPI.fetchFromMetaAPI(endpoint, params, accessToken);
-
-      if (result.error) {
-        if (result.authRequired) {
-          setAuthRequired(true);
-          setError('Authentication required. Please log in to Facebook.');
-        } else {
-          setError(`Meta API Error: ${result.error}`);
-        }
-        return;
-      }
-
-      if (!result.data || !result.data.data || result.data.data.length === 0) {
-        console.log('No creative performance data returned from Meta API');
-        setCreatives([]);
-        setFilteredCreatives([]);
-        setStatusMessage('No creative performance data found for the selected period');
-        return;
-      }
-
-      console.log('Raw Meta API response:', result.data.data.length, 'records');
-
-      // Process and format the creative data
-      const processedCreatives = result.data.data.map((item, index) => {
-        // Extract conversion metrics from actions
-        const actions = item.actions || [];
-        const actionValues = item.action_values || [];
-        const costPerActionType = item.cost_per_action_type || [];
-
-        const purchases = parseInt(metaAPI.getActionValue(actions, 'purchase')) || 0;
-        const landingPageViews = parseInt(metaAPI.getActionValue(actions, 'landing_page_view')) || 0;
-        const addToCarts = parseInt(metaAPI.getActionValue(actions, 'add_to_cart')) || 0;
-        
-        // Extract purchase value for ROAS calculation
-        const purchaseValueAction = actionValues.find(a => a.action_type === 'purchase');
-        const revenue = parseFloat(purchaseValueAction?.value || 0);
-
-        // Extract cost per purchase
-        const costPerPurchaseAction = costPerActionType.find(c => c.action_type === 'purchase');
-        const costPerPurchase = parseFloat(costPerPurchaseAction?.value || 0);
-
-        // Basic metrics
-        const impressions = parseInt(item.impressions || 0);
-        const clicks = parseInt(item.clicks || 0);
-        const spend = parseFloat(item.spend || 0);
-        const ctr = parseFloat(item.ctr || 0) * 100; // Convert to percentage
-        const cpc = parseFloat(item.cpc || 0);
-        const cpm = parseFloat(item.cpm || 0);
-
-        // Calculate ROAS
-        const roas = spend > 0 && revenue > 0 ? revenue / spend : 0;
-
-        // Generate mock engagement metrics (Meta API doesn't provide these directly)
-        const seeMoreRate = impressions > 0 ? Math.random() * 3 + 0.5 : 0;
-        const thumbstopRate = impressions > 0 ? Math.random() * 5 + 1 : 0;
-
-        // Generate creative thumbnail URL (Meta API requires separate call for creative assets)
-        const thumbnailUrl = `https://external.flhr${Math.floor(Math.random() * 10)}-1.fna.fbcdn.net/emg1/v/t13/${Math.floor(Math.random() * 999999999)}?url=${encodeURIComponent('https://via.placeholder.com/400x600/4267B2/FFFFFF?text=' + encodeURIComponent(item.ad_name || 'Creative'))}&fb_oip=1`;
-
-        // Extract ad copy from ad name or create engaging copy
-        const extractedCopy = extractAdCopyFromData(item);
-
-        return {
-          id: `creative_${item.ad_id}_${index}`,
-          adId: item.ad_id,
-          adName: item.ad_name || `Ad ${index + 1}`,
-          adsetName: item.adset_name || 'Unknown Adset',
-          creativeId: item.ad_id, // Use ad_id as creative identifier
-          thumbnailUrl,
-          objectStorySpec: null, // Would need separate API call to get this
-          accountId: selectedAccountId,
-
-          // Metrics
-          impressions,
-          clicks,
-          spend,
-          purchases,
-          revenue,
-          ctr,
-          cpc,
-          cpm,
-          costPerPurchase: costPerPurchase || (purchases > 0 ? spend / purchases : 0),
-          roas,
-          seeMoreRate,
-          thumbstopRate,
-          conversionRate: clicks > 0 && purchases > 0 ? (purchases / clicks) * 100 : 0,
-          landingPageViews,
-          addToCarts,
-
-          // Copy for display
-          extractedCopy
-        };
-      });
-
-      console.log('Processed creative data:', processedCreatives.length, 'creatives');
-      
-      // Set the data
-      setCreatives(processedCreatives);
-      setFilteredCreatives(processedCreatives);
-      setStatusMessage('');
-
-    } catch (error) {
-      console.error('Error fetching creative performance data:', error);
-      setError(`Failed to fetch creative data: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedAccountId, dateRange]);
-
-  // Extract ad copy from Meta API data
-  const extractAdCopyFromData = (item) => {
-    const adName = item.ad_name || '';
+  // Copy extraction function - ENHANCED with more patterns
+const extractAdCopy = (creative) => {
+  let copyText = null;
+  
+  console.log('🔍 Extracting copy for:', creative.adName);
+  console.log('🔍 objectStorySpec:', creative.objectStorySpec);
+  
+  // PRIORITY 1: Real ad copy from object_story_spec
+  if (creative.objectStorySpec) {
+    const spec = creative.objectStorySpec;
     
-    // Try to extract meaningful copy from ad name
-    if (adName) {
-      // Look for common patterns in ad names that contain actual copy
-      const copyPatterns = [
-        // Star ratings with quotes
-        /⭐+\s*"([^"]{15,})"/,
-        // Direct quotes
-        /"([^"]{20,})"/,
-        // Customer review patterns
-        /customer review[:\s]+([^|]{20,})/i,
-        // Testimonial starters
-        /(I was shocked[^|]{10,})/i,
-        /(Not only do these[^|]{15,})/i,
-        /(These leggings[^|]{10,})/i,
-        /(I absolutely love[^|]{10,})/i,
+    // Try all possible message fields
+    copyText = 
+      spec.page_post?.message ||
+      spec.link_data?.message ||
+      spec.link_data?.description ||
+      spec.link_data?.call_to_action?.value?.text ||
+      spec.video_data?.message ||
+      spec.video_data?.description ||
+      spec.photo_data?.message ||
+      spec.text_data?.message ||
+      spec.template_data?.message ||
+      spec.call_to_action?.value?.text;
+      
+    console.log('🔍 Found objectStorySpec copy:', copyText);
+  }
+  
+  // PRIORITY 2: Extract testimonials and reviews from ad name
+  if (!copyText && creative.adName) {
+    const adName = creative.adName;
+    
+    // Pattern 1: Extract star ratings with quotes
+    const starQuoteMatch = adName.match(/⭐+\s*"([^"]+)"/);
+    if (starQuoteMatch && starQuoteMatch[1].length > 15) {
+      copyText = starQuoteMatch[1];
+      console.log('🔍 Found star quote pattern:', copyText);
+    }
+    
+    // Pattern 2: Extract customer review content  
+    if (!copyText) {
+      const reviewMatch = adName.match(/customer review\s+(.+?)(?:\s*\|\s*Homepage|$)/i);
+      if (reviewMatch && reviewMatch[1].length > 15) {
+        copyText = reviewMatch[1];
+        console.log('🔍 Found review pattern:', copyText);
+      }
+    }
+    
+    // Pattern 3: Extract quoted testimonials
+    if (!copyText) {
+      const quoteMatch = adName.match(/"([^"]{20,})"/);
+      if (quoteMatch && quoteMatch[1]) {
+        copyText = quoteMatch[1];
+        console.log('🔍 Found quote pattern:', copyText);
+      }
+    }
+    
+    // Pattern 4: Look for testimonial indicators and extract full context
+    if (!copyText) {
+      const testimonialPatterns = [
+        { pattern: /I was shocked/i, extract: /I was shocked[^|]+/ },
+        { pattern: /Not only do these/i, extract: /Not only do these[^|]+/ },
+        { pattern: /These leggings/i, extract: /These leggings[^|]+/ },
+        { pattern: /Pushing my daughter/i, extract: /Pushing my daughter[^|]+/ },
+        { pattern: /Did you know/i, extract: /Did you know[^|]+/ },
+        { pattern: /I absolutely love/i, extract: /I absolutely love[^|]+/ },
+        { pattern: /One of the other moms/i, extract: /One of the other moms[^|]+/ },
+        { pattern: /I'm a mother/i, extract: /I'm a mother[^|]+/ },
+        { pattern: /That's right/i, extract: /That's right[^|]+/ },
+        { pattern: /Tested at the prestigious/i, extract: /Tested at the prestigious[^|]+/ },
+        { pattern: /Meet the Sweetflexx/i, extract: /Meet the Sweetflexx[^|]+/ },
+        { pattern: /Yale-tested/i, extract: /Yale-tested[^|]+/ },
+        { pattern: /resistance technology/i, extract: /[^|]*resistance technology[^|]*/ },
+        { pattern: /game changer/i, extract: /[^|]*game changer[^|]*/ },
+        { pattern: /built-in resistance/i, extract: /[^|]*built-in resistance[^|]*/ },
+        { pattern: /burn up to \d+/i, extract: /[^|]*burn up to \d+[^|]*/ },
+        { pattern: /255 more calories/i, extract: /[^|]*255 more calories[^|]*/ },
+        { pattern: /firmed up/i, extract: /[^|]*firmed up[^|]*/ },
+        { pattern: /changing nothing else/i, extract: /[^|]*changing nothing else[^|]*/ },
+        { pattern: /sneak in a workout/i, extract: /[^|]*sneak in a workout[^|]*/ },
+        { pattern: /easy way to/i, extract: /[^|]*easy way to[^|]*/ },
+        { pattern: /amazing quality/i, extract: /[^|]*amazing quality[^|]*/ },
+        { pattern: /helped shape my legs/i, extract: /[^|]*helped shape my legs[^|]*/ },
+        { pattern: /skeptical at first/i, extract: /[^|]*skeptical at first[^|]*/ },
+        { pattern: /worth it/i, extract: /[^|]*worth it[^|]*/ },
+        { pattern: /GAME CHANGER/i, extract: /[^|]*GAME CHANGER[^|]*/ },
+        // NEW PATTERNS ADDED:
+        { pattern: /transformed my/i, extract: /[^|]*transformed my[^|]*/ },
+        { pattern: /never felt better/i, extract: /[^|]*never felt better[^|]*/ },
+        { pattern: /best investment/i, extract: /[^|]*best investment[^|]*/ },
+        { pattern: /couldn't believe/i, extract: /[^|]*couldn't believe[^|]*/ },
+        { pattern: /results speak for themselves/i, extract: /[^|]*results speak for themselves[^|]*/ },
+        { pattern: /highly recommend/i, extract: /[^|]*highly recommend[^|]*/ },
+        { pattern: /life-changing/i, extract: /[^|]*life-changing[^|]*/ },
+        { pattern: /exceeded my expectations/i, extract: /[^|]*exceeded my expectations[^|]*/ },
+        { pattern: /finally found/i, extract: /[^|]*finally found[^|]*/ },
+        { pattern: /wish I had found/i, extract: /[^|]*wish I had found[^|]*/ },
+        { pattern: /incredible results/i, extract: /[^|]*incredible results[^|]*/ },
+        { pattern: /confidence boost/i, extract: /[^|]*confidence boost[^|]*/ },
+        { pattern: /feel like a new person/i, extract: /[^|]*feel like a new person[^|]*/ },
+        { pattern: /before and after/i, extract: /[^|]*before and after[^|]*/ },
+        { pattern: /doctor recommended/i, extract: /[^|]*doctor recommended[^|]*/ },
+        { pattern: /clinical study/i, extract: /[^|]*clinical study[^|]*/ },
+        { pattern: /scientifically proven/i, extract: /[^|]*scientifically proven[^|]*/ },
+        { pattern: /money back guarantee/i, extract: /[^|]*money back guarantee[^|]*/ },
+        { pattern: /limited time/i, extract: /[^|]*limited time[^|]*/ },
+        { pattern: /special offer/i, extract: /[^|]*special offer[^|]*/ },
+        { pattern: /act now/i, extract: /[^|]*act now[^|]*/ },
+        { pattern: /don't wait/i, extract: /[^|]*don't wait[^|]*/ },
+        { pattern: /join thousands/i, extract: /[^|]*join thousands[^|]*/ },
+        { pattern: /community of/i, extract: /[^|]*community of[^|]*/ },
+        { pattern: /success stories/i, extract: /[^|]*success stories[^|]*/ }
       ];
-
-      for (const pattern of copyPatterns) {
-        const match = adName.match(pattern);
-        if (match && match[1] && match[1].length > 15) {
-          return match[1].trim();
+      
+      for (const { pattern, extract } of testimonialPatterns) {
+        if (pattern.test(adName)) {
+          const extractMatch = adName.match(extract);
+          if (extractMatch && extractMatch[0].length > 20) {
+            copyText = extractMatch[0].trim();
+            console.log('🔍 Found testimonial pattern:', copyText);
+            break;
+          }
         }
       }
-
-      // If no specific pattern found, clean up the ad name
-      const cleanedName = adName
-        .split('|')[0]
-        .replace(/^(25_|24_|IMG_|VID_|GIF_)/, '')
-        .trim();
-      
-      if (cleanedName.length > 10) {
-        return cleanedName;
+    }
+    
+    // Pattern 5: Extract multi-sentence testimonials
+    if (!copyText) {
+      // Look for sentences that span across the ad name
+      const sentences = adName.split(/[.!?]+/).filter(s => s.trim().length > 10);
+      if (sentences.length >= 2) {
+        const meaningfulSentences = sentences.filter(s => 
+          s.toLowerCase().includes('leggings') ||
+          s.toLowerCase().includes('amazing') ||
+          s.toLowerCase().includes('love') ||
+          s.toLowerCase().includes('workout') ||
+          s.toLowerCase().includes('resistance') ||
+          s.toLowerCase().includes('quality') ||
+          s.toLowerCase().includes('helped') ||
+          s.toLowerCase().includes('transformed') ||
+          s.toLowerCase().includes('results') ||
+          s.toLowerCase().includes('recommend') ||
+          s.toLowerCase().includes('confidence') ||
+          s.toLowerCase().includes('incredible')
+        );
+        
+        if (meaningfulSentences.length > 0) {
+          copyText = meaningfulSentences.slice(0, 2).join('. ').trim() + '.';
+          console.log('🔍 Found multi-sentence testimonial:', copyText);
+        }
       }
     }
-
-    // Default engaging copy
-    return "High-converting ad creative with proven performance metrics and audience engagement.";
-  };
-
-  // Enhanced copy extraction function for aggregation
-  const extractAdCopy = (creative) => {
-    // If we already have extracted copy from API data, use it
-    if (creative.extractedCopy) {
-      return creative.extractedCopy;
+    
+    // Pattern 6: If contains common testimonial keywords, extract the meaningful part
+    if (!copyText) {
+      const testimonialKeywords = [
+        'amazing quality', 'helped shape', 'worth it', 'love them', 'transformed', 
+        'skeptical', 'resistance', 'workout', 'calories', 'firmed up', 'easy way',
+        'sneak in', 'game changer', 'built-in', 'yale-tested', 'prestigious',
+        'incredible results', 'confidence boost', 'life-changing', 'highly recommend',
+        'best investment', 'never felt better', 'exceeded expectations', 'finally found'
+      ];
+      
+      const hasTestimonialKeyword = testimonialKeywords.some(keyword => 
+        adName.toLowerCase().includes(keyword)
+      );
+      
+      if (hasTestimonialKeyword) {
+        // Extract everything before the first | or technical marker
+        let meaningfulPart = adName
+          .split(/\s*\|\s*(VID|IMG|GIF|24_|25_|Homepage)/)[0]
+          .replace(/^.*?(⭐+.*|".*|I was.*|Not only.*|These.*|Pushing.*|One of.*|That's.*|Meet.*|Amazing.*|Incredible.*|Transform.*)/i, '$1')
+          .trim();
+          
+        if (meaningfulPart.length > 15) {
+          copyText = meaningfulPart;
+          console.log('🔍 Found testimonial keyword extraction:', copyText);
+        }
+      }
     }
-
-    // Otherwise use the same logic as extractAdCopyFromData
-    return extractAdCopyFromData({ ad_name: creative.adName });
-  };
-
-  // Helper function to format copy text
+  }
+  
+  // PRIORITY 3: Create engaging copy from product name
+  if (!copyText && creative.adName) {
+    const adName = creative.adName;
+    
+    // Extract clean product name and make it engaging
+    const productName = adName.split('|')[0].trim();
+    if (productName.length > 5 && !productName.includes('24_') && !productName.includes('25_')) {
+      // Create engaging copy from product name
+      if (productName.toLowerCase().includes('pockets high rise')) {
+        copyText = "High-rise leggings with built-in pockets for the ultimate workout experience. Perfect fit, maximum comfort.";
+      } else if (productName.toLowerCase().includes('leggings')) {
+        copyText = `Discover the amazing ${productName.toLowerCase()} that everyone is talking about. Premium quality you can feel.`;
+      } else if (productName.toLowerCase().includes('resistance')) {
+        copyText = `Experience the revolutionary ${productName.toLowerCase()} technology. Transform your workouts effortlessly.`;
+      } else {
+        copyText = `Premium ${productName.toLowerCase()} that delivers incredible results. Join thousands of satisfied customers.`;
+      }
+      console.log('🔍 Created engaging copy from product name:', copyText);
+    }
+  }
+  
+  // FALLBACK
+  if (!copyText || copyText.length < 10) {
+    copyText = creative.adName?.split('|')[0]?.trim() || 'Premium quality product that delivers amazing results';
+    console.log('🔍 Using enhanced fallback:', copyText);
+  }
+  
+  // Format the final copy
+  const formatted = formatCopyText(copyText);
+  console.log('🔍 Final formatted copy:', formatted);
+  return formatted;
+};
+  
+  // Helper function to format copy text into 3 lines
   const formatCopyText = (text) => {
     if (!text) return 'No copy available';
     
@@ -302,61 +296,6 @@ const EnhancedCreativePerformanceTable = ({
     return text;
   };
 
-  // Enhanced image quality function with proper 403 handling
-  const enhanceImageQuality = (originalSrc, imgElement) => {
-    // Facebook images require special handling due to CORS and access restrictions
-    if (originalSrc && (originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net'))) {
-      // For Facebook images, don't try to modify URLs - they're heavily protected
-      // Instead, apply CSS enhancement to the existing image
-      applyImageSharpening(imgElement);
-      return;
-    }
-    
-    // For non-Facebook images, try enhancement
-    if (originalSrc && !originalSrc.includes('facebook.com') && !originalSrc.includes('fbcdn.net')) {
-      let enhancedSrc = originalSrc
-        .replace(/\/s\d+x\d+\//, '/s720x720/')
-        .replace(/\/\d+x\d+\//, '/720x720/')
-        .replace(/_s\.jpg/, '_n.jpg')
-        .replace(/_t\.jpg/, '_n.jpg')
-        .replace(/quality=\d+/, 'quality=85');
-
-      if (enhancedSrc !== originalSrc) {
-        const testImg = new Image();
-        testImg.onload = () => {
-          imgElement.src = enhancedSrc;
-          applyImageSharpening(imgElement);
-        };
-        testImg.onerror = () => {
-          applyImageSharpening(imgElement);
-        };
-        testImg.src = enhancedSrc;
-      } else {
-        applyImageSharpening(imgElement);
-      }
-    } else {
-      applyImageSharpening(imgElement);
-    }
-  };
-
-  const applyImageSharpening = (imgElement) => {
-    // Advanced CSS sharpening and enhancement
-    imgElement.style.filter = [
-      'contrast(1.15)',
-      'saturate(1.1)',
-      'brightness(1.02)',
-      'blur(0)'
-    ].join(' ');
-    
-    // Additional sharpening via image-rendering
-    imgElement.style.imageRendering = 'crisp-edges';
-    imgElement.style.imageRendering = '-webkit-optimize-contrast';
-    
-    // Force hardware acceleration
-    imgElement.style.transform = 'translateZ(0)';
-    imgElement.style.backfaceVisibility = 'hidden';
-  };
-
   // Data cleaning functions
   const cleanNumericValue = (value, defaultValue = 0) => {
     if (value === null || value === undefined || value === '') {
@@ -403,6 +342,11 @@ const EnhancedCreativePerformanceTable = ({
         default:
           groupKey = creative.creativeId || `unknown-${index}`;
       }
+
+      console.log(`Processing ad ${index + 1}: ${creative.adName}`);
+      const extractedCopy = extractAdCopy(creative);
+      console.log(`Extracted copy: "${extractedCopy.substring(0, 100)}..."`);
+      console.log(`Group key: ${groupKey.substring(0, 50)}...`);
 
       if (!groupedCreatives[groupKey]) {
         groupedCreatives[groupKey] = {
@@ -512,21 +456,15 @@ const EnhancedCreativePerformanceTable = ({
     return aggregatedCreatives;
   }, []);
 
-  // Initialize creatives from Meta API when account or date range changes
+  // Initialize creatives from props - effect runs when mode changes
   useEffect(() => {
-    if (selectedAccountId) {
-      fetchCreativePerformanceData();
-    }
-  }, [selectedAccountId, dateRange, fetchCreativePerformanceData]);
-
-  // Re-aggregate when mode changes
-  useEffect(() => {
-    if (creatives.length > 0) {
+    if (analyticsData && analyticsData.creativePerformance) {
       console.log('🔄 Re-aggregating data for mode:', aggregationMode);
-      const aggregatedCreatives = aggregateCreatives(creatives, aggregationMode);
+      const aggregatedCreatives = aggregateCreatives(analyticsData.creativePerformance, aggregationMode);
+      setCreatives(aggregatedCreatives);
       setFilteredCreatives(aggregatedCreatives);
     }
-  }, [aggregationMode, creatives, aggregateCreatives]);
+  }, [analyticsData, aggregationMode, aggregateCreatives]);
 
   // Initialize benchmarks
   useEffect(() => {
@@ -563,7 +501,7 @@ const EnhancedCreativePerformanceTable = ({
 
   // Apply filters and sort
   useEffect(() => {
-    let results = [...filteredCreatives];
+    let results = [...creatives];
     
     if (searchQuery && searchQuery.trim() !== '') {
       const lowercaseQuery = searchQuery.toLowerCase().trim();
@@ -588,11 +526,8 @@ const EnhancedCreativePerformanceTable = ({
       return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
     });
     
-    // Only update if there's actually a change to avoid infinite loops
-    if (JSON.stringify(results) !== JSON.stringify(filteredCreatives)) {
-      setFilteredCreatives(results);
-    }
-  }, [searchQuery, sortColumn, sortDirection]);
+    setFilteredCreatives(results);
+  }, [creatives, searchQuery, sortColumn, sortDirection]);
 
   // Handle creative selection
   const handleCreativeSelect = (creativeId) => {
@@ -731,68 +666,6 @@ const EnhancedCreativePerformanceTable = ({
         }}>
           Creative Performance Analysis
         </h3>
-
-        {/* Error State */}
-        {error && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#fee2e2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            color: '#dc2626',
-            marginBottom: '16px'
-          }}>
-            {error}
-            {authRequired && (
-              <div style={{ marginTop: '8px' }}>
-                <button
-                  onClick={() => {
-                    // Trigger Facebook login
-                    metaAPI.login().then(() => {
-                      fetchCreativePerformanceData();
-                    }).catch(console.error);
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#1877f2',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  Login to Facebook
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Loading State */}
-        {isLoading && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            borderRadius: '6px',
-            color: '#1e40af',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <div style={{
-              width: '16px',
-              height: '16px',
-              border: '2px solid #1e40af',
-              borderTop: '2px solid transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }}></div>
-            Loading creative performance data...
-          </div>
-        )}
         
         {/* Aggregation Mode Tabs */}
         <div style={{
@@ -913,16 +786,7 @@ const EnhancedCreativePerformanceTable = ({
         </div>
         
         {statusMessage && (
-          <div style={{
-            padding: '8px 12px',
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            borderRadius: '4px',
-            color: '#1e40af',
-            fontSize: '14px',
-            textAlign: 'center',
-            marginBottom: '16px'
-          }}>
+          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-4 rounded">
             {statusMessage}
           </div>
         )}
@@ -930,28 +794,17 @@ const EnhancedCreativePerformanceTable = ({
 
       {/* Benchmark Settings */}
       {isEditingBenchmarks && (
-        <div style={{
-          marginBottom: '24px',
-          padding: '16px',
-          backgroundColor: '#f9fafb',
-          border: '1px solid #d1d5db',
-          borderRadius: '8px'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}>
-            <h4 style={{ fontWeight: '500', color: '#374151', margin: 0 }}>Performance Benchmarks</h4>
+        <div className="mb-6 p-4 bg-gray-50 border rounded-lg">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-medium text-gray-800">Performance Benchmarks</h4>
             <button 
-              onClick={() => {
+              onClick={async () => {
                 try {
                   const formattedBenchmarks = {};
                   Object.keys(tempBenchmarks).forEach(metricId => {
                     formattedBenchmarks[metricId] = {
-                      low: tempBenchmarks[metricId]?.low === '' ? null : parseFloat(tempBenchmarks[metricId]?.low || 0),
-                      medium: tempBenchmarks[metricId]?.medium === '' ? null : parseFloat(tempBenchmarks[metricId]?.medium || 0)
+                      low: tempBenchmarks[metricId].low === '' ? null : parseFloat(tempBenchmarks[metricId].low),
+                      medium: tempBenchmarks[metricId].medium === '' ? null : parseFloat(tempBenchmarks[metricId].medium)
                     };
                   });
                   
@@ -964,41 +817,23 @@ const EnhancedCreativePerformanceTable = ({
                   setTimeout(() => setStatusMessage(''), 3000);
                 }
               }}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#2563eb',
-                color: 'white',
-                fontSize: '14px',
-                borderRadius: '4px',
-                border: 'none',
-                cursor: 'pointer'
-              }}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
             >
               Save Benchmarks
             </button>
           </div>
           
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
-          }}>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {metricsConfig.map(metric => (
               <div key={metric.id}>
-                <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '8px' }}>{metric.name}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="font-medium text-sm mb-2">{metric.name}</div>
+                <div className="space-y-2">
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280' }}>Low</label>
+                    <label className="block text-xs text-gray-500">Low</label>
                     <input
                       type="number"
                       step="0.1"
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        fontSize: '14px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px'
-                      }}
+                      className="w-full p-1 text-sm border rounded"
                       value={tempBenchmarks[metric.id]?.low ?? ''}
                       onChange={(e) => setTempBenchmarks(prev => ({
                         ...prev,
@@ -1010,17 +845,11 @@ const EnhancedCreativePerformanceTable = ({
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280' }}>Good</label>
+                    <label className="block text-xs text-gray-500">Good</label>
                     <input
                       type="number"
                       step="0.1"
-                      style={{
-                        width: '100%',
-                        padding: '4px 8px',
-                        fontSize: '14px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px'
-                      }}
+                      className="w-full p-1 text-sm border rounded"
                       value={tempBenchmarks[metric.id]?.medium ?? ''}
                       onChange={(e) => setTempBenchmarks(prev => ({
                         ...prev,
@@ -1045,20 +874,6 @@ const EnhancedCreativePerformanceTable = ({
         gap: '16px',
         width: '100%'
       }}>
-        {!isLoading && filteredCreatives.length === 0 && !error && (
-          <div style={{
-            gridColumn: '1 / -1',
-            textAlign: 'center',
-            padding: '48px 0',
-            color: '#6b7280'
-          }}>
-            {selectedAccountId ? 
-              'No creative performance data found for the selected period.' :
-              'Please select an ad account to view creative performance data.'
-            }
-          </div>
-        )}
-
         {filteredCreatives.map((creative) => (
           <div
             key={creative.id || creative.creativeId || Math.random()}
@@ -1077,10 +892,10 @@ const EnhancedCreativePerformanceTable = ({
             className={selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''}
             onClick={() => handleCreativeSelect(creative.creativeId)}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+              e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
             {/* Creative Thumbnail (for Creative and Combined modes) */}
@@ -1096,35 +911,56 @@ const EnhancedCreativePerformanceTable = ({
                     objectFit: 'cover',
                     borderRadius: '6px',
                     backgroundColor: '#f9fafb',
-                    display: 'block'
+                    display: 'block',
+                    imageRendering: 'auto',
+                    imageRendering: '-webkit-optimize-contrast',
+                    WebkitImageSmoothing: 'high',
+                    msInterpolationMode: 'bicubic'
                   }}
                   onLoad={(e) => {
-                    // Only enhance non-Facebook images to avoid 403s
-                    if (!e.target.src.includes('facebook.com') && !e.target.src.includes('fbcdn.net')) {
-                      enhanceImageQuality(e.target.src, e.target);
+                    // Try to get higher resolution version
+                    const originalSrc = e.target.src;
+                    
+                    // If it's a Facebook image, try to get a higher resolution version
+                    if (originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net')) {
+                      // Try common high-res patterns
+                      const highResSrc = originalSrc
+                        .replace(/\/s\d+x\d+\//, '/s600x600/')  // Increase size
+                        .replace(/\/\d+x\d+\//, '/600x600/')     // Increase size
+                        .replace(/_s\.jpg/, '_n.jpg')           // Normal size instead of small
+                        .replace(/_t\.jpg/, '_n.jpg')           // Normal size instead of thumbnail
+                        .replace(/quality=\d+/, 'quality=95');  // Higher quality
+                      
+                      if (highResSrc !== originalSrc) {
+                        const testImg = new Image();
+                        testImg.onload = () => {
+                          e.target.src = highResSrc;
+                          e.target.style.filter = 'contrast(1.05) saturate(1.05) brightness(1.01)';
+                        };
+                        testImg.onerror = () => {
+                          // Fallback to original with enhancement
+                          e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                        };
+                        testImg.src = highResSrc;
+                      } else {
+                        e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                      }
                     } else {
-                      // For Facebook images, just apply basic CSS enhancement
-                      applyImageSharpening(e.target);
+                      e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
                     }
                   }}
                   onError={(e) => {
-                    // Enhanced error handling with better placeholder
-                    e.target.style.backgroundColor = '#f3f4f6';
+                    e.target.style.backgroundColor = '#e5e7eb';
                     e.target.style.display = 'flex';
                     e.target.style.alignItems = 'center';
                     e.target.style.justifyContent = 'center';
-                    e.target.style.color = '#9ca3af';
-                    e.target.style.fontSize = '14px';
-                    e.target.style.fontWeight = '500';
-                    e.target.innerHTML = '🖼️ Creative Preview';
-                    e.target.style.border = '2px dashed #e5e7eb';
-                    e.target.style.textAlign = 'center';
+                    e.target.innerHTML = '🖼️';
                   }}
                 />
               </div>
             )}
             
-            {/* Copy Text */}
+            {/* Copy Text - NO AD NAME SHOWN */}
             <div style={{ marginBottom: '16px', flex: '1' }}>
               <div style={{
                 fontSize: '14px',
@@ -1133,9 +969,9 @@ const EnhancedCreativePerformanceTable = ({
                 minHeight: '60px',
                 fontWeight: '400'
               }}>
-                {creative.extractedCopy?.split('\n').map((line, index) => (
+                {creative.extractedCopy.split('\n').map((line, index) => (
                   <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
-                )) || 'No copy available'}
+                ))}
               </div>
             </div>
             
@@ -1203,88 +1039,21 @@ const EnhancedCreativePerformanceTable = ({
           </div>
         ))}
         
-        {/* Loading skeleton cards */}
-        {isLoading && Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={`skeleton-${index}`}
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              border: '1px solid #e5e7eb',
-              padding: '16px',
-              minHeight: '400px',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            {/* Skeleton thumbnail */}
-            <div style={{
-              width: '100%',
-              height: '200px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '6px',
-              marginBottom: '12px',
-              animation: 'pulse 2s ease-in-out infinite'
-            }}></div>
-            
-            {/* Skeleton text lines */}
-            <div style={{ marginBottom: '16px', flex: '1' }}>
-              <div style={{
-                height: '16px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '4px',
-                marginBottom: '8px',
-                animation: 'pulse 2s ease-in-out infinite'
-              }}></div>
-              <div style={{
-                height: '16px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '4px',
-                width: '70%',
-                animation: 'pulse 2s ease-in-out infinite'
-              }}></div>
-            </div>
-            
-            {/* Skeleton metrics */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} style={{
-                  height: '32px',
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: '4px',
-                  animation: 'pulse 2s ease-in-out infinite'
-                }}></div>
-              ))}
-            </div>
+        {filteredCreatives.length === 0 && (
+          <div style={{
+            gridColumn: '1 / -1',
+            textAlign: 'center',
+            padding: '48px 0',
+            color: '#6b7280'
+          }}>
+            No creatives found matching your criteria.
           </div>
-        ))}
+        )}
       </div>
       
-      {/* Add CSS for loading animation */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `
-      }} />
-      
       {/* Footer */}
-      <div style={{
-        marginTop: '24px',
-        fontSize: '12px',
-        color: '#6b7280',
-        textAlign: 'center'
-      }}>
+      <div className="mt-6 text-xs text-gray-500 text-center">
         <p>Performance data aggregated by {aggregationMode}. Colors indicate benchmark performance.</p>
-        {selectedAccountId && (
-          <p>Data fetched from Meta API for account: {selectedAccountId}</p>
-        )}
       </div>
     </div>
   );
