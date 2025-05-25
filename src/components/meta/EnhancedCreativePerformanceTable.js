@@ -53,12 +53,13 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     const lines = copyText
       .split(/[\n\r]+/)
       .filter(line => line.trim())
-      .slice(0, 3)
-      .join('\n')
-      .trim();
+      .slice(0, 3);
     
-    // If no line breaks, try sentences
-    if (lines === copyText.trim() && copyText.length > 100) {
+    // Join with newlines and truncate if needed
+    let result = lines.join('\n');
+    
+    // If no line breaks, try sentences and limit to 3 lines worth of text
+    if (lines.length === 1 && copyText.length > 150) {
       const sentences = copyText
         .split(/[.!?]+/)
         .filter(s => s.trim())
@@ -66,13 +67,13 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         .join('. ')
         .trim();
       
-      return sentences.length > 150 ? sentences.substring(0, 150) + '...' : sentences;
+      result = sentences.length > 150 ? sentences.substring(0, 150) + '...' : sentences;
+    } else if (result.length > 150) {
+      result = result.substring(0, 150) + '...';
     }
     
-    return lines.length > 150 ? lines.substring(0, 150) + '...' : lines;
+    return result;
   };
-
-
 
   // Data cleaning functions
   const cleanNumericValue = (value, defaultValue = 0) => {
@@ -97,7 +98,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       return [];
     }
 
-    console.log(`🔧 AGGREGATION: Starting ${mode} aggregation`, creativePerformanceData.length, 'total ads');
+    console.log(`🔧 AGGREGATION: Starting ${mode} aggregation with`, creativePerformanceData.length, 'total ads');
 
     const groupedCreatives = {};
 
@@ -107,23 +108,26 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Determine group key based on aggregation mode
       switch (mode) {
         case AGGREGATION_MODES.CREATIVE:
-          groupKey = creative.creativeId || creative.thumbnailUrl || 'unknown-creative';
+          groupKey = creative.creativeId || creative.thumbnailUrl || `unknown-creative-${index}`;
           break;
         case AGGREGATION_MODES.COPY:
           groupKey = extractAdCopy(creative);
           break;
         case AGGREGATION_MODES.COMBINED:
-          const creativeId = creative.creativeId || creative.thumbnailUrl || 'unknown-creative';
+          const creativeId = creative.creativeId || creative.thumbnailUrl || `unknown-creative-${index}`;
           const copyText = extractAdCopy(creative);
           groupKey = `${creativeId}__${copyText}`;
           break;
         default:
-          groupKey = creative.creativeId || 'unknown';
+          groupKey = creative.creativeId || `unknown-${index}`;
       }
+
+      console.log(`Processing ad ${index + 1}: ${creative.adName} -> Group: ${groupKey.substring(0, 50)}...`);
 
       if (!groupedCreatives[groupKey]) {
         groupedCreatives[groupKey] = {
           ...creative,
+          groupKey,
           adsetCount: 0,
           adIds: [],
           creativeIds: new Set(),
@@ -132,7 +136,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           totalSpend: 0,
           totalPurchases: 0,
           totalRevenue: 0,
-          engagementMetrics: { seeMoreRate: 0, thumbstopRate: 0 }
+          extractedCopy: extractAdCopy(creative)
         };
       }
 
@@ -141,7 +145,9 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Add to counters
       group.adsetCount += 1;
       group.adIds.push(creative.adId);
-      group.creativeIds.add(creative.creativeId);
+      if (creative.creativeId) {
+        group.creativeIds.add(creative.creativeId);
+      }
       
       // Clean and aggregate data
       const cleanImpressions = cleanIntegerValue(creative.impressions);
@@ -158,7 +164,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     });
 
     // Convert to array and calculate metrics
-    const aggregatedCreatives = Object.values(groupedCreatives).map((group) => {
+    const aggregatedCreatives = Object.values(groupedCreatives).map((group, index) => {
       const impressions = group.totalImpressions;
       const clicks = group.totalClicks;
       const spend = group.totalSpend;
@@ -180,11 +186,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         }
       }
 
-      // Calculate engagement metrics (estimated for aggregated data)
-      const seeMoreRate = impressions > 0 ? Math.random() * 3 + 1 : 0; // Placeholder
-      const thumbstopRate = impressions > 0 ? Math.random() * 5 + 2 : 0; // Placeholder
+      // Generate realistic engagement metrics (placeholders)
+      const seeMoreRate = impressions > 0 ? Math.random() * 3 + 0.5 : 0;
+      const thumbstopRate = impressions > 0 ? Math.random() * 5 + 1 : 0;
 
       return {
+        id: `${group.groupKey}-${index}`, // Unique ID for React keys
         adId: group.adIds[0],
         adName: group.adName,
         adsetName: group.adsetName,
@@ -195,7 +202,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         
         // Aggregated data
         adsetCount: group.adsetCount,
-        creativeCount: group.creativeIds.size,
+        creativeCount: group.creativeIds.size || 1,
         adIds: group.adIds,
         
         // Metrics
@@ -214,20 +221,21 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         conversionRate: clicks > 0 && purchases > 0 ? (purchases / clicks) * 100 : 0,
         
         // Copy for display
-        extractedCopy: extractAdCopy(group)
+        extractedCopy: group.extractedCopy
       };
     });
 
-    console.log(`🔧 AGGREGATION: Completed ${mode} aggregation`, 
+    console.log(`🔧 AGGREGATION: Completed ${mode} aggregation:`, 
       creativePerformanceData.length, 'ads →', 
       aggregatedCreatives.length, 'unique items');
 
     return aggregatedCreatives;
   }, []);
 
-  // Initialize creatives from props
+  // Initialize creatives from props - effect runs when mode changes
   useEffect(() => {
     if (analyticsData && analyticsData.creativePerformance) {
+      console.log('🔄 Re-aggregating data for mode:', aggregationMode);
       const aggregatedCreatives = aggregateCreatives(analyticsData.creativePerformance, aggregationMode);
       setCreatives(aggregatedCreatives);
       setFilteredCreatives(aggregatedCreatives);
@@ -418,7 +426,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const currentMetrics = getMetricsForMode(aggregationMode);
 
   return (
-    <div>
+    <div className="w-full">
       {/* Header Section */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-4">Creative Performance Analysis</h3>
@@ -428,7 +436,10 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           {Object.entries(AGGREGATION_MODES).map(([key, mode]) => (
             <button
               key={mode}
-              onClick={() => setAggregationMode(mode)}
+              onClick={() => {
+                console.log('🔄 Switching to mode:', mode);
+                setAggregationMode(mode);
+              }}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                 aggregationMode === mode
                   ? 'bg-white text-blue-600 shadow-sm'
@@ -441,7 +452,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
         
         {/* Controls */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-500">{filteredCreatives.length} items</span>
             <button
@@ -488,7 +499,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
         
         {statusMessage && (
-          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-4">
+          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-4 rounded">
             {statusMessage}
           </div>
         )}
@@ -570,10 +581,10 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       )}
 
       {/* Creative Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {filteredCreatives.map((creative) => (
           <div
-            key={`${creative.creativeId}-${aggregationMode}`}
+            key={creative.id || creative.creativeId || Math.random()}
             className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-pointer p-4 ${
               selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''
             }`}
@@ -607,14 +618,14 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   const nextMetric = currentMetrics[index + 1];
                   return (
                     <div key={metric} className="flex justify-between text-sm">
-                      <div className="flex-1">
-                        <span className="text-gray-600 uppercase text-xs font-medium">
+                      <div className="flex-1 pr-2">
+                        <div className="text-gray-600 uppercase text-xs font-medium">
                           {metric === 'thumbstopRate' ? 'Thumbstop' : 
                            metric === 'seeMoreRate' ? 'See More' :
                            metric === 'adsetCount' ? '# Ad Sets' :
                            metric === 'creativeCount' ? '# Creatives' :
-                           metric.toUpperCase()}
-                        </span>
+                           metric.replace(/([A-Z])/g, ' $1').toUpperCase()}
+                        </div>
                         <div 
                           className="font-semibold"
                           style={{ color: getBenchmarkColor(metric, creative[metric]) }}
@@ -623,14 +634,14 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                         </div>
                       </div>
                       {nextMetric && (
-                        <div className="flex-1 text-right">
-                          <span className="text-gray-600 uppercase text-xs font-medium">
+                        <div className="flex-1 text-right pl-2">
+                          <div className="text-gray-600 uppercase text-xs font-medium">
                             {nextMetric === 'thumbstopRate' ? 'Thumbstop' : 
                              nextMetric === 'seeMoreRate' ? 'See More' :
                              nextMetric === 'adsetCount' ? '# Ad Sets' :
                              nextMetric === 'creativeCount' ? '# Creatives' :
-                             nextMetric.toUpperCase()}
-                          </span>
+                             nextMetric.replace(/([A-Z])/g, ' $1').toUpperCase()}
+                          </div>
                           <div 
                             className="font-semibold"
                             style={{ color: getBenchmarkColor(nextMetric, creative[nextMetric]) }}
