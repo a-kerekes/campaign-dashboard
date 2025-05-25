@@ -459,18 +459,15 @@ const extractAdCopy = (creative) => {
       // Select best thumbnail (prefer the first one that exists)
       const bestThumbnail = Array.from(group.thumbnailUrls)[0] || group.thumbnailUrl;
       
-      // Create display name (use the shortest/cleanest ad name)
-      const displayName = group.adNames
-        .sort((a, b) => a.length - b.length)[0] // Shortest name first
-        .split('|')[0] // Take part before first |
-        .trim();
+      // Create display name (use the full ad name, don't truncate)
+      const displayName = group.adNames[0]; // Use the first (and representative) full ad name
 
       console.log(`🏁 Final group "${group.groupKey}": ${group.adsetCount} ads → "${displayName}"`);
 
       return {
         id: `${group.groupKey}-${index}`, // Unique ID for React keys
         adId: group.adIds[0],
-        adName: displayName, // Use clean display name
+        adName: displayName, // Use full ad name for display
         adsetName: group.adsetName,
         creativeId: group.creativeId,
         thumbnailUrl: bestThumbnail, // Use best available thumbnail
@@ -1016,14 +1013,19 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Ad Name Display - ALWAYS SHOW */}
+            {/* Ad Name Display - ALWAYS SHOW FULL NAME */}
             <div style={{ marginBottom: '4px' }}>
               <div style={{
-                fontSize: '12px',
-                fontWeight: '600',
+                fontSize: '11px', // Slightly smaller to fit long names
+                fontWeight: '500',
                 color: '#1f2937',
-                lineHeight: '1.3',
-                minHeight: '20px'
+                lineHeight: '1.2',
+                minHeight: '30px', // More space for longer names
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 3, // Allow up to 3 lines
+                WebkitBoxOrient: 'vertical',
+                wordBreak: 'break-word'
               }}>
                 {creative.adName}
               </div>
