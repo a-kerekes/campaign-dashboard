@@ -2,11 +2,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download } from 'lucide-react';
 
-// Aggregation modes
+// Aggregation modes - SIMPLIFIED TO 2 TABS
 const AGGREGATION_MODES = {
-  CREATIVE: 'creative',
-  COPY: 'copy',
-  COMBINED: 'combined'
+  POST: 'post',      // Group by Post ID (extracted from ad names)
+  COPY: 'copy'       // Group by extracted copy text
 };
 
 // Metrics configuration
@@ -20,7 +19,7 @@ const metricsConfig = [
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
-  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.CREATIVE);
+  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.POST); // Default to POST mode
   const [sortColumn, setSortColumn] = useState('spend');
   const [sortDirection, setSortDirection] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +29,36 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [isEditingBenchmarks, setIsEditingBenchmarks] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
+
+  // Extract Post ID from ad name - NEW FUNCTION
+  const extractPostId = (adName) => {
+    if (!adName) return null;
+    
+    // Look for patterns like:
+    // "Ad Name | Homepage | 1053140566829277" 
+    // "Ad Name | VID | tof17-rc-black-sweetflexx-features-slideshow | 630340219109316"
+    // "Ad Name | 25_SF_Ads_FB_April_Booty_Compare_RegularLeggings_R1 | 109532574927742"
+    
+    const patterns = [
+      // Pattern 1: Number at the very end after |
+      /\|\s*(\d{10,})\s*$/,
+      // Pattern 2: Number after technical suffix
+      /\|\s*[\w\-_]+\s*\|\s*(\d{10,})\s*$/,
+      // Pattern 3: Long number anywhere in the string
+      /(\d{13,})/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = adName.match(pattern);
+      if (match && match[1]) {
+        console.log(`🆔 Extracted Post ID "${match[1]}" from "${adName}"`);
+        return match[1];
+      }
+    }
+    
+    console.log(`❌ No Post ID found in "${adName}"`);
+    return null;
+  };
 
   // Copy extraction function - ENHANCED with more patterns
 const extractAdCopy = (creative) => {
@@ -313,25 +342,13 @@ const extractAdCopy = (creative) => {
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
-  // Aggregation function with multiple modes - ENHANCED DEBUG VERSION
+  // Aggregation function with POST ID-based grouping - COMPLETELY REWRITTEN
   const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
     }
 
     console.log(`🔧 AGGREGATION: Starting ${mode} aggregation with`, creativePerformanceData.length, 'total ads');
-    
-    // DEBUG: Log all creative data first
-    console.log('🔍 DEBUG: All creative data:');
-    creativePerformanceData.forEach((creative, index) => {
-      console.log(`Ad ${index + 1}:`, {
-        adId: creative.adId,
-        adName: creative.adName,
-        creativeId: creative.creativeId,
-        thumbnailUrl: creative.thumbnailUrl?.substring(0, 100),
-        hasThumb: !!creative.thumbnailUrl
-      });
-    });
 
     const groupedCreatives = {};
 
@@ -340,52 +357,27 @@ const extractAdCopy = (creative) => {
       
       // Determine group key based on aggregation mode
       switch (mode) {
-        case AGGREGATION_MODES.CREATIVE:
-          // ENHANCED: Use more aggressive grouping for identical visuals
-          
-          // Strategy 1: If we have a thumbnail URL, use that as the primary grouping key
-          if (creative.thumbnailUrl) {
-            // Clean the thumbnail URL to remove query parameters and focus on the core image
-            let cleanUrl = creative.thumbnailUrl.split('?')[0]; // Remove query params
-            cleanUrl = cleanUrl.split('&')[0]; // Remove additional params
-            // Extract the key part of the URL (usually the image hash/ID)
-            const urlParts = cleanUrl.split('/');
-            const imageId = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
-            groupKey = `image_${imageId}`;
-            console.log(`🎯 Using thumbnail-based grouping: ${groupKey}`);
+        case AGGREGATION_MODES.POST:
+          // Extract Post ID from ad name
+          const postId = extractPostId(creative.adName);
+          if (postId) {
+            groupKey = `post_${postId}`;
+          } else {
+            // Fallback: use cleaned ad name if no Post ID found
+            const cleanAdName = creative.adName?.split('|')[0]?.trim() || `unknown-${index}`;
+            groupKey = `name_${cleanAdName}`;
           }
-          // Strategy 2: If no thumbnail, use creative ID if available
-          else if (creative.creativeId && creative.creativeId !== 'unknown') {
-            groupKey = `creative_${creative.creativeId}`;
-            console.log(`🎯 Using creativeId-based grouping: ${groupKey}`);
-          }
-          // Strategy 3: Fallback to ad name pattern matching
-          else {
-            // Extract the base ad name (before any | separator)
-            const baseAdName = creative.adName?.split('|')[0]?.trim() || `unknown-${index}`;
-            // Further clean by removing common suffixes like VID, IMG, etc.
-            const cleanName = baseAdName.replace(/\s+(VID|IMG|GIF|24_|25_).*$/i, '').trim();
-            groupKey = `name_${cleanName}`;
-            console.log(`🎯 Using name-based grouping: ${groupKey}`);
-          }
+          console.log(`🏷️ Post grouping: "${creative.adName}" → "${groupKey}"`);
           break;
           
         case AGGREGATION_MODES.COPY:
           groupKey = extractAdCopy(creative);
-          break;
-          
-        case AGGREGATION_MODES.COMBINED:
-          const creativeId = creative.creativeId || creative.thumbnailUrl || `unknown-creative-${index}`;
-          const copyText = extractAdCopy(creative);
-          groupKey = `${creativeId}__${copyText}`;
+          console.log(`📝 Copy grouping: "${creative.adName}" → "${groupKey.substring(0, 50)}..."`);
           break;
           
         default:
-          groupKey = creative.creativeId || `unknown-${index}`;
+          groupKey = `unknown_${index}`;
       }
-
-      console.log(`📊 Processing ad ${index + 1}: "${creative.adName}"`);
-      console.log(`📊 Final group key: "${groupKey}"`);
 
       if (!groupedCreatives[groupKey]) {
         groupedCreatives[groupKey] = {
@@ -393,14 +385,15 @@ const extractAdCopy = (creative) => {
           groupKey,
           adsetCount: 0,
           adIds: [],
-          creativeIds: new Set(),
           adNames: [], // Track all ad names in this group
+          creativeIds: new Set(),
+          thumbnailUrls: new Set(), // Track all thumbnails
           totalImpressions: 0,
           totalClicks: 0,
           totalSpend: 0,
           totalPurchases: 0,
           totalRevenue: 0,
-          extractedCopy: extractAdCopy(creative)
+          extractedCopy: mode === AGGREGATION_MODES.COPY ? groupKey : extractAdCopy(creative)
         };
         console.log(`✨ Created new group: "${groupKey}"`);
       } else {
@@ -416,6 +409,9 @@ const extractAdCopy = (creative) => {
       if (creative.creativeId) {
         group.creativeIds.add(creative.creativeId);
       }
+      if (creative.thumbnailUrl) {
+        group.thumbnailUrls.add(creative.thumbnailUrl);
+      }
       
       // Clean and aggregate data
       const cleanImpressions = cleanIntegerValue(creative.impressions);
@@ -430,7 +426,7 @@ const extractAdCopy = (creative) => {
       group.totalPurchases += cleanPurchases;
       group.totalRevenue += cleanRevenue;
       
-      console.log(`📈 Group "${groupKey}" now has ${group.adsetCount} ads, ${group.totalSpend.toFixed(2)} spend`);
+      console.log(`📈 Group "${groupKey}" now has ${group.adsetCount} ads, $${group.totalSpend.toFixed(2)} total spend`);
     });
 
     // Convert to array and calculate metrics
@@ -460,15 +456,24 @@ const extractAdCopy = (creative) => {
       const seeMoreRate = impressions > 0 ? Math.random() * 3 + 0.5 : 0;
       const thumbstopRate = impressions > 0 ? Math.random() * 5 + 1 : 0;
 
-      console.log(`🏁 Final group "${group.groupKey}": ${group.adsetCount} ads, ${spend.toFixed(2)} total spend`);
+      // Select best thumbnail (prefer the first one that exists)
+      const bestThumbnail = Array.from(group.thumbnailUrls)[0] || group.thumbnailUrl;
+      
+      // Create display name (use the shortest/cleanest ad name)
+      const displayName = group.adNames
+        .sort((a, b) => a.length - b.length)[0] // Shortest name first
+        .split('|')[0] // Take part before first |
+        .trim();
+
+      console.log(`🏁 Final group "${group.groupKey}": ${group.adsetCount} ads → "${displayName}"`);
 
       return {
         id: `${group.groupKey}-${index}`, // Unique ID for React keys
         adId: group.adIds[0],
-        adName: group.adName,
+        adName: displayName, // Use clean display name
         adsetName: group.adsetName,
         creativeId: group.creativeId,
-        thumbnailUrl: group.thumbnailUrl,
+        thumbnailUrl: bestThumbnail, // Use best available thumbnail
         objectStorySpec: group.objectStorySpec,
         accountId: group.accountId,
         
@@ -476,7 +481,7 @@ const extractAdCopy = (creative) => {
         adsetCount: group.adsetCount,
         creativeCount: group.creativeIds.size || 1,
         adIds: group.adIds,
-        adNames: group.adNames, // All ad names in this group
+        adNames: group.adNames, // All original ad names
         
         // Metrics
         impressions,
@@ -498,14 +503,8 @@ const extractAdCopy = (creative) => {
       };
     });
 
-    console.log(`🔧 AGGREGATION SUMMARY: ${creativePerformanceData.length} ads → ${aggregatedCreatives.length} unique items`);
-    console.log('🔧 Final groups:', aggregatedCreatives.map(item => ({
-      groupKey: item.id,
-      adCount: item.adsetCount,
-      spend: item.spend.toFixed(2),
-      adName: item.adName
-    })));
-
+    console.log(`🔧 AGGREGATION SUMMARY: ${creativePerformanceData.length} ads → ${aggregatedCreatives.length} unique ${mode}s`);
+    
     return aggregatedCreatives;
   }, []);
 
@@ -614,15 +613,13 @@ const extractAdCopy = (creative) => {
     }
   };
 
-  // Get metrics for current mode
+  // Get metrics for current mode - UPDATED FOR 2 MODES
   const getMetricsForMode = (mode) => {
     switch (mode) {
-      case AGGREGATION_MODES.CREATIVE:
+      case AGGREGATION_MODES.POST:
         return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
       case AGGREGATION_MODES.COPY:
         return ['roas', 'revenue', 'cpc', 'ctr', 'seeMoreRate', 'spend', 'purchases', 'creativeCount'];
-      case AGGREGATION_MODES.COMBINED:
-        return ['roas', 'revenue', 'cpm', 'cpc', 'thumbstopRate', 'seeMoreRate', 'spend', 'purchases'];
       default:
         return ['roas', 'revenue', 'cpm', 'ctr', 'spend', 'purchases'];
     }
@@ -640,7 +637,7 @@ const extractAdCopy = (creative) => {
       case 'cpc':
       case 'cpm':
       case 'costPerPurchase':
-        return `$${value.toFixed(2)}`;
+        return `${value.toFixed(2)}`;
       case 'ctr':
       case 'seeMoreRate':
       case 'thumbstopRate':
@@ -720,7 +717,7 @@ const extractAdCopy = (creative) => {
           Creative Performance Analysis
         </h3>
         
-        {/* Aggregation Mode Tabs */}
+        {/* Aggregation Mode Tabs - UPDATED FOR 2 MODES */}
         <div style={{
           display: 'flex',
           gap: '4px',
@@ -750,7 +747,7 @@ const extractAdCopy = (creative) => {
                 boxShadow: aggregationMode === mode ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
               }}
             >
-              {key === 'CREATIVE' ? 'By Creative' : key === 'COPY' ? 'By Copy' : 'Combined'}
+              {key === 'POST' ? 'By Post' : 'By Copy'}
             </button>
           ))}
         </div>
@@ -923,8 +920,8 @@ const extractAdCopy = (creative) => {
       {/* Creative Cards Grid - 5 CARDS PER ROW */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', // Reduced from 280px to 220px for 5 cards
-        gap: '12px', // Reduced from 16px
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: '12px',
         width: '100%'
       }}>
         {filteredCreatives.map((creative) => (
@@ -935,12 +932,13 @@ const extractAdCopy = (creative) => {
               borderRadius: '8px',
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              padding: '8px', // Reduced from 12px to 8px
+              padding: '8px',
               cursor: 'pointer',
               transition: 'box-shadow 0.2s',
-              minHeight: '320px', // Reduced from 360px
+              minHeight: '300px',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              justifyContent: 'space-between'
             }}
             className={selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''}
             onClick={() => handleCreativeSelect(creative.creativeId)}
@@ -951,11 +949,10 @@ const extractAdCopy = (creative) => {
               e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
-            {/* Creative Thumbnail (for Creative and Combined modes) - REDUCE GAP TO TEXT */}
-            {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
-             creative.thumbnailUrl && (
+            {/* Creative Thumbnail - ALWAYS SHOW IN BOTH MODES */}
+            {creative.thumbnailUrl && (
               <div style={{ 
-                marginBottom: '2px', // Reduced from 6px to 2px - much smaller gap to text
+                marginBottom: '2px',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -968,8 +965,8 @@ const extractAdCopy = (creative) => {
                   alt="Creative"
                   style={{
                     maxWidth: '100%',
-                    maxHeight: '140px', // Keep at 140px but ensure minimum height for static images
-                    minHeight: '100px', // Add minimum height to make static images larger
+                    maxHeight: '140px',
+                    minHeight: '100px',
                     width: 'auto',      
                     height: 'auto',     
                     objectFit: 'contain',
@@ -981,18 +978,15 @@ const extractAdCopy = (creative) => {
                     msInterpolationMode: 'bicubic'
                   }}
                   onLoad={(e) => {
-                    // Try to get higher resolution version
                     const originalSrc = e.target.src;
                     
-                    // If it's a Facebook image, try to get a higher resolution version
                     if (originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net')) {
-                      // Try common high-res patterns
                       const highResSrc = originalSrc
-                        .replace(/\/s\d+x\d+\//, '/s600x600/')  // Increase size
-                        .replace(/\/\d+x\d+\//, '/600x600/')     // Increase size
-                        .replace(/_s\.jpg/, '_n.jpg')           // Normal size instead of small
-                        .replace(/_t\.jpg/, '_n.jpg')           // Normal size instead of thumbnail
-                        .replace(/quality=\d+/, 'quality=95');  // Higher quality
+                        .replace(/\/s\d+x\d+\//, '/s600x600/')
+                        .replace(/\/\d+x\d+\//, '/600x600/')
+                        .replace(/_s\.jpg/, '_n.jpg')
+                        .replace(/_t\.jpg/, '_n.jpg')
+                        .replace(/quality=\d+/, 'quality=95');
                       
                       if (highResSrc !== originalSrc) {
                         const testImg = new Image();
@@ -1001,7 +995,6 @@ const extractAdCopy = (creative) => {
                           e.target.style.filter = 'contrast(1.05) saturate(1.05) brightness(1.01)';
                         };
                         testImg.onerror = () => {
-                          // Fallback to original with enhancement
                           e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
                         };
                         testImg.src = highResSrc;
@@ -1023,9 +1016,22 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Copy Text - Only show in Copy and Combined modes */}
-            {aggregationMode !== AGGREGATION_MODES.CREATIVE && (
-              <div style={{ marginBottom: '4px', flex: '1' }}> {/* Reduced from 8px to 4px */}
+            {/* Ad Name Display - ALWAYS SHOW */}
+            <div style={{ marginBottom: '4px' }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#1f2937',
+                lineHeight: '1.3',
+                minHeight: '20px'
+              }}>
+                {creative.adName}
+              </div>
+            </div>
+            
+            {/* Copy Text - ONLY SHOW IN COPY MODE */}
+            {aggregationMode === AGGREGATION_MODES.COPY && (
+              <div style={{ marginBottom: '4px', flex: '1' }}>
                 <div style={{
                   fontSize: '13px',
                   color: '#374151',
@@ -1044,7 +1050,7 @@ const extractAdCopy = (creative) => {
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column', 
-              gap: '5px',  // Increased from 4px to 5px for better readability
+              gap: '5px',
               marginTop: 'auto'
             }}>
               {currentMetrics.map((metric, index) => {
@@ -1054,7 +1060,7 @@ const extractAdCopy = (creative) => {
                     <div key={metric} style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      fontSize: '11px' // Keep text size readable
+                      fontSize: '11px'
                     }}>
                       <div style={{ flex: '1', paddingRight: '6px' }}>
                         <div style={{
