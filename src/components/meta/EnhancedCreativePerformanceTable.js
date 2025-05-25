@@ -31,7 +31,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Copy extraction function - ENHANCED with better fallback
+  // Enhanced copy extraction function
   const extractAdCopy = (creative) => {
     let copyText = null;
     
@@ -58,93 +58,113 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       console.log('🔍 Found objectStorySpec copy:', copyText);
     }
     
-    // PRIORITY 2: Extract testimonials and reviews from ad name
+    // PRIORITY 2: Enhanced testimonial extraction from ad names
     if (!copyText && creative.adName) {
       const adName = creative.adName;
       
-      // Pattern 1: Extract star ratings with quotes
-      const starQuoteMatch = adName.match(/⭐+\s*"([^"]+)"/);
-      if (starQuoteMatch && starQuoteMatch[1].length > 15) {
-        copyText = starQuoteMatch[1];
-        console.log('🔍 Found star quote pattern:', copyText);
-      }
-      
-      // Pattern 2: Extract customer review content  
-      if (!copyText) {
-        const reviewMatch = adName.match(/customer review\s+(.+?)(?:\s*\|\s*Homepage|$)/i);
-        if (reviewMatch && reviewMatch[1].length > 15) {
-          copyText = reviewMatch[1];
-          console.log('🔍 Found review pattern:', copyText);
-        }
-      }
-      
-      // Pattern 3: Extract quoted testimonials
-      if (!copyText) {
-        const quoteMatch = adName.match(/"([^"]{20,})"/);
-        if (quoteMatch && quoteMatch[1]) {
-          copyText = quoteMatch[1];
-          console.log('🔍 Found quote pattern:', copyText);
-        }
-      }
-      
-      // Pattern 4: Look for testimonial indicators and extract full context
-      if (!copyText) {
-        const testimonialPatterns = [
-          { pattern: /I was shocked/i, extract: /I was shocked[^|]+/ },
-          { pattern: /Not only do these/i, extract: /Not only do these[^|]+/ },
-          { pattern: /These leggings/i, extract: /These leggings[^|]+/ },
-          { pattern: /Pushing my daughter/i, extract: /Pushing my daughter[^|]+/ },
-          { pattern: /Did you know/i, extract: /Did you know[^|]+/ },
-          { pattern: /I absolutely love/i, extract: /I absolutely love[^|]+/ },
-          { pattern: /One of the other moms/i, extract: /One of the other moms[^|]+/ },
-          { pattern: /I'm a mother/i, extract: /I'm a mother[^|]+/ },
-          { pattern: /That's right/i, extract: /That's right[^|]+/ },
-          { pattern: /Tested at the prestigious/i, extract: /Tested at the prestigious[^|]+/ },
-          { pattern: /Meet the Sweetflexx/i, extract: /Meet the Sweetflexx[^|]+/ },
-          { pattern: /Yale-tested/i, extract: /Yale-tested[^|]+/ },
-          { pattern: /resistance technology/i, extract: /[^|]*resistance technology[^|]*/ },
-          { pattern: /game changer/i, extract: /[^|]*game changer[^|]*/ },
-          { pattern: /built-in resistance/i, extract: /[^|]*built-in resistance[^|]*/ },
-          { pattern: /burn up to \d+/i, extract: /[^|]*burn up to \d+[^|]*/ },
-          { pattern: /255 more calories/i, extract: /[^|]*255 more calories[^|]*/ },
-          { pattern: /firmed up/i, extract: /[^|]*firmed up[^|]*/ },
-          { pattern: /changing nothing else/i, extract: /[^|]*changing nothing else[^|]*/ },
-          { pattern: /sneak in a workout/i, extract: /[^|]*sneak in a workout[^|]*/ },
-          { pattern: /easy way to/i, extract: /[^|]*easy way to[^|]*/ },
-          { pattern: /amazing quality/i, extract: /[^|]*amazing quality[^|]*/ },
-          { pattern: /helped shape my legs/i, extract: /[^|]*helped shape my legs[^|]*/ },
-          { pattern: /skeptical at first/i, extract: /[^|]*skeptical at first[^|]*/ },
-          { pattern: /worth it/i, extract: /[^|]*worth it[^|]*/ },
-          { pattern: /GAME CHANGER/i, extract: /[^|]*GAME CHANGER[^|]*/ }
-        ];
+      // Enhanced testimonial patterns
+      const testimonialPatterns = [
+        // Star ratings with quotes
+        { pattern: /⭐+\s*"([^"]{15,})"/, extract: (match) => match[1] },
         
-        for (const { pattern, extract } of testimonialPatterns) {
-          if (pattern.test(adName)) {
-            const extractMatch = adName.match(extract);
-            if (extractMatch && extractMatch[0].length > 20) {
-              copyText = extractMatch[0].trim();
-              console.log('🔍 Found testimonial pattern:', copyText);
-              break;
-            }
-          }
+        // Customer review indicators
+        { pattern: /customer review[:\s]+([^|]{20,})/i, extract: (match) => match[1] },
+        { pattern: /review[:\s]+"([^"]{15,})"/i, extract: (match) => match[1] },
+        
+        // Direct testimonial quotes
+        { pattern: /"([^"]{20,})"/, extract: (match) => match[1] },
+        { pattern: /'([^']{20,})'/, extract: (match) => match[1] },
+        
+        // Specific testimonial starters
+        { pattern: /(I was shocked[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(Not only do these[^|]{15,})/i, extract: (match) => match[1] },
+        { pattern: /(These leggings[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(I absolutely love[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(One of the other moms[^|]{15,})/i, extract: (match) => match[1] },
+        { pattern: /(I'm a mother[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(That's right[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(Meet the [^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(Pushing my daughter[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(Did you know[^|]{10,})/i, extract: (match) => match[1] },
+        
+        // Product benefit testimonials
+        { pattern: /(Yale-tested[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*resistance technology[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*game changer[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*built-in resistance[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*burn up to \d+[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*255 more calories[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*firmed up[^|]{5,})/i, extract: (match) => match[1] },
+        
+        // Emotional testimonials
+        { pattern: /([^|]*changing nothing else[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*sneak in a workout[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*easy way to[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*amazing quality[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*helped shape my legs[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*skeptical at first[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*worth it[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*GAME CHANGER[^|]{5,})/i, extract: (match) => match[1] },
+        
+        // Additional patterns for more testimonials
+        { pattern: /([^|]*transformed my[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*couldn't believe[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*best purchase[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*highly recommend[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*obsessed with[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*never felt better[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*completely changed[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*blown away[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*can't live without[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*miracle product[^|]{5,})/i, extract: (match) => match[1] },
+        
+        // Results-focused testimonials
+        { pattern: /([^|]*lost \d+ pounds[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*dropped \d+ sizes[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*in just \d+ weeks[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*within \d+ days[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*incredible results[^|]{5,})/i, extract: (match) => match[1] },
+        
+        // Comparison testimonials
+        { pattern: /([^|]*better than[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*tried everything[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*nothing worked until[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*finally found[^|]{10,})/i, extract: (match) => match[1] },
+        
+        // Social proof patterns
+        { pattern: /([^|]*everyone asks[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*friends keep asking[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*getting compliments[^|]{5,})/i, extract: (match) => match[1] },
+        { pattern: /([^|]*people notice[^|]{10,})/i, extract: (match) => match[1] },
+        
+        // Question-based hooks
+        { pattern: /(Curious why everyone[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(Why do [^|]{15,})/i, extract: (match) => match[1] },
+        { pattern: /(Want to know[^|]{10,})/i, extract: (match) => match[1] },
+        { pattern: /(Ever wondered[^|]{10,})/i, extract: (match) => match[1] }
+      ];
+      
+      // Try each pattern
+      for (const { pattern, extract } of testimonialPatterns) {
+        const match = adName.match(pattern);
+        if (match && extract(match).length > 15) {
+          copyText = extract(match).trim();
+          console.log('🔍 Found testimonial pattern:', copyText);
+          break;
         }
       }
       
-      // Pattern 5: Extract multi-sentence testimonials
+      // Enhanced multi-sentence extraction
       if (!copyText) {
-        // Look for sentences that span across the ad name
         const sentences = adName.split(/[.!?]+/).filter(s => s.trim().length > 10);
         if (sentences.length >= 2) {
-          const meaningfulSentences = sentences.filter(s => 
-            s.toLowerCase().includes('leggings') ||
-            s.toLowerCase().includes('amazing') ||
-            s.toLowerCase().includes('love') ||
-            s.toLowerCase().includes('workout') ||
-            s.toLowerCase().includes('resistance') ||
-            s.toLowerCase().includes('quality') ||
-            s.toLowerCase().includes('helped') ||
-            s.toLowerCase().includes('transformed')
-          );
+          const meaningfulSentences = sentences.filter(s => {
+            const lower = s.toLowerCase();
+            return ['leggings', 'amazing', 'love', 'workout', 'resistance', 'quality', 
+                    'helped', 'transformed', 'obsessed', 'recommend', 'changed', 'results',
+                    'better', 'incredible', 'miracle', 'blown away'].some(keyword => 
+                    lower.includes(keyword));
+          });
           
           if (meaningfulSentences.length > 0) {
             copyText = meaningfulSentences.slice(0, 2).join('. ').trim() + '.';
@@ -153,12 +173,13 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         }
       }
       
-      // Pattern 6: If contains common testimonial keywords, extract the meaningful part
+      // Extract based on testimonial keywords with better context
       if (!copyText) {
         const testimonialKeywords = [
           'amazing quality', 'helped shape', 'worth it', 'love them', 'transformed', 
           'skeptical', 'resistance', 'workout', 'calories', 'firmed up', 'easy way',
-          'sneak in', 'game changer', 'built-in', 'yale-tested', 'prestigious'
+          'sneak in', 'game changer', 'built-in', 'yale-tested', 'prestigious',
+          'obsessed', 'recommend', 'blown away', 'miracle', 'incredible', 'changed my life'
         ];
         
         const hasTestimonialKeyword = testimonialKeywords.some(keyword => 
@@ -166,9 +187,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         );
         
         if (hasTestimonialKeyword) {
-          // Extract everything before the first | or technical marker
           let meaningfulPart = adName
-            .split(/\s*\|\s*(VID|IMG|GIF|24_|25_|Homepage)/)[0]
+            .split(/\s*\|\s*(VID|IMG|GIF|24_|25_|Homepage|Static|Video|Carousel)/)[0]
             .replace(/^.*?(⭐+.*|".*|I was.*|Not only.*|These.*|Pushing.*|One of.*|That's.*|Meet.*)/i, '$1')
             .trim();
             
@@ -184,10 +204,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     if (!copyText && creative.adName) {
       const adName = creative.adName;
       
-      // Extract clean product name and make it engaging
       const productName = adName.split('|')[0].trim();
       if (productName.length > 5 && !productName.includes('24_') && !productName.includes('25_')) {
-        // Create engaging copy from product name
         if (productName.toLowerCase().includes('pockets high rise')) {
           copyText = "High-rise leggings with built-in pockets for the ultimate workout experience. Perfect fit, maximum comfort.";
         } else {
@@ -258,6 +276,62 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     
     // For shorter text, return as is
     return text;
+  };
+
+  // Enhanced image quality function
+  const enhanceImageQuality = (originalSrc, imgElement) => {
+    // Facebook/Meta URL patterns and their high-res equivalents
+    let enhancedSrc = originalSrc;
+    
+    // Try progressively higher resolutions
+    enhancedSrc = enhancedSrc
+      .replace(/\/s\d+x\d+\//, '/s1080x1080/')
+      .replace(/\/\d+x\d+\//, '/1080x1080/')
+      .replace(/_s\.jpg/, '_o.jpg')      // Original size
+      .replace(/_t\.jpg/, '_o.jpg')      // Original instead of thumbnail
+      .replace(/_m\.jpg/, '_o.jpg')      // Original instead of medium
+      .replace(/_n\.jpg/, '_o.jpg')      // Try original if normal doesn't work
+      .replace(/quality=\d+/, 'quality=100')
+      .replace(/&width=\d+/, '')
+      .replace(/&height=\d+/, '')
+      .replace(/&crop/, '');
+
+    // If URL was modified, try loading the enhanced version
+    if (enhancedSrc !== originalSrc) {
+      const testImg = new Image();
+      testImg.crossOrigin = 'anonymous';
+      
+      testImg.onload = () => {
+        imgElement.src = enhancedSrc;
+        applyImageSharpening(imgElement);
+      };
+      
+      testImg.onerror = () => {
+        applyImageSharpening(imgElement);
+      };
+      
+      testImg.src = enhancedSrc;
+    } else {
+      applyImageSharpening(imgElement);
+    }
+  };
+
+  const applyImageSharpening = (imgElement) => {
+    // Advanced CSS sharpening and enhancement
+    imgElement.style.filter = [
+      'contrast(1.15)',
+      'saturate(1.1)',
+      'brightness(1.02)',
+      'blur(0)'
+    ].join(' ');
+    
+    // Additional sharpening via image-rendering
+    imgElement.style.imageRendering = 'crisp-edges';
+    imgElement.style.imageRendering = '-webkit-optimize-contrast';
+    
+    // Force hardware acceleration
+    imgElement.style.transform = 'translateZ(0)';
+    imgElement.style.backfaceVisibility = 'hidden';
   };
 
   // Data cleaning functions
@@ -551,7 +625,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       case 'cpc':
       case 'cpm':
       case 'costPerPurchase':
-        return `$${value.toFixed(2)}`;
+        return `${value.toFixed(2)}`;
       case 'ctr':
       case 'seeMoreRate':
       case 'thumbstopRate':
@@ -882,36 +956,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     msInterpolationMode: 'bicubic'
                   }}
                   onLoad={(e) => {
-                    // Try to get higher resolution version
-                    const originalSrc = e.target.src;
-                    
-                    // If it's a Facebook image, try to get a higher resolution version
-                    if (originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net')) {
-                      // Try common high-res patterns
-                      const highResSrc = originalSrc
-                        .replace(/\/s\d+x\d+\//, '/s600x600/')  // Increase size
-                        .replace(/\/\d+x\d+\//, '/600x600/')     // Increase size
-                        .replace(/_s\.jpg/, '_n.jpg')           // Normal size instead of small
-                        .replace(/_t\.jpg/, '_n.jpg')           // Normal size instead of thumbnail
-                        .replace(/quality=\d+/, 'quality=95');  // Higher quality
-                      
-                      if (highResSrc !== originalSrc) {
-                        const testImg = new Image();
-                        testImg.onload = () => {
-                          e.target.src = highResSrc;
-                          e.target.style.filter = 'contrast(1.05) saturate(1.05) brightness(1.01)';
-                        };
-                        testImg.onerror = () => {
-                          // Fallback to original with enhancement
-                          e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
-                        };
-                        testImg.src = highResSrc;
-                      } else {
-                        e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
-                      }
-                    } else {
-                      e.target.style.filter = 'contrast(1.1) saturate(1.1) brightness(1.02) unsharp-mask(1px 1px 1px)';
-                    }
+                    enhanceImageQuality(e.target.src, e.target);
                   }}
                   onError={(e) => {
                     e.target.style.backgroundColor = '#e5e7eb';
