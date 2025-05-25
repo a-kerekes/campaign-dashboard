@@ -915,7 +915,8 @@ const extractAdCopy = (creative) => {
                   alt="Creative"
                   style={{
                     maxWidth: '100%',
-                    maxHeight: '140px', // Reduced from 180px to 140px
+                    maxHeight: '140px', // Keep at 140px but ensure minimum height for static images
+                    minHeight: '100px', // Add minimum height to make static images larger
                     width: 'auto',      
                     height: 'auto',     
                     objectFit: 'contain',
@@ -986,8 +987,13 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Metrics Grid - TIGHTER SPACING */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {/* Metrics Grid - ELIMINATE BOTTOM WHITE SPACE */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '4px',  // Further reduced from 6px
+              marginTop: 'auto' // Push metrics to bottom to eliminate white space
+            }}>
               {currentMetrics.map((metric, index) => {
                 if (index % 2 === 0) {
                   const nextMetric = currentMetrics[index + 1];
