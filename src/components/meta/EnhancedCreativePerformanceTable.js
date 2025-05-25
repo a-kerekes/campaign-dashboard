@@ -898,19 +898,28 @@ const extractAdCopy = (creative) => {
               e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
-            {/* Creative Thumbnail (for Creative and Combined modes) */}
+            {/* Creative Thumbnail (for Creative and Combined modes) - UPDATED FOR NATIVE DIMENSIONS */}
             {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
              creative.thumbnailUrl && (
-              <div style={{ marginBottom: '12px' }}>
+              <div style={{ 
+                marginBottom: '12px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                overflow: 'hidden',
+                borderRadius: '6px',
+                backgroundColor: '#f9fafb'
+              }}>
                 <img 
                   src={creative.thumbnailUrl} 
                   alt="Creative"
                   style={{
-                    width: '100%',
-                    height: '200px',
-                    objectFit: 'cover',
+                    maxWidth: '100%',
+                    maxHeight: '300px', // Set a reasonable max height to prevent cards from becoming too tall
+                    width: 'auto',      // Let width adjust naturally based on aspect ratio
+                    height: 'auto',     // Let height adjust naturally based on aspect ratio
+                    objectFit: 'contain', // Changed from 'cover' to 'contain' to preserve aspect ratio
                     borderRadius: '6px',
-                    backgroundColor: '#f9fafb',
                     display: 'block',
                     imageRendering: 'auto',
                     imageRendering: '-webkit-optimize-contrast',
@@ -961,21 +970,21 @@ const extractAdCopy = (creative) => {
             )}
             
             {/* Copy Text - Only show in Copy and Combined modes */}
-{aggregationMode !== AGGREGATION_MODES.CREATIVE && (
-  <div style={{ marginBottom: '16px', flex: '1' }}>
-    <div style={{
-      fontSize: '14px',
-      color: '#374151',
-      lineHeight: '1.5',
-      minHeight: '60px',
-      fontWeight: '400'
-    }}>
-      {creative.extractedCopy.split('\n').map((line, index) => (
-        <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
-      ))}
-    </div>
-  </div>
-)}
+            {aggregationMode !== AGGREGATION_MODES.CREATIVE && (
+              <div style={{ marginBottom: '16px', flex: '1' }}>
+                <div style={{
+                  fontSize: '14px',
+                  color: '#374151',
+                  lineHeight: '1.5',
+                  minHeight: '60px',
+                  fontWeight: '400'
+                }}>
+                  {creative.extractedCopy.split('\n').map((line, index) => (
+                    <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             {/* Metrics Grid */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
