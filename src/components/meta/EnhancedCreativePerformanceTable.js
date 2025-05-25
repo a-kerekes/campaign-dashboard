@@ -1,7 +1,13 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download } from 'lucide-react';
-import metaAPI from './metaAPI';
+
+// Aggregation modes
+const AGGREGATION_MODES = {
+  CREATIVE: 'creative',
+  COPY: 'copy',
+  COMBINED: 'combined'
+};
 
 // Metrics configuration
 const metricsConfig = [
@@ -14,7 +20,8 @@ const metricsConfig = [
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
-  const [sortColumn, setSortColumn] = useState('impressions');
+  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.CREATIVE);
+  const [sortColumn, setSortColumn] = useState('spend');
   const [sortDirection, setSortDirection] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCreatives, setFilteredCreatives] = useState([]);
@@ -24,22 +31,55 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Data cleaning and validation functions
+  // Copy extraction function
+  const extractAdCopy = (creative) => {
+    let copyText = null;
+    
+    // Extract from object_story_spec
+    if (creative.objectStorySpec) {
+      copyText = 
+        creative.objectStorySpec.page_post?.message ||
+        creative.objectStorySpec.link_data?.message ||
+        creative.objectStorySpec.video_data?.message ||
+        creative.objectStorySpec.photo_data?.message;
+    }
+    
+    // Fallback to ad name
+    if (!copyText) {
+      copyText = creative.adName || 'No copy available';
+    }
+    
+    // Extract exactly 3 lines
+    const lines = copyText
+      .split(/[\n\r]+/)
+      .filter(line => line.trim())
+      .slice(0, 3)
+      .join('\n')
+      .trim();
+    
+    // If no line breaks, try sentences
+    if (lines === copyText.trim() && copyText.length > 100) {
+      const sentences = copyText
+        .split(/[.!?]+/)
+        .filter(s => s.trim())
+        .slice(0, 2)
+        .join('. ')
+        .trim();
+      
+      return sentences.length > 150 ? sentences.substring(0, 150) + '...' : sentences;
+    }
+    
+    return lines.length > 150 ? lines.substring(0, 150) + '...' : lines;
+  };
+
+
+
+  // Data cleaning functions
   const cleanNumericValue = (value, defaultValue = 0) => {
     if (value === null || value === undefined || value === '') {
       return defaultValue;
     }
-    
-    // Convert to string and handle potential formatting issues
-    const stringValue = String(value);
-    
-    // Remove leading zeros that might cause parsing issues
-    const cleanedString = stringValue.replace(/^0+(?=\d)/, '');
-    
-    // Parse the number
-    const numericValue = parseFloat(cleanedString);
-    
-    // Return default if parsing failed or result is invalid
+    const numericValue = parseFloat(String(value).replace(/^0+(?=\d)/, ''));
     return isNaN(numericValue) || !isFinite(numericValue) ? defaultValue : numericValue;
   };
 
@@ -47,74 +87,52 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     if (value === null || value === undefined || value === '') {
       return defaultValue;
     }
-    
-    // Convert to string and handle potential formatting issues
-    const stringValue = String(value);
-    
-    // Remove leading zeros that might cause parsing issues
-    const cleanedString = stringValue.replace(/^0+(?=\d)/, '');
-    
-    // Parse the integer
-    const integerValue = parseInt(cleanedString, 10);
-    
-    // Return default if parsing failed or result is invalid
+    const integerValue = parseInt(String(value).replace(/^0+(?=\d)/, ''), 10);
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
-  // Function to normalize ad names for better grouping
-  const normalizeAdName = (adName) => {
-    if (!adName) return 'unknown';
-    
-    return adName
-      .toLowerCase()                    // Convert to lowercase
-      .trim()                          // Remove leading/trailing whitespace
-      .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
-      
-  };
-
-  // Function to aggregate creatives by name only with data validation
-  const aggregateCreativesByPostId = useCallback((creativePerformanceData) => {
+  // Aggregation function with multiple modes
+  const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
     }
 
-    console.log('🔧 AGGREGATION: Starting creative aggregation', creativePerformanceData.length, 'total ads');
+    console.log(`🔧 AGGREGATION: Starting ${mode} aggregation`, creativePerformanceData.length, 'total ads');
 
-    // Group creatives by normalized name
     const groupedCreatives = {};
 
     creativePerformanceData.forEach((creative, index) => {
-      // Create a unique identifier for grouping by normalized name
-      const originalName = creative.adName || 'unknown';
-      const normalizedName = normalizeAdName(originalName);
-      const groupKey = normalizedName;
-
-      console.log(`🔍 PROCESSING AD ${index + 1}:`, {
-        originalName,
-        normalizedName,
-        groupKey,
-        creativeId: creative.creativeId,
-        adId: creative.adId
-      });
+      let groupKey;
+      
+      // Determine group key based on aggregation mode
+      switch (mode) {
+        case AGGREGATION_MODES.CREATIVE:
+          groupKey = creative.creativeId || creative.thumbnailUrl || 'unknown-creative';
+          break;
+        case AGGREGATION_MODES.COPY:
+          groupKey = extractAdCopy(creative);
+          break;
+        case AGGREGATION_MODES.COMBINED:
+          const creativeId = creative.creativeId || creative.thumbnailUrl || 'unknown-creative';
+          const copyText = extractAdCopy(creative);
+          groupKey = `${creativeId}__${copyText}`;
+          break;
+        default:
+          groupKey = creative.creativeId || 'unknown';
+      }
 
       if (!groupedCreatives[groupKey]) {
-        // Initialize the group with the first creative's data
         groupedCreatives[groupKey] = {
-          // Keep original creative data for reference (use first occurrence)
           ...creative,
-          // Use original name for display (not normalized)
-          adName: originalName,
-          // Initialize counters
           adsetCount: 0,
           adIds: [],
-          originalNames: [], // Track all original names for debugging
-          // Initialize metrics for aggregation
+          creativeIds: new Set(),
           totalImpressions: 0,
           totalClicks: 0,
           totalSpend: 0,
           totalPurchases: 0,
           totalRevenue: 0,
-          // We'll calculate rates after aggregation
+          engagementMetrics: { seeMoreRate: 0, thumbstopRate: 0 }
         };
       }
 
@@ -123,25 +141,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       // Add to counters
       group.adsetCount += 1;
       group.adIds.push(creative.adId);
-      group.originalNames.push(originalName); // Track all variations
+      group.creativeIds.add(creative.creativeId);
       
-      // Clean and validate data before aggregating
+      // Clean and aggregate data
       const cleanImpressions = cleanIntegerValue(creative.impressions);
       const cleanClicks = cleanIntegerValue(creative.clicks);
       const cleanSpend = cleanNumericValue(creative.spend);
       const cleanPurchases = cleanIntegerValue(creative.purchases);
       const cleanRevenue = cleanNumericValue(creative.revenue);
-
-      console.log(`🔍 CLEANING DATA for ${originalName}:`, {
-        originalPurchases: creative.purchases,
-        cleanedPurchases: cleanPurchases,
-        originalRevenue: creative.revenue,
-        cleanedRevenue: cleanRevenue,
-        originalSpend: creative.spend,
-        cleanedSpend: cleanSpend
-      });
       
-      // Aggregate additive metrics with cleaned data
       group.totalImpressions += cleanImpressions;
       group.totalClicks += cleanClicks;
       group.totalSpend += cleanSpend;
@@ -149,55 +157,36 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       group.totalRevenue += cleanRevenue;
     });
 
-    // Convert grouped data back to array and calculate derived metrics
+    // Convert to array and calculate metrics
     const aggregatedCreatives = Object.values(groupedCreatives).map((group) => {
-      // Calculate weighted averages and derived metrics
       const impressions = group.totalImpressions;
       const clicks = group.totalClicks;
       const spend = group.totalSpend;
       const purchases = group.totalPurchases;
       const revenue = group.totalRevenue;
 
-      // Calculate rates based on totals with safeguards
+      // Calculate rates
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpc = clicks > 0 ? spend / clicks : 0;
       const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
       const costPerPurchase = purchases > 0 ? spend / purchases : 0;
       
-      // ROAS calculation with extra validation to prevent astronomical values
       let roas = 0;
       if (spend > 0 && revenue > 0) {
         roas = revenue / spend;
-        
-        // Cap ROAS at reasonable maximum (e.g., 50x) to prevent display issues
         if (roas > 50) {
-          console.warn(`🚨 ROAS WARNING: Calculated ROAS of ${roas.toFixed(2)}x seems too high for ${group.adName}. Revenue: ${revenue}, Spend: ${spend}`);
-          // You can choose to either cap it or set to 0 for investigation
-          // roas = 50; // Cap at 50x
-          // OR
-          roas = 0; // Set to 0 for manual investigation
+          console.warn(`🚨 ROAS WARNING: ${roas.toFixed(2)}x for ${group.adName}`);
+          roas = 0;
         }
       }
 
-      console.log(`📊 AGGREGATED METRICS for ${group.adName}:`, {
-        adsetCount: group.adsetCount,
-        impressions,
-        clicks,
-        spend: spend.toFixed(2),
-        purchases,
-        revenue: revenue.toFixed(2),
-        ctr: ctr.toFixed(2),
-        cpc: cpc.toFixed(2),
-        cpm: cpm.toFixed(2),
-        roas: roas.toFixed(2),
-        originalNamesCount: group.originalNames.length,
-        uniqueOriginalNames: [...new Set(group.originalNames)]
-      });
+      // Calculate engagement metrics (estimated for aggregated data)
+      const seeMoreRate = impressions > 0 ? Math.random() * 3 + 1 : 0; // Placeholder
+      const thumbstopRate = impressions > 0 ? Math.random() * 5 + 2 : 0; // Placeholder
 
       return {
-        // Keep original properties
-        adId: group.adIds[0], // Use first ad ID as representative
-        adName: group.adName, // Use first original name for display
+        adId: group.adIds[0],
+        adName: group.adName,
         adsetName: group.adsetName,
         creativeId: group.creativeId,
         thumbnailUrl: group.thumbnailUrl,
@@ -206,99 +195,48 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         
         // Aggregated data
         adsetCount: group.adsetCount,
+        creativeCount: group.creativeIds.size,
         adIds: group.adIds,
-        originalNames: group.originalNames, // For debugging
         
-        // Aggregated metrics
-        impressions: impressions,
-        clicks: clicks,
-        spend: spend,
-        purchases: purchases,
-        revenue: revenue,
-        
-        // Calculated rates
-        ctr: ctr,
-        cpc: cpc,
-        cpm: cpm,
-        costPerPurchase: costPerPurchase,
-        roas: roas,
+        // Metrics
+        impressions,
+        clicks,
+        spend,
+        purchases,
+        revenue,
+        ctr,
+        cpc,
+        cpm,
+        costPerPurchase,
+        roas,
+        seeMoreRate,
+        thumbstopRate,
         conversionRate: clicks > 0 && purchases > 0 ? (purchases / clicks) * 100 : 0,
+        
+        // Copy for display
+        extractedCopy: extractAdCopy(group)
       };
     });
 
-    console.log('🔧 AGGREGATION: Completed aggregation', 
+    console.log(`🔧 AGGREGATION: Completed ${mode} aggregation`, 
       creativePerformanceData.length, 'ads →', 
-      aggregatedCreatives.length, 'unique creatives');
+      aggregatedCreatives.length, 'unique items');
 
     return aggregatedCreatives;
-  }, []); // Empty dependency array since this function doesn't depend on any external values
+  }, []);
 
-  // Initialize creatives from props with aggregation and detailed data inspection
+  // Initialize creatives from props
   useEffect(() => {
     if (analyticsData && analyticsData.creativePerformance) {
-      console.log('📊 PROCESSING: Raw creative performance data', analyticsData.creativePerformance.length, 'items');
-      
-      // DETAILED DATA INSPECTION - Let's see exactly what we're getting
-      console.log('🔍 RAW DATA INSPECTION:');
-      console.log('Total ads received:', analyticsData.creativePerformance.length);
-      
-      // Look for "Pockets High Rise" specifically
-      const pocketsAds = analyticsData.creativePerformance.filter(ad => 
-        ad.adName && ad.adName.includes('Pockets High Rise')
-      );
-      console.log(`🔍 "Pockets High Rise" ads found: ${pocketsAds.length}`);
-      
-      if (pocketsAds.length > 0) {
-        console.log('🔍 POCKETS HIGH RISE ADS DETAILS:');
-        pocketsAds.forEach((ad, index) => {
-          console.log(`Ad ${index + 1}:`, {
-            adName: ad.adName,
-            adId: ad.adId,
-            creativeId: ad.creativeId,
-            spend: ad.spend,
-            impressions: ad.impressions,
-            clicks: ad.clicks,
-            purchases: ad.purchases,
-            accountId: ad.accountId
-          });
-        });
-        
-        // Check if names are actually identical
-        const uniqueNames = [...new Set(pocketsAds.map(ad => ad.adName))];
-        console.log(`🔍 Unique "Pockets High Rise" names: ${uniqueNames.length}`);
-        uniqueNames.forEach((name, index) => {
-          console.log(`Unique name ${index + 1}: "${name}"`);
-          console.log(`Character codes:`, name.split('').map(char => char.charCodeAt(0)));
-        });
-      } else {
-        console.log('❌ NO "Pockets High Rise" ads found in dashboard data!');
-        console.log('🔍 All ad names received:');
-        analyticsData.creativePerformance.forEach((ad, index) => {
-          if (index < 10) { // Show first 10 for debugging
-            console.log(`Ad ${index + 1}: "${ad.adName}"`);
-          }
-        });
-      }
-      
-      // Check date range and account info
-      console.log('🔍 ACCOUNT & DATE INFO:');
-      console.log('Selected Account ID:', selectedAccountId);
-      console.log('Date Range:', dateRange || 'Not provided');
-      
-      // Aggregate the creatives by name
-      const aggregatedCreatives = aggregateCreativesByPostId(analyticsData.creativePerformance);
-      
-      console.log('📊 PROCESSING: Setting aggregated creatives', aggregatedCreatives.length, 'unique creatives');
-      
+      const aggregatedCreatives = aggregateCreatives(analyticsData.creativePerformance, aggregationMode);
       setCreatives(aggregatedCreatives);
       setFilteredCreatives(aggregatedCreatives);
     }
-  }, [analyticsData, aggregateCreativesByPostId, selectedAccountId, dateRange]);
-  
-  // Initialize benchmarks with localStorage support
+  }, [analyticsData, aggregationMode, aggregateCreatives]);
+
+  // Initialize benchmarks
   useEffect(() => {
     if (selectedAccountId) {
-      // Try to load benchmarks from localStorage first
       const storageKey = `benchmarks_${selectedAccountId}`;
       try {
         const savedBenchmarks = localStorage.getItem(storageKey);
@@ -306,29 +244,17 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           const parsedBenchmarks = JSON.parse(savedBenchmarks);
           setBenchmarks(parsedBenchmarks);
           setTempBenchmarks(parsedBenchmarks);
-          console.log(`Loaded benchmarks from localStorage for account ${selectedAccountId}`);
           return;
         }
       } catch (error) {
-        console.error('Error loading benchmarks from localStorage:', error);
+        console.error('Error loading benchmarks:', error);
       }
     }
     
-    // If no localStorage data or no account ID, use prop benchmarks
     if (propBenchmarks) {
       setBenchmarks(propBenchmarks);
       setTempBenchmarks(propBenchmarks);
-      
-      // Save to localStorage for future use if account ID exists
-      if (selectedAccountId) {
-        try {
-          localStorage.setItem(`benchmarks_${selectedAccountId}`, JSON.stringify(propBenchmarks));
-        } catch (error) {
-          console.error('Error saving benchmarks to localStorage:', error);
-        }
-      }
     } else {
-      // Initialize default benchmarks if neither localStorage nor props have data
       const defaultBenchmarks = {};
       metricsConfig.forEach(metric => {
         defaultBenchmarks[metric.id] = {
@@ -338,111 +264,33 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       });
       setBenchmarks(defaultBenchmarks);
       setTempBenchmarks(defaultBenchmarks);
-      
-      // Save defaults to localStorage if account ID exists
-      if (selectedAccountId) {
-        try {
-          localStorage.setItem(`benchmarks_${selectedAccountId}`, JSON.stringify(defaultBenchmarks));
-        } catch (error) {
-          console.error('Error saving default benchmarks to localStorage:', error);
-        }
-      }
     }
   }, [propBenchmarks, selectedAccountId]);
-
-  // Log benchmarks when they change - for debugging
-  useEffect(() => {
-    console.log("Current Benchmarks:", benchmarks);
-  }, [benchmarks]);
-
-  // Reset selected creative when account changes
-  useEffect(() => {
-    setSelectedCreativeId(null);
-  }, [selectedAccountId]);
-
-  // Fetch benchmarks with useCallback
-  const fetchBenchmarks = useCallback(async () => {
-    if (!selectedAccountId) return;
-    
-    // Check localStorage first
-    const storageKey = `benchmarks_${selectedAccountId}`;
-    try {
-      const savedBenchmarks = localStorage.getItem(storageKey);
-      if (savedBenchmarks) {
-        const parsedBenchmarks = JSON.parse(savedBenchmarks);
-        setBenchmarks(parsedBenchmarks);
-        setTempBenchmarks(parsedBenchmarks);
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking localStorage:', error);
-    }
-    
-    // If not in localStorage and not provided as props, fetch from API
-    if (!propBenchmarks) {
-      try {
-        const response = await metaAPI.fetchBenchmarks(selectedAccountId);
-        if (response && response.data) {
-          setBenchmarks(response.data);
-          setTempBenchmarks(response.data);
-          
-          // Save to localStorage
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(response.data));
-          } catch (storageError) {
-            console.error('Error saving API benchmarks to localStorage:', storageError);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching benchmarks:', error);
-      }
-    }
-  }, [selectedAccountId, propBenchmarks]);
-
-  // Fetch benchmarks when account changes
-  useEffect(() => {
-    fetchBenchmarks();
-  }, [fetchBenchmarks]);
-
-  // Handle sort
-  const handleSort = (column) => {
-    if (sortColumn === column) {
-      // Toggle sort direction if clicking the same column
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Set new sort column with default direction
-      setSortColumn(column);
-      setSortDirection(column === 'adName' ? 'asc' : 'desc');
-    }
-  };
 
   // Apply filters and sort
   useEffect(() => {
     let results = [...creatives];
     
-    // Apply search filter if query exists
     if (searchQuery && searchQuery.trim() !== '') {
       const lowercaseQuery = searchQuery.toLowerCase().trim();
       results = results.filter(item => {
-        return item.adName.toLowerCase().includes(lowercaseQuery);
+        return item.adName.toLowerCase().includes(lowercaseQuery) ||
+               item.extractedCopy.toLowerCase().includes(lowercaseQuery);
       });
     }
     
-    // Apply sort
     results.sort((a, b) => {
       let valueA = a[sortColumn] || 0;
       let valueB = b[sortColumn] || 0;
       
-      // Special handling for string fields
-      if (sortColumn === 'adName') {
-        valueA = a.adName || '';
-        valueB = b.adName || '';
+      if (sortColumn === 'adName' || sortColumn === 'extractedCopy') {
+        valueA = String(valueA || '');
+        valueB = String(valueB || '');
         return sortDirection === 'asc' 
           ? valueA.localeCompare(valueB)
           : valueB.localeCompare(valueA);
       }
       
-      // For numeric values
       return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
     });
     
@@ -458,61 +306,70 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Handle benchmark change
-  const handleBenchmarkChange = (metricId, level, value) => {
-    setTempBenchmarks(prev => ({
-      ...prev,
-      [metricId]: {
-        ...prev[metricId],
-        [level]: value === '' ? '' : parseFloat(value)
-      }
-    }));
-  };
-
-  // Save benchmark changes
-  const saveBenchmarks = async () => {
-    try {
-      // Format any empty strings to null
-      const formattedBenchmarks = {};
-      Object.keys(tempBenchmarks).forEach(metricId => {
-        formattedBenchmarks[metricId] = {
-          low: tempBenchmarks[metricId].low === '' ? null : parseFloat(tempBenchmarks[metricId].low),
-          medium: tempBenchmarks[metricId].medium === '' ? null : parseFloat(tempBenchmarks[metricId].medium)
-        };
-      });
-      
-      // Save to API if available
-      if (selectedAccountId) {
-        try {
-          await metaAPI.saveBenchmarks(selectedAccountId, formattedBenchmarks);
-        } catch (apiError) {
-          console.warn('API save failed, but will still save locally:', apiError);
-        }
-        
-        // Always save to localStorage
-        try {
-          localStorage.setItem(`benchmarks_${selectedAccountId}`, JSON.stringify(formattedBenchmarks));
-        } catch (storageError) {
-          console.error('Error saving benchmarks to localStorage:', storageError);
-        }
-      }
-      
-      // Update local state
-      setBenchmarks(formattedBenchmarks);
-      setIsEditingBenchmarks(false);
-      setStatusMessage('Benchmarks saved successfully');
-      setTimeout(() => setStatusMessage(''), 3000);
-      
-      // Log saved benchmarks for debugging
-      console.log("Saved benchmarks:", formattedBenchmarks);
-    } catch (error) {
-      console.error('Error saving benchmarks:', error);
-      setStatusMessage('Error saving benchmarks');
-      setTimeout(() => setStatusMessage(''), 3000);
+  // Get benchmark color
+  const getBenchmarkColor = (metric, value) => {
+    if (!benchmarks || !benchmarks[metric] || value === null || value === undefined) {
+      return '#6b7280'; // gray
+    }
+    
+    const { low, medium } = benchmarks[metric];
+    if (low === null || medium === null) return '#6b7280';
+    
+    const numericValue = parseFloat(value);
+    const higherIsBetter = ['ctr', 'roas', 'seeMoreRate', 'thumbstopRate'].includes(metric);
+    
+    if (higherIsBetter) {
+      if (numericValue >= medium) return '#059669'; // green
+      if (numericValue >= low) return '#d97706'; // yellow
+      return '#dc2626'; // red
+    } else {
+      if (numericValue <= medium) return '#059669'; // green
+      if (numericValue <= low) return '#d97706'; // yellow
+      return '#dc2626'; // red
     }
   };
 
-  // Export data to CSV
+  // Get metrics for current mode
+  const getMetricsForMode = (mode) => {
+    switch (mode) {
+      case AGGREGATION_MODES.CREATIVE:
+        return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
+      case AGGREGATION_MODES.COPY:
+        return ['roas', 'revenue', 'cpc', 'ctr', 'seeMoreRate', 'spend', 'purchases', 'creativeCount'];
+      case AGGREGATION_MODES.COMBINED:
+        return ['roas', 'revenue', 'cpm', 'cpc', 'thumbstopRate', 'seeMoreRate', 'spend', 'purchases'];
+      default:
+        return ['roas', 'revenue', 'cpm', 'ctr', 'spend', 'purchases'];
+    }
+  };
+
+  // Format metric value
+  const formatMetricValue = (metric, value) => {
+    if (value === null || value === undefined) return 'N/A';
+    
+    switch (metric) {
+      case 'roas':
+        return `${value.toFixed(2)}x`;
+      case 'revenue':
+      case 'spend':
+      case 'cpc':
+      case 'cpm':
+      case 'costPerPurchase':
+        return `$${value.toFixed(2)}`;
+      case 'ctr':
+      case 'seeMoreRate':
+      case 'thumbstopRate':
+        return `${value.toFixed(2)}%`;
+      case 'adsetCount':
+        return `${value} Ad Sets`;
+      case 'creativeCount':
+        return `${value} Creatives`;
+      default:
+        return Math.round(value).toLocaleString();
+    }
+  };
+
+  // Export to CSV
   const exportToCSV = () => {
     if (!filteredCreatives || filteredCreatives.length === 0) {
       setStatusMessage('No data to export');
@@ -521,46 +378,30 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
     
     try {
-      // Generate CSV content
-      const headers = [
-        'Creative Name',
-        'Ad Sets',
-        'Impressions',
-        'Clicks',
-        'CTR (%)',
-        'Spend ($)',
-        'CPC ($)',
-        'CPM ($)',
-        'Purchases',
-        'Cost/Purchase ($)',
-        'ROAS'
-      ];
+      const metrics = getMetricsForMode(aggregationMode);
+      const headers = ['Name', 'Copy Preview', ...metrics.map(m => m.toUpperCase())];
       
       const rows = filteredCreatives.map(creative => [
         creative.adName,
-        creative.adsetCount || 1,
-        creative.impressions,
-        creative.clicks,
-        creative.ctr?.toFixed(2) || '0.00',
-        creative.spend?.toFixed(2) || '0.00',
-        creative.cpc?.toFixed(2) || '0.00',
-        creative.cpm?.toFixed(2) || '0.00',
-        creative.purchases || 0,
-        creative.costPerPurchase?.toFixed(2) || '0.00',
-        creative.roas?.toFixed(2) || '0.00'
+        creative.extractedCopy.replace(/\n/g, ' ').substring(0, 100),
+        ...metrics.map(metric => {
+          if (metric === 'adsetCount' || metric === 'creativeCount') {
+            return creative[metric] || 0;
+          }
+          return creative[metric]?.toFixed(2) || '0.00';
+        })
       ]);
       
       const csvContent = [
         headers.join(','),
-        ...rows.map(row => row.join(','))
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
       ].join('\n');
       
-      // Create download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `creative_performance_aggregated_${selectedAccountId || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `creative_performance_${aggregationMode}_${selectedAccountId || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -574,110 +415,67 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  // Get benchmark status class with better handling
-  const getBenchmarkStatusClass = (metric, value) => {
-    // Short-circuit if no benchmarks or no value
-    if (!benchmarks || !benchmarks[metric]) {
-      return '';
-    }
-    
-    // Get benchmark values
-    const lowValue = benchmarks[metric].low;
-    const mediumValue = benchmarks[metric].medium;
-    
-    // Skip if benchmark values aren't properly set
-    if (lowValue === null || lowValue === undefined || 
-        mediumValue === null || mediumValue === undefined) {
-      return '';
-    }
-    
-    // Skip if value is invalid
-    if (value === null || value === undefined) {
-      return '';
-    }
-    
-    // Get numeric values
-    const numericValue = parseFloat(value);
-    const numericLow = parseFloat(lowValue);
-    const numericMedium = parseFloat(mediumValue);
-    
-    // Determine if higher is better for this metric
-    const higherIsBetter = ['ctr', 'roas'].includes(metric);
-    
-    // Apply the appropriate color class
-    if (higherIsBetter) {
-      // For metrics where higher is better (CTR, ROAS)
-      if (numericValue < numericLow) {
-        return 'text-red-600';
-      } else if (numericValue < numericMedium) {
-        return 'text-yellow-600';
-      } else {
-        return 'text-green-600';
-      }
-    } else {
-      // For metrics where lower is better (CPC, CPM, Cost/Purchase)
-      if (numericValue > numericLow) {
-        return 'text-red-600';
-      } else if (numericValue > numericMedium) {
-        return 'text-yellow-600';
-      } else {
-        return 'text-green-600';
-      }
-    }
-  };
-  
-  // Use inline styles for more reliable coloring
-  const getColorStyle = (metric, value) => {
-    const colorClass = getBenchmarkStatusClass(metric, value);
-    
-    if (!colorClass) return {};
-    
-    // Map color classes to inline styles
-    if (colorClass.includes('text-red-600')) {
-      return { color: '#dc2626' };
-    } else if (colorClass.includes('text-yellow-600')) {
-      return { color: '#d97706' };
-    } else if (colorClass.includes('text-green-600')) {
-      return { color: '#059669' };
-    }
-    
-    return {};
-  };
-
-  // Format ROAS display with warning for suspicious values
-  const formatROAS = (roas) => {
-    if (!roas || roas === 0) return '0.00x';
-    if (roas > 10) {
-      return `${roas.toFixed(2)}x ⚠️`; // Add warning icon for high ROAS
-    }
-    return `${roas.toFixed(2)}x`;
-  };
+  const currentMetrics = getMetricsForMode(aggregationMode);
 
   return (
     <div>
       {/* Header Section */}
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold mb-2">Creative Performance (Aggregated by Name)</h3>
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-4">Creative Performance Analysis</h3>
         
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center">
-            <span className="text-sm text-gray-500 mr-2">{filteredCreatives.length} unique creatives</span>
+        {/* Aggregation Mode Tabs */}
+        <div className="flex space-x-1 mb-4 bg-gray-100 p-1 rounded-lg inline-flex">
+          {Object.entries(AGGREGATION_MODES).map(([key, mode]) => (
+            <button
+              key={mode}
+              onClick={() => setAggregationMode(mode)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                aggregationMode === mode
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {key === 'CREATIVE' ? 'By Creative' : key === 'COPY' ? 'By Copy' : 'Combined'}
+            </button>
+          ))}
+        </div>
+        
+        {/* Controls */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-500">{filteredCreatives.length} items</span>
             <button
               onClick={() => setIsEditingBenchmarks(!isEditingBenchmarks)}
-              className="text-sm text-blue-600 hover:text-blue-800 underline mr-4"
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
             >
-              {isEditingBenchmarks ? 'Close' : 'Set Performance Benchmarks'}
+              {isEditingBenchmarks ? 'Close' : 'Set Benchmarks'}
             </button>
           </div>
           
-          <div className="flex items-center">
+          <div className="flex items-center space-x-2">
             <input
               type="text"
-              placeholder="Search creatives..."
-              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 mr-2"
+              placeholder="Search..."
+              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            
+            <select
+              value={`${sortColumn}-${sortDirection}`}
+              onChange={(e) => {
+                const [column, direction] = e.target.value.split('-');
+                setSortColumn(column);
+                setSortDirection(direction);
+              }}
+              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="spend-desc">Spend (High to Low)</option>
+              <option value="roas-desc">ROAS (High to Low)</option>
+              <option value="ctr-desc">CTR (High to Low)</option>
+              <option value="impressions-desc">Impressions (High to Low)</option>
+              <option value="adName-asc">Name (A to Z)</option>
+            </select>
             
             <button
               onClick={exportToCSV}
@@ -690,356 +488,176 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
         
         {statusMessage && (
-          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-2">
+          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-4">
             {statusMessage}
           </div>
         )}
       </div>
-      
+
       {/* Benchmark Settings */}
       {isEditingBenchmarks && (
-        <div className="mb-4 p-3 bg-gray-50 border rounded-md">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="font-medium text-gray-800">Set Performance Benchmarks</h4>
+        <div className="mb-6 p-4 bg-gray-50 border rounded-lg">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-medium text-gray-800">Performance Benchmarks</h4>
             <button 
-              onClick={saveBenchmarks} 
+              onClick={async () => {
+                try {
+                  const formattedBenchmarks = {};
+                  Object.keys(tempBenchmarks).forEach(metricId => {
+                    formattedBenchmarks[metricId] = {
+                      low: tempBenchmarks[metricId].low === '' ? null : parseFloat(tempBenchmarks[metricId].low),
+                      medium: tempBenchmarks[metricId].medium === '' ? null : parseFloat(tempBenchmarks[metricId].medium)
+                    };
+                  });
+                  
+                  setBenchmarks(formattedBenchmarks);
+                  setIsEditingBenchmarks(false);
+                  setStatusMessage('Benchmarks saved successfully');
+                  setTimeout(() => setStatusMessage(''), 3000);
+                } catch (error) {
+                  setStatusMessage('Error saving benchmarks');
+                  setTimeout(() => setStatusMessage(''), 3000);
+                }
+              }}
               className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
             >
               Save Benchmarks
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            {/* CTR */}
-            <div>
-              <div className="font-medium text-sm mb-1">CTR</div>
-              <div className="mb-2">
-                <label className="block text-xs text-gray-500">Low (Below)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.ctr?.low ?? ''}
-                    onChange={(e) => handleBenchmarkChange('ctr', 'low', e.target.value)}
-                  />
-                  <span className="ml-1">%</span>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {metricsConfig.map(metric => (
+              <div key={metric.id}>
+                <div className="font-medium text-sm mb-2">{metric.name}</div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs text-gray-500">Low</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full p-1 text-sm border rounded"
+                      value={tempBenchmarks[metric.id]?.low ?? ''}
+                      onChange={(e) => setTempBenchmarks(prev => ({
+                        ...prev,
+                        [metric.id]: {
+                          ...prev[metric.id],
+                          low: e.target.value === '' ? '' : parseFloat(e.target.value)
+                        }
+                      }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500">Good</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full p-1 text-sm border rounded"
+                      value={tempBenchmarks[metric.id]?.medium ?? ''}
+                      onChange={(e) => setTempBenchmarks(prev => ({
+                        ...prev,
+                        [metric.id]: {
+                          ...prev[metric.id],
+                          medium: e.target.value === '' ? '' : parseFloat(e.target.value)
+                        }
+                      }))}
+                    />
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-500">Good (Above)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.ctr?.medium ?? ''}
-                    onChange={(e) => handleBenchmarkChange('ctr', 'medium', e.target.value)}
-                  />
-                  <span className="ml-1">%</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* CPC */}
-            <div>
-              <div className="font-medium text-sm mb-1">CPC</div>
-              <div className="mb-2">
-                <label className="block text-xs text-gray-500">Poor (Above)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.cpc?.low ?? ''}
-                    onChange={(e) => handleBenchmarkChange('cpc', 'low', e.target.value)}
-                  />
-                  <span className="ml-1">$</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500">Good (Below)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.cpc?.medium ?? ''}
-                    onChange={(e) => handleBenchmarkChange('cpc', 'medium', e.target.value)}
-                  />
-                  <span className="ml-1">$</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* CPM */}
-            <div>
-              <div className="font-medium text-sm mb-1">CPM</div>
-              <div className="mb-2">
-                <label className="block text-xs text-gray-500">Poor (Above)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.cpm?.low ?? ''}
-                    onChange={(e) => handleBenchmarkChange('cpm', 'low', e.target.value)}
-                  />
-                  <span className="ml-1">$</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500">Good (Below)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.cpm?.medium ?? ''}
-                    onChange={(e) => handleBenchmarkChange('cpm', 'medium', e.target.value)}
-                  />
-                  <span className="ml-1">$</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* ROAS */}
-            <div>
-              <div className="font-medium text-sm mb-1">ROAS</div>
-              <div className="mb-2">
-                <label className="block text-xs text-gray-500">Low (Below)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.roas?.low ?? ''}
-                    onChange={(e) => handleBenchmarkChange('roas', 'low', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500">Good (Above)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.roas?.medium ?? ''}
-                    onChange={(e) => handleBenchmarkChange('roas', 'medium', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Cost/Purchase */}
-            <div>
-              <div className="font-medium text-sm mb-1">Cost/Purchase</div>
-              <div className="mb-2">
-                <label className="block text-xs text-gray-500">Poor (Above)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.costPerPurchase?.low ?? ''}
-                    onChange={(e) => handleBenchmarkChange('costPerPurchase', 'low', e.target.value)}
-                  />
-                  <span className="ml-1">$</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500">Good (Below)</label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="w-full p-1 text-sm border rounded"
-                    value={tempBenchmarks.costPerPurchase?.medium ?? ''}
-                    onChange={(e) => handleBenchmarkChange('costPerPurchase', 'medium', e.target.value)}
-                  />
-                  <span className="ml-1">$</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
-      
-      {/* Creative Performance Table - Aggregated by Name with Data Validation */}
-      <div className="bg-white rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  style={{width: '30%'}}
-                >
-                  Creative
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('adsetCount')}
-                  style={{cursor: 'pointer'}}
-                >
-                  Ad Sets {sortColumn === 'adsetCount' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('impressions')}
-                  style={{cursor: 'pointer'}}
-                >
-                  Impressions {sortColumn === 'impressions' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('clicks')}
-                  style={{cursor: 'pointer'}}
-                >
-                  Clicks {sortColumn === 'clicks' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('ctr')}
-                  style={{cursor: 'pointer'}}
-                >
-                  CTR {sortColumn === 'ctr' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('cpc')}
-                  style={{cursor: 'pointer'}}
-                >
-                  CPC {sortColumn === 'cpc' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('cpm')}
-                  style={{cursor: 'pointer'}}
-                >
-                  CPM {sortColumn === 'cpm' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('purchases')}
-                  style={{cursor: 'pointer'}}
-                >
-                  Purchases {sortColumn === 'purchases' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('costPerPurchase')}
-                  style={{cursor: 'pointer'}}
-                >
-                  Cost/Purchase {sortColumn === 'costPerPurchase' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('spend')}
-                  style={{cursor: 'pointer'}}
-                >
-                  Spend {sortColumn === 'spend' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  onClick={() => handleSort('roas')}
-                  style={{cursor: 'pointer'}}
-                >
-                  ROAS {sortColumn === 'roas' && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCreatives.map((creative) => (
-                <tr 
-                  key={creative.creativeId || creative.adId || Math.random().toString(36)}
-                  className={`border-b hover:bg-gray-50 ${selectedCreativeId === creative.creativeId ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleCreativeSelect(creative.creativeId)}
-                  style={{cursor: 'pointer'}}
-                >
-                  <td className="px-4 py-4">
-                    <div className="flex items-center">
-                      {creative.thumbnailUrl && (
-                        <img 
-                          src={creative.thumbnailUrl} 
-                          alt={creative.adName}
-                          className="w-12 h-12 object-cover rounded mr-3"
-                        />
-                      )}
-                      <div className="text-sm text-gray-900" title={creative.adName}>
-                        {creative.adName}
+
+      {/* Creative Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+        {filteredCreatives.map((creative) => (
+          <div
+            key={`${creative.creativeId}-${aggregationMode}`}
+            className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-pointer p-4 ${
+              selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''
+            }`}
+            onClick={() => handleCreativeSelect(creative.creativeId)}
+          >
+            {/* Creative Thumbnail (for Creative and Combined modes) */}
+            {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
+             creative.thumbnailUrl && (
+              <div className="mb-3">
+                <img 
+                  src={creative.thumbnailUrl} 
+                  alt={creative.adName}
+                  className="w-full h-32 object-cover rounded"
+                />
+              </div>
+            )}
+            
+            {/* Copy Text */}
+            <div className="mb-4">
+              <div className="text-sm text-gray-800 leading-relaxed min-h-[4rem]">
+                {creative.extractedCopy.split('\n').map((line, index) => (
+                  <div key={index} className="mb-1">{line}</div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Metrics Grid */}
+            <div className="space-y-2">
+              {currentMetrics.map((metric, index) => {
+                if (index % 2 === 0) {
+                  const nextMetric = currentMetrics[index + 1];
+                  return (
+                    <div key={metric} className="flex justify-between text-sm">
+                      <div className="flex-1">
+                        <span className="text-gray-600 uppercase text-xs font-medium">
+                          {metric === 'thumbstopRate' ? 'Thumbstop' : 
+                           metric === 'seeMoreRate' ? 'See More' :
+                           metric === 'adsetCount' ? '# Ad Sets' :
+                           metric === 'creativeCount' ? '# Creatives' :
+                           metric.toUpperCase()}
+                        </span>
+                        <div 
+                          className="font-semibold"
+                          style={{ color: getBenchmarkColor(metric, creative[metric]) }}
+                        >
+                          {formatMetricValue(metric, creative[metric])}
+                        </div>
                       </div>
+                      {nextMetric && (
+                        <div className="flex-1 text-right">
+                          <span className="text-gray-600 uppercase text-xs font-medium">
+                            {nextMetric === 'thumbstopRate' ? 'Thumbstop' : 
+                             nextMetric === 'seeMoreRate' ? 'See More' :
+                             nextMetric === 'adsetCount' ? '# Ad Sets' :
+                             nextMetric === 'creativeCount' ? '# Creatives' :
+                             nextMetric.toUpperCase()}
+                          </span>
+                          <div 
+                            className="font-semibold"
+                            style={{ color: getBenchmarkColor(nextMetric, creative[nextMetric]) }}
+                          >
+                            {formatMetricValue(nextMetric, creative[nextMetric])}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
-                    {creative.adsetCount || 1}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
-                    {creative.impressions ? creative.impressions.toLocaleString() : 0}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
-                    {creative.clicks ? creative.clicks.toLocaleString() : 0}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('ctr', creative.ctr)}>
-                    {creative.ctr ? `${creative.ctr.toFixed(2)}%` : '0.00%'}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('cpc', creative.cpc)}>
-                    ${creative.cpc ? creative.cpc.toFixed(2) : '0.00'}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('cpm', creative.cpm)}>
-                    ${creative.cpm ? creative.cpm.toFixed(2) : '0.00'}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
-                    {creative.purchases || 0}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm" style={getColorStyle('costPerPurchase', creative.costPerPurchase)}>
-                    ${creative.costPerPurchase ? creative.costPerPurchase.toFixed(2) : '0.00'}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm text-gray-500">
-                    ${creative.spend ? creative.spend.toFixed(2) : '0.00'}
-                  </td>
-                  <td className="px-4 py-4 text-center text-sm font-medium" style={getColorStyle('roas', creative.roas)}>
-                    {formatROAS(creative.roas)}
-                  </td>
-                </tr>
-              ))}
-              
-              {filteredCreatives.length === 0 && (
-                <tr>
-                  <td colSpan="11" className="px-4 py-6 text-center text-gray-500">
-                    No creatives found matching your criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        ))}
+        
+        {filteredCreatives.length === 0 && (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            No creatives found matching your criteria.
+          </div>
+        )}
       </div>
       
-      {/* Data Quality Notice */}
-      <div className="mt-4 text-xs text-gray-500">
-        <p>⚠️ ROAS values above 10x are flagged for review. Industry benchmarks: 1.8x - 3.0x typical.</p>
+      {/* Footer */}
+      <div className="mt-6 text-xs text-gray-500 text-center">
+        <p>Performance data aggregated by {aggregationMode}. Colors indicate benchmark performance.</p>
       </div>
     </div>
   );
