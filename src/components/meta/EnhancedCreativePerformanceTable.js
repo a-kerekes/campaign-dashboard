@@ -898,11 +898,11 @@ const extractAdCopy = (creative) => {
               e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
-            {/* Creative Thumbnail (for Creative and Combined modes) - SMALLER IMAGES */}
+            {/* Creative Thumbnail (for Creative and Combined modes) - REDUCE GAP TO TEXT */}
             {(aggregationMode === AGGREGATION_MODES.CREATIVE || aggregationMode === AGGREGATION_MODES.COMBINED) && 
              creative.thumbnailUrl && (
               <div style={{ 
-                marginBottom: '6px', // Reduced from 8px
+                marginBottom: '2px', // Reduced from 6px to 2px - much smaller gap to text
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -972,7 +972,7 @@ const extractAdCopy = (creative) => {
             
             {/* Copy Text - Only show in Copy and Combined modes */}
             {aggregationMode !== AGGREGATION_MODES.CREATIVE && (
-              <div style={{ marginBottom: '8px', flex: '1' }}>
+              <div style={{ marginBottom: '4px', flex: '1' }}> {/* Reduced from 8px to 4px */}
                 <div style={{
                   fontSize: '13px',
                   color: '#374151',
@@ -987,12 +987,12 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Metrics Grid - ELIMINATE BOTTOM WHITE SPACE */}
+            {/* Metrics Grid - KEEP TEXT READABLE BUT REDUCE GAPS */}
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column', 
-              gap: '4px',  // Further reduced from 6px
-              marginTop: 'auto' // Push metrics to bottom to eliminate white space
+              gap: '5px',  // Increased from 4px to 5px for better readability
+              marginTop: 'auto'
             }}>
               {currentMetrics.map((metric, index) => {
                 if (index % 2 === 0) {
@@ -1001,7 +1001,7 @@ const extractAdCopy = (creative) => {
                     <div key={metric} style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      fontSize: '11px'
+                      fontSize: '11px' // Keep text size readable
                     }}>
                       <div style={{ flex: '1', paddingRight: '6px' }}>
                         <div style={{
