@@ -31,7 +31,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
 
-  // Copy extraction function - FIXED to get actual ad copy
+  // Copy extraction function - ENHANCED to get more actual ad copy
   const extractAdCopy = (creative) => {
     let copyText = null;
     
@@ -41,78 +41,117 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         creative.objectStorySpec.page_post?.message ||
         creative.objectStorySpec.link_data?.message ||
         creative.objectStorySpec.link_data?.description ||
+        creative.objectStorySpec.link_data?.call_to_action?.value?.text ||
         creative.objectStorySpec.video_data?.message ||
+        creative.objectStorySpec.video_data?.description ||
         creative.objectStorySpec.photo_data?.message ||
-        creative.objectStorySpec.text_data?.message;
+        creative.objectStorySpec.text_data?.message ||
+        creative.objectStorySpec.template_data?.message;
     }
     
-    // If no actual copy found, try to extract from ad name parts
+    // Second priority: Look for common copy patterns in ad name
     if (!copyText && creative.adName) {
-      // Try to extract meaningful copy from ad name by removing technical parts
       const adName = creative.adName;
       
-      // Remove common technical suffixes and prefixes
-      let cleanedName = adName
-        .replace(/\s*\|\s*(VID|IMG|24_|25_|mof\d+).*$/i, '') // Remove everything after | VID/IMG/technical codes
-        .replace(/^.*Homepage\s*\|\s*/i, '') // Remove Homepage prefix
-        .replace(/\s*-\s*(NVT|UN|HMP).*$/i, '') // Remove technical suffixes
-        .replace(/\s*\|\s*Copy.*$/i, '') // Remove Copy suffixes
-        .trim();
+      // Extract meaningful copy patterns from ad names
+      let cleanedName = adName;
       
-      // If we got something meaningful, use it
-      if (cleanedName.length > 10) {
-        copyText = cleanedName;
+      // Pattern 1: Remove everything after | and technical codes
+      cleanedName = cleanedName.replace(/\s*\|\s*(VID|IMG|GIF|24_|25_|mof\d+).*$/i, '');
+      
+      // Pattern 2: Remove Homepage prefix
+      cleanedName = cleanedName.replace(/^.*Homepage\s*\|\s*/i, '');
+      
+      // Pattern 3: Remove technical suffixes
+      cleanedName = cleanedName.replace(/\s*-\s*(NVT|UN|HMP|PRF|PA).*$/i, '');
+      
+      // Pattern 4: Remove Copy Customer/Satisfaction suffixes
+      cleanedName = cleanedName.replace(/\s*\|\s*Copy\s+(Customer|Satisfaction).*$/i, '');
+      
+      // Pattern 5: Extract customer review/testimonial patterns
+      const reviewMatch = adName.match(/(customer review|review)\s+(.+?)(?:\s*\|\s*|$)/i);
+      if (reviewMatch && reviewMatch[2]) {
+        copyText = reviewMatch[2].trim();
+      }
+      
+      // Pattern 6: Extract star rating + text patterns
+      const starMatch = adName.match(/⭐+\s*"?([^"]+)"?/);
+      if (starMatch && starMatch[1]) {
+        copyText = starMatch[1].trim();
+      }
+      
+      // If we got something meaningful from cleaning, use it
+      if (!copyText && cleanedName.length > 10 && cleanedName !== adName) {
+        copyText = cleanedName.trim();
+      }
+    }
+    
+    // Third priority: Try to extract quoted text from ad name
+    if (!copyText && creative.adName) {
+      const quotedMatch = creative.adName.match(/"([^"]+)"/);
+      if (quotedMatch && quotedMatch[1].length > 10) {
+        copyText = quotedMatch[1];
       }
     }
     
     // Final fallback
-    if (!copyText || copyText.length < 10) {
+    if (!copyText || copyText.length < 5) {
       copyText = creative.adName || 'No copy available';
     }
     
-    // Process the copy text to extract 3 lines
-    const lines = copyText
-      .split(/[\n\r]+/)
-      .filter(line => line.trim())
-      .slice(0, 3);
+    // Process the copy text to format as 3 lines
+    return formatCopyText(copyText);
+  };
+  
+  // Helper function to format copy text into 3 lines
+  const formatCopyText = (text) => {
+    if (!text) return 'No copy available';
     
-    // If we have multiple lines, join them
-    if (lines.length > 1) {
-      return lines.join('\n');
+    // Clean up the text
+    text = text.trim();
+    
+    // If text has line breaks, use them
+    const existingLines = text.split(/[\n\r]+/).filter(line => line.trim());
+    if (existingLines.length >= 2) {
+      return existingLines.slice(0, 3).join('\n');
     }
     
-    // If single line, try to break it into sentences and limit to ~150 chars for 3 lines
-    const singleLine = lines[0] || copyText;
-    if (singleLine.length > 150) {
-      // Try to break at sentence boundaries
-      const sentences = singleLine
-        .split(/[.!?]+/)
-        .filter(s => s.trim())
-        .slice(0, 2);
+    // If single line is very long, break it intelligently
+    if (text.length > 120) {
+      // Try to break at sentence boundaries first
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim());
+      if (sentences.length >= 2) {
+        let result = sentences[0].trim();
+        if (sentences[1] && (result + sentences[1]).length < 150) {
+          result += '. ' + sentences[1].trim();
+        }
+        if (sentences[2] && (result + sentences[2]).length < 200) {
+          result += '. ' + sentences[2].trim();
+        }
+        return result.endsWith('.') ? result : result + '.';
+      }
       
-      if (sentences.length > 1) {
-        const result = sentences.join('. ').trim();
-        return result.length > 150 ? result.substring(0, 150) + '...' : result + '.';
-      } else {
-        // Break at word boundaries for long single sentence
-        const words = singleLine.split(' ');
-        let result = '';
-        let lineCount = 0;
+      // Break at word boundaries, roughly 40-50 chars per line
+      const words = text.split(' ');
+      let lines = ['', '', ''];
+      let currentLine = 0;
+      
+      for (const word of words) {
+        if (currentLine >= 3) break;
         
-        for (const word of words) {
-          if ((result + word).length > 50 * (lineCount + 1)) {
-            result += '\n';
-            lineCount++;
-            if (lineCount >= 3) break;
-          }
-          result += (result.endsWith('\n') ? '' : ' ') + word;
+        if (lines[currentLine].length + word.length + 1 > 50 && lines[currentLine].length > 0) {
+          currentLine++;
+          if (currentLine >= 3) break;
         }
         
-        return result.length > 150 ? result.substring(0, 150) + '...' : result;
+        lines[currentLine] += (lines[currentLine] ? ' ' : '') + word;
       }
+      
+      return lines.filter(line => line.trim()).join('\n');
     }
     
-    return singleLine;
+    // For shorter text, return as is
+    return text;
   };
 
   // Data cleaning functions
@@ -468,7 +507,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const currentMetrics = getMetricsForMode(aggregationMode);
 
   return (
-    <div style={{ width: '100%', padding: '24px', paddingRight: '48px' }}>
+    <div style={{ 
+      width: '100%', 
+      maxWidth: '1400px', 
+      margin: '0 auto', 
+      padding: '24px'
+    }}>
       {/* Header Section */}
       <div style={{ marginBottom: '24px' }}>
         <h3 style={{ 
@@ -723,8 +767,17 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     height: '120px',
                     objectFit: 'cover',
                     borderRadius: '6px',
-                    imageRendering: 'auto',
-                    filter: 'none'
+                    imageRendering: 'crisp-edges',
+                    imageRendering: '-webkit-optimize-contrast',
+                    filter: 'contrast(1.1) brightness(1.02)',
+                    backgroundColor: '#f9fafb'
+                  }}
+                  onError={(e) => {
+                    e.target.style.backgroundColor = '#e5e7eb';
+                    e.target.style.display = 'flex';
+                    e.target.style.alignItems = 'center';
+                    e.target.style.justifyContent = 'center';
+                    e.target.innerHTML = '🖼️';
                   }}
                 />
               </div>
