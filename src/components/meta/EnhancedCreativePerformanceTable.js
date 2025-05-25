@@ -960,20 +960,22 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Copy Text - NO AD NAME SHOWN */}
-            <div style={{ marginBottom: '16px', flex: '1' }}>
-              <div style={{
-                fontSize: '14px',
-                color: '#374151',
-                lineHeight: '1.5',
-                minHeight: '60px',
-                fontWeight: '400'
-              }}>
-                {creative.extractedCopy.split('\n').map((line, index) => (
-                  <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
-                ))}
-              </div>
-            </div>
+            {/* Copy Text - Only show in Copy and Combined modes */}
+{aggregationMode !== AGGREGATION_MODES.CREATIVE && (
+  <div style={{ marginBottom: '16px', flex: '1' }}>
+    <div style={{
+      fontSize: '14px',
+      color: '#374151',
+      lineHeight: '1.5',
+      minHeight: '60px',
+      fontWeight: '400'
+    }}>
+      {creative.extractedCopy.split('\n').map((line, index) => (
+        <div key={index} style={{ marginBottom: '4px' }}>{line}</div>
+      ))}
+    </div>
+  </div>
+)}
             
             {/* Metrics Grid */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
