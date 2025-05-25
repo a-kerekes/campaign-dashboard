@@ -260,11 +260,31 @@ try {
         {
           params: {
             access_token: accessToken,
-            fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
-            limit: 100 // Increased from 50 to get more ads
+            fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec},adset{name}',
+            limit: 100
           }
         }
-      )
+      );
+
+      // 3b. NEW: Fetch creative library for better video quality
+      const creativesResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops',
+            limit: 100
+          }
+        }
+      );
+
+      // Create a lookup map for creative library data
+      const creativesMap = {};
+      if (creativesResponse.data.data) {
+        creativesResponse.data.data.forEach(creative => {
+          creativesMap[creative.id] = creative;
+        });
+      }
       
       // Get all the ad IDs to use for filtering insights
       const ads = adsResponse.data.data;
@@ -324,19 +344,24 @@ try {
             ? parseFloat(insight.spend) / purchases 
             : 0;
           
-            return {
-              adId: ad.id,
-              adName: ad.name,
-              adsetName: ad.adset ? ad.adset.name : 'Unknown',
-              creativeId: ad.creative.id,
-  // Enhanced thumbnail logic for both images and videos
-  thumbnailUrl: ad.creative.image_url || 
-              ad.creative.thumbnail_url || 
-              (ad.creative.object_story_spec?.video_data?.image_url) ||
-              (ad.creative.object_story_spec?.video_data?.thumbnail_url) ||
-              (ad.creative.object_story_spec?.link_data?.picture) ||
-              null,
-  objectStorySpec: ad.creative.object_story_spec || null,
+          return {
+            adId: ad.id,
+            adName: ad.name,
+            adsetName: ad.adset ? ad.adset.name : 'Unknown',
+            creativeId: ad.creative.id,
+            // Enhanced thumbnail logic using Creative Library
+            thumbnailUrl: (() => {
+              const creativeLibData = creativesMap[ad.creative.id];
+              return creativeLibData?.image_url ||           // Creative Library high-res
+                     ad.creative.image_url ||                // Ads API image
+                     creativeLibData?.thumbnail_url ||       // Creative Library thumbnail  
+                     ad.creative.thumbnail_url ||            // Ads API thumbnail
+                     (creativeLibData?.object_story_spec?.video_data?.image_url) ||
+                     (ad.creative.object_story_spec?.video_data?.image_url) ||
+                     (ad.creative.object_story_spec?.link_data?.picture) ||
+                     null;
+            })(),
+            objectStorySpec: ad.creative.object_story_spec || null,
             accountId: selectedAccountId, // Add this to track which account each creative belongs to
             impressions: insight ? parseInt(insight.impressions || 0) : 0,
             clicks: insight ? parseInt(insight.clicks || 0) : 0,
