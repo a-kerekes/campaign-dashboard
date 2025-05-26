@@ -1,4 +1,4 @@
-// src/components/meta/AiAdvisor.js (Enhanced with Multiple Data Sources)
+// src/components/meta/AiAdvisor.js (Enhanced with Creative Analysis)
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   checkServerRunning, 
@@ -36,6 +36,52 @@ const AiAdvisor = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Helper function to extract Post ID from ad names
+  const extractPostId = (adName) => {
+    if (!adName) return null;
+    
+    const patterns = [
+      /\|\s*(\d{10,})\s*$/,
+      /\|\s*[\w\-_]+\s*\|\s*(\d{10,})\s*$/,
+      /(\d{13,})/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = adName.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  // Helper function to extract creative metadata from ad names
+  const extractCreativeMetadata = (adName) => {
+    if (!adName) return {};
+    
+    return {
+      adType: adName.includes('VID') ? 'VID' : adName.includes('IMG') ? 'IMG' : 'GIF',
+      style: adName.includes('slideshow') ? 'slideshow' : 
+             adName.includes('features') ? 'features' :
+             adName.includes('compare') ? 'comparison' :
+             adName.includes('motion') ? 'motion' :
+             adName.includes('static') ? 'static' : 'unknown',
+      theme: adName.toLowerCase().includes('review') ? 'testimonial' :
+             adName.toLowerCase().includes('customer') ? 'testimonial' :
+             adName.toLowerCase().includes('money') ? 'product-focused' :
+             adName.toLowerCase().includes('calorie') ? 'benefit-focused' :
+             adName.toLowerCase().includes('booty') ? 'benefit-focused' :
+             adName.toLowerCase().includes('mother') ? 'emotional' :
+             adName.toLowerCase().includes('galentines') ? 'emotional' : 'unknown',
+      duration: adName.includes('15s') ? '15s' : 
+                adName.includes('30s') ? '30s' : 
+                adName.includes('60s') ? '60s' : 'unknown',
+      format: adName.includes('9x16') ? '9:16' :
+              adName.includes('4x5') ? '4:5' :
+              adName.includes('1x1') ? '1:1' : 'unknown'
+    };
+  };
 
   // Handle checking/starting the serverless function
   const handleStartServer = async () => {
@@ -111,7 +157,9 @@ const AiAdvisor = ({
       lowerCaseContent.includes('video') || 
       lowerCaseContent.includes('ad copy') || 
       lowerCaseContent.includes('best performing ad') || 
-      lowerCaseContent.includes('worst performing ad');
+      lowerCaseContent.includes('worst performing ad') ||
+      lowerCaseContent.includes('visual') ||
+      lowerCaseContent.includes('design');
     
     // Check for general analytics terms
     const isAskingAboutAnalytics = 
@@ -159,10 +207,37 @@ const AiAdvisor = ({
         contextData.audience = audienceInsightsData;
       }
       
-      // Add creative performance data if available
-      if (creativePerformanceData) {
-        // If we have detailed creative data, include it
-        contextData.creatives = creativePerformanceData;
+      // Prepare creative analysis data if available and relevant
+      let creativeAnalysisData = null;
+      if (dataInterest.creatives && creativePerformanceData && creativePerformanceData.length > 0) {
+        // Filter and enhance creative data
+        const videoCreatives = creativePerformanceData
+          .filter(c => c.adName?.includes('VID') && (c.spend || 0) > 50) // Only significant spend videos
+          .map(c => ({
+            postId: extractPostId(c.adName),
+            roas: c.roas || 0,
+            ctr: c.ctr || 0,
+            spend: c.spend || 0,
+            adName: c.adName,
+            metadata: extractCreativeMetadata(c.adName)
+          }));
+
+        const imageCreatives = creativePerformanceData
+          .filter(c => c.adName?.includes('IMG') && c.thumbnailUrl && (c.spend || 0) > 50) // Only images with thumbnails and significant spend
+          .map(c => ({
+            postId: extractPostId(c.adName),
+            thumbnailUrl: c.thumbnailUrl,
+            roas: c.roas || 0,
+            ctr: c.ctr || 0,
+            spend: c.spend || 0,
+            adName: c.adName,
+            metadata: extractCreativeMetadata(c.adName)
+          }));
+
+        creativeAnalysisData = {
+          videoCreatives,
+          imageCreatives
+        };
       }
       
       // Create a system prompt that includes relevant data based on user's question
@@ -172,12 +247,6 @@ const AiAdvisor = ({
       if (dataInterest.audience && audienceInsightsData) {
         systemPrompt += `\n\nRegarding audience insights, here's the data I have access to:
         ${JSON.stringify(contextData.audience, null, 2)}`;
-      }
-      
-      // If asking about creative performance and we have that data
-      if (dataInterest.creatives && creativePerformanceData) {
-        systemPrompt += `\n\nRegarding creative performance, here's the data I have access to:
-        ${JSON.stringify(contextData.creatives, null, 2)}`;
       }
       
       // Always include general analytics
@@ -202,6 +271,7 @@ const AiAdvisor = ({
       7. When giving recommendations, be specific and actionable
       8. Use bullet points for lists and recommendations, rather than long paragraphs
       9. IMPORTANT: Keep your responses BRIEF. Aim for 3-5 sentences maximum for most responses.
+      10. When analyzing creatives, focus on performance patterns and actionable insights
       
       Remember that you're having a conversation with the user about their specific Meta ad account performance. You have access to data from multiple sections of their dashboard: general analytics, audience insights (demographics, platforms, etc.), and creative performance (individual ads and their metrics).`;
       
@@ -214,12 +284,22 @@ const AiAdvisor = ({
       
       console.log('Sending request to:', API_URL);
       
+      // Prepare the API request payload
+      const requestPayload = {
+        messages: conversationHistory
+      };
+
+      // Add creative analysis data if available
+      if (creativeAnalysisData) {
+        requestPayload.creativeAnalysisData = creativeAnalysisData;
+      }
+      
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: conversationHistory }),
+        body: JSON.stringify(requestPayload),
       });
       
       if (!response.ok) {
@@ -416,7 +496,7 @@ const AiAdvisor = ({
       </div>
       
       <div style={{marginTop: "12px", fontSize: "14px", color: "#666"}}>
-        Try asking: "Which creative is performing best?" or "Tell me about my audience demographics"
+        Try asking: "Which creative is performing best?" or "Analyze my video vs image performance" or "What visual elements work best?"
       </div>
     </div>
   );
