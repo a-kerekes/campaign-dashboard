@@ -768,7 +768,7 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
       const endpoint = `act_${adAccountId}/ads`;
       const params = {
         fields: `id,name,status,created_time,effective_status,insights.date_preset(${datePreset}){impressions,clicks,spend,ctr,cpc}`,
-        limit: 1000, // Adjust based on your needs
+        limit: 500, // Adjust based on your needs
         app_id: FACEBOOK_APP_ID // Explicitly include app ID
       };
       
@@ -927,7 +927,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       fields: 'impressions,clicks,spend,ctr,cpc,date_start,actions,action_values,cost_per_action_type',
       level: 'account',
       // ADDITIONAL FIX: Add limit to ensure we get all data
-      limit: 1000
+      limit: 500
     };
     
     console.log(`🐛 DEBUG: API params being sent:`, params);
