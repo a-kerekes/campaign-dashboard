@@ -237,7 +237,7 @@ try {
             }),
             fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
             level: 'account',
-            limit: 100
+            limit: 1000
           }
         }
       );
@@ -249,7 +249,7 @@ try {
           params: {
             access_token: accessToken,
             fields: 'name,status,objective',
-            limit: 100
+            limit: 1000
           }
         }
       );
@@ -261,7 +261,7 @@ try {
           params: {
             access_token: accessToken,
             fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec},adset{name}',
-            limit: 100
+            limit: 1000
           }
         }
       );
@@ -273,7 +273,7 @@ try {
           params: {
             access_token: accessToken,
             fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops',
-            limit: 100
+            limit: 1000
           }
         }
       );
@@ -311,7 +311,7 @@ try {
               since,
               until
             }),
-            limit: 500
+            limit: 1000
           }
         }
       );

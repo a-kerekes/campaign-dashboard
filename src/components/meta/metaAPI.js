@@ -768,7 +768,7 @@ export async function getMetaAdDataByTenant(tenantId, dateRange = 'Last 30 Days'
       const endpoint = `act_${adAccountId}/ads`;
       const params = {
         fields: `id,name,status,created_time,effective_status,insights.date_preset(${datePreset}){impressions,clicks,spend,ctr,cpc}`,
-        limit: 25, // Adjust based on your needs
+        limit: 1000, // Adjust based on your needs
         app_id: FACEBOOK_APP_ID // Explicitly include app ID
       };
       
