@@ -161,7 +161,10 @@ const AiAdvisor = ({
       lowerCaseContent.includes('visual') ||
       lowerCaseContent.includes('design') ||
       lowerCaseContent.includes('analyze') ||
-      lowerCaseContent.includes('thumbnail');
+      lowerCaseContent.includes('thumbnail') ||
+      lowerCaseContent.includes('top performing') ||
+      lowerCaseContent.includes('successful') ||
+      lowerCaseContent.includes('element');
     
     // Check for general analytics terms
     const isAskingAboutAnalytics = 
@@ -188,6 +191,14 @@ const AiAdvisor = ({
       
       // Detect what kind of data the user is asking about
       const dataInterest = detectDataInterest(userMessage.content);
+      
+      // 🚨 DEBUG: Log detection results
+      console.log('🔍 DATA INTEREST DETECTION:', {
+        userMessage: userMessage.content,
+        dataInterest,
+        hasCreativePerformanceData: !!creativePerformanceData,
+        creativePerformanceDataLength: creativePerformanceData?.length || 0
+      });
       
       // Prepare context data for the system prompt
       let contextData = {};

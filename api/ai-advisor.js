@@ -63,14 +63,38 @@ export default async function handler(req, res) {
                          msg.content.toLowerCase().includes('compare')
                        );
     
+    // Add enhanced debug logging
+    console.log('🔍 VISION DEBUG:', {
+      needsVision,
+      imageAnalysisDataLength: imageAnalysisData.length,
+      chatMessagesWithKeywords: chatMessages.filter(msg => 
+        msg.content.toLowerCase().includes('image') || 
+        msg.content.toLowerCase().includes('visual') ||
+        msg.content.toLowerCase().includes('analyze')
+      ),
+      sampleImageUrl: imageAnalysisData[0]?.thumbnailUrl
+    });
+    
     let response;
     
     if (needsVision && imageAnalysisData.length > 0) {
       console.log(`🎨 Using vision analysis for ${imageAnalysisData.length} images`);
+      console.log('🔍 Sample thumbnail URLs:', imageAnalysisData.slice(0, 3).map(c => c.thumbnailUrl));
+      
       // Use Claude with vision for image analysis
       response = await analyzeCreativesWithVision(anthropic, systemMessage, chatMessages, imageAnalysisData);
     } else {
       console.log('📝 Using text-only analysis');
+      console.log('🔍 Vision not triggered because:', {
+        needsVision,
+        imageCount: imageAnalysisData.length,
+        keywordMatch: chatMessages.some(msg => 
+          msg.content.toLowerCase().includes('image') || 
+          msg.content.toLowerCase().includes('visual') ||
+          msg.content.toLowerCase().includes('analyze')
+        )
+      });
+      
       // Standard text-only analysis
       response = await anthropic.messages.create({
         model: 'claude-3-haiku-20240307',
@@ -385,6 +409,7 @@ async function analyzeCreativesWithVision(anthropic, systemMessage, chatMessages
     for (const [index, creative] of imagesToAnalyze.entries()) {
       try {
         console.log(`📸 Processing image ${index + 1}: Post ID ${creative.postId || creative.creativeId}`);
+        console.log(`🌐 Image URL: ${creative.thumbnailUrl}`);
         
         // Fetch and encode image
         const imageBase64 = await fetchAndEncodeImage(creative.thumbnailUrl);
@@ -396,10 +421,9 @@ Performance Data:
 - Post ID: ${creative.postId || creative.creativeId}
 - ROAS: ${(creative.roas || 0).toFixed(2)}x
 - CTR: ${(creative.ctr || 0).toFixed(2)}%
-- Spend: ${(creative.spend || 0).toFixed(2)}
-- Ad Copy: ${creative.adCopyText || 'Not available'}
-- Headline: ${creative.headline || 'Not available'}
-- Call to Action: ${creative.callToAction || 'Not available'}
+- Spend: $${(creative.spend || 0).toFixed(2)}
+- Impressions: ${(creative.impressions || 0).toLocaleString()}
+- Clicks: ${(creative.clicks || 0).toLocaleString()}
 
 Please analyze the visual elements that might contribute to this performance level. Look at:
 1. Color scheme and visual appeal
@@ -430,15 +454,14 @@ Please analyze the visual elements that might contribute to this performance lev
         console.log(`✅ Successfully added image ${index + 1} to analysis`);
         
       } catch (imageError) {
-        console.error(`❌ Error processing image for Post ID ${creative.postId || creative.creativeId}:`, imageError);
+        console.error(`❌ Error processing image for Post ID ${creative.postId || creative.creativeId}:`, imageError.message);
         
         // Add text-only analysis for failed images
         visionMessages.push({
           role: "user",
-          content: `Unable to load image for Post ID ${creative.postId || creative.creativeId}, but here's the performance data:
-          ROAS: ${(creative.roas || 0).toFixed(2)}x, CTR: ${(creative.ctr || 0).toFixed(2)}%, Spend: ${(creative.spend || 0).toFixed(2)}
-          Ad Copy: ${creative.adCopyText || 'Not available'}
-          Please provide insights based on the available text data.`
+          content: `Unable to load image for Post ID ${creative.postId || creative.creativeId} (${imageError.message}), but here's the performance data:
+          ROAS: ${(creative.roas || 0).toFixed(2)}x, CTR: ${(creative.ctr || 0).toFixed(2)}%, Spend: $${(creative.spend || 0).toFixed(2)}
+          Please provide insights based on the available performance data and suggest what visual elements might improve performance.`
         });
       }
     }
