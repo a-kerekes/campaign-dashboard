@@ -159,7 +159,9 @@ const AiAdvisor = ({
       lowerCaseContent.includes('best performing ad') || 
       lowerCaseContent.includes('worst performing ad') ||
       lowerCaseContent.includes('visual') ||
-      lowerCaseContent.includes('design');
+      lowerCaseContent.includes('design') ||
+      lowerCaseContent.includes('analyze') ||
+      lowerCaseContent.includes('thumbnail');
     
     // Check for general analytics terms
     const isAskingAboutAnalytics = 
@@ -210,9 +212,21 @@ const AiAdvisor = ({
       // Prepare creative analysis data if available and relevant
       let creativeAnalysisData = null;
       if (dataInterest.creatives && creativePerformanceData && creativePerformanceData.length > 0) {
-        // Filter and enhance creative data
+        
+        // 🚨 DEBUG: Log what we're receiving
+        console.log('🔍 AI ADVISOR CREATIVE DEBUG:', {
+          totalCreatives: creativePerformanceData.length,
+          creativesWithThumbnails: creativePerformanceData.filter(c => c.thumbnailUrl).length,
+          sampleCreativeWithThumbnail: creativePerformanceData.find(c => c.thumbnailUrl),
+          adNamePatterns: creativePerformanceData.slice(0, 5).map(c => c.adName)
+        });
+        
+        // Filter and enhance creative data - RELAXED FILTERS
         const videoCreatives = creativePerformanceData
-          .filter(c => c.adName?.includes('VID') && (c.spend || 0) > 50) // Only significant spend videos
+          .filter(c => 
+            (c.adName?.includes('VID') || c.adName?.includes('video') || c.adName?.includes('Video')) && 
+            (c.spend || 0) > 10  // Lowered spend threshold
+          )
           .map(c => ({
             postId: extractPostId(c.adName),
             roas: c.roas || 0,
@@ -223,7 +237,13 @@ const AiAdvisor = ({
           }));
 
         const imageCreatives = creativePerformanceData
-          .filter(c => c.adName?.includes('IMG') && c.thumbnailUrl && (c.spend || 0) > 50) // Only images with thumbnails and significant spend
+          .filter(c => 
+            c.thumbnailUrl && // Must have thumbnail
+            (c.spend || 0) > 10  // Lowered spend threshold to $10
+            // Removed the 'IMG' requirement since your ads might not follow this naming pattern
+          )
+          .sort((a, b) => (b.spend || 0) - (a.spend || 0)) // Sort by spend descending
+          .slice(0, 20) // Take top 20 by spend to avoid overwhelming the AI
           .map(c => ({
             postId: extractPostId(c.adName),
             thumbnailUrl: c.thumbnailUrl,
@@ -231,8 +251,18 @@ const AiAdvisor = ({
             ctr: c.ctr || 0,
             spend: c.spend || 0,
             adName: c.adName,
-            metadata: extractCreativeMetadata(c.adName)
+            metadata: extractCreativeMetadata(c.adName),
+            impressions: c.impressions || 0,
+            clicks: c.clicks || 0
           }));
+
+        // 🚨 DEBUG: Log what we're sending to AI
+        console.log('🔍 SENDING TO AI:', {
+          videoCreatives: videoCreatives.length,
+          imageCreatives: imageCreatives.length,
+          sampleImageCreative: imageCreatives[0],
+          allThumbnailUrls: imageCreatives.map(c => c.thumbnailUrl).slice(0, 3)
+        });
 
         creativeAnalysisData = {
           videoCreatives,
