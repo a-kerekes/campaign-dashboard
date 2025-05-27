@@ -220,16 +220,17 @@ const AiAdvisor = ({
         contextData.audience = audienceInsightsData;
       }
       
-      // Prepare creative analysis data if available and relevant
+      // 🔧 SIMPLIFIED: Always prepare creative analysis data if we have creative performance data
       let creativeAnalysisData = null;
-      if (dataInterest.creatives && creativePerformanceData && creativePerformanceData.length > 0) {
+      if (creativePerformanceData && creativePerformanceData.length > 0) {
         
         // 🚨 DEBUG: Log what we're receiving
         console.log('🔍 AI ADVISOR CREATIVE DEBUG:', {
           totalCreatives: creativePerformanceData.length,
           creativesWithThumbnails: creativePerformanceData.filter(c => c.thumbnailUrl).length,
           sampleCreativeWithThumbnail: creativePerformanceData.find(c => c.thumbnailUrl),
-          adNamePatterns: creativePerformanceData.slice(0, 5).map(c => c.adName)
+          adNamePatterns: creativePerformanceData.slice(0, 5).map(c => c.adName),
+          sampleROAS: creativePerformanceData.slice(0, 3).map(c => ({ adName: c.adName, roas: c.roas }))
         });
         
         // Filter and enhance creative data - RELAXED FILTERS
@@ -275,6 +276,7 @@ const AiAdvisor = ({
           allThumbnailUrls: imageCreatives.map(c => c.thumbnailUrl).slice(0, 3)
         });
 
+        // 🔧 ALWAYS create creativeAnalysisData if we have any creatives
         creativeAnalysisData = {
           videoCreatives,
           imageCreatives
@@ -330,10 +332,22 @@ const AiAdvisor = ({
         messages: conversationHistory
       };
 
-      // Add creative analysis data if available
+      // 🔧 ALWAYS add creative analysis data if available (simplified logic)
       if (creativeAnalysisData) {
         requestPayload.creativeAnalysisData = creativeAnalysisData;
       }
+      
+      // 🚨 DEBUG: Log what we're actually sending to the API
+      console.log('🚨 API PAYLOAD DEBUG:', {
+        hasCreativeAnalysisData: !!creativeAnalysisData,
+        creativeAnalysisDataValue: creativeAnalysisData,
+        dataInterestCreatives: dataInterest.creatives,
+        hasCreativePerformanceData: !!creativePerformanceData,
+        creativePerformanceDataLength: creativePerformanceData?.length || 0,
+        payloadKeys: Object.keys(requestPayload),
+        imageCreativesCount: creativeAnalysisData?.imageCreatives?.length || 0,
+        videoCreativesCount: creativeAnalysisData?.videoCreatives?.length || 0
+      });
       
       const response = await fetch(API_URL, {
         method: 'POST',
