@@ -304,8 +304,36 @@ const CreativeAnalyticsDashboard = () => {
         });
       }
 
-      // 4. Fetch ad insights for performance data
-      const adInsightsResponse = await axios.get(
+// 4. Fetch ad insights for performance data - WITH BATCHING
+console.log('🔍 Fetching ad insights with batching...');
+let adInsightsResponse = { data: { data: [] } };
+
+try {
+  // Get all ad IDs
+  const allAdIds = ads.map(ad => ad.id);
+  console.log(`📊 Need insights for ${allAdIds.length} ads`);
+  
+  // Batch the requests - Meta API can handle ~50 ads per request
+  const batchSize = 50;
+  const batches = [];
+  
+  for (let i = 0; i < allAdIds.length; i += batchSize) {
+    const batchAdIds = allAdIds.slice(i, i + batchSize);
+    batches.push(batchAdIds);
+  }
+  
+  console.log(`📦 Split into ${batches.length} batches of ~${batchSize} ads each`);
+  
+  // Process each batch
+  const allInsightsData = [];
+  
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batchAdIds = batches[batchIndex];
+    
+    try {
+      console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
+      
+      const batchResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
         {
           params: {
@@ -316,10 +344,50 @@ const CreativeAnalyticsDashboard = () => {
             }),
             fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
             level: 'ad',
-            limit: 500
+            filtering: JSON.stringify([
+              {
+                field: 'ad.id',
+                operator: 'IN',
+                value: batchAdIds
+              }
+            ]),
+            limit: batchSize
           }
         }
       );
+      
+      if (batchResponse.data && batchResponse.data.data) {
+        allInsightsData.push(...batchResponse.data.data);
+        console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
+      }
+      
+      // Add a small delay between batches to avoid rate limiting
+      if (batchIndex < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+    } catch (batchError) {
+      console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
+      // Continue with other batches even if one fails
+    }
+  }
+  
+  // Reconstruct the response format
+  adInsightsResponse = {
+    data: {
+      data: allInsightsData
+    }
+  };
+  
+  console.log(`🎉 Successfully fetched insights for ${allInsightsData.length} ads total`);
+  
+} catch (insightsError) {
+  console.error('❌ Error fetching ad insights:', insightsError);
+  console.log('⚠️  Continuing without individual ad insights - will use aggregated data');
+  
+  // Fallback: continue without ad-level insights
+  adInsightsResponse = { data: { data: [] } };
+}
 
       // Extract ads from response
       const ads = adsResponse.data.data;
