@@ -392,74 +392,99 @@ const CreativeAnalyticsDashboard = () => {
         adInsightsResponse = { data: { data: [] } };
       }
 
-      // 5. Map insights to ads with creatives
-      const creativePerformance = ads
-        .filter(ad => ad.creative)
-        .map(ad => {
-          const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
-          
-          // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
-          const creativeLibData = creativesMap[ad.creative.id];
-          
-          console.log(`🔍 PROCESSING AD ${ad.id}:`, {
-            adName: ad.name,
-            creativeId: ad.creative.id,
-            adsAPI_image_url: ad.creative.image_url,
-            adsAPI_thumbnail_url: ad.creative.thumbnail_url,
-            adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
-            creativeLib_image_url: creativeLibData?.image_url,
-            creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
-            creativeLib_video_id: creativeLibData?.video_id
-          });
-          
-          // Enhanced thumbnail logic
-          const thumbnailUrl = (() => {
-            // Try multiple sources in order of preference
-            const candidates = [
-              creativeLibData?.image_url,                                    // Creative Library high-res
-              ad.creative.image_url,                                         // Ads API image
-              creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
-              ad.creative.thumbnail_url,                                     // Ads API thumbnail
-              creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
-              ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
-              ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
-              creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
-            ];
-            
-            const finalUrl = candidates.find(url => url && url.length > 0);
-            
-            console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
-              candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
-              selected: finalUrl || 'NONE FOUND'
-            });
-            
-            return finalUrl || null;
-          })();
-          
-          return {
-            adId: ad.id,
-            adName: ad.name,
-            adsetName: ad.adset ? ad.adset.name : 'Unknown',
-            creativeId: ad.creative.id,
-            thumbnailUrl: thumbnailUrl,  // This should now have better URLs
-            objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
-            accountId: selectedAccountId,
-            // Performance metrics
-            impressions: insight ? parseInt(insight.impressions || 0) : 0,
-            clicks: insight ? parseInt(insight.clicks || 0) : 0,
-            spend: insight ? parseFloat(insight.spend || 0) : 0,
-            ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-            cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-            cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-            // Add conversion metrics
-            purchases: insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0,
-            landingPageViews: insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-            addToCarts: insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0
-          };
-        });
+      // REPLACE THIS SECTION in CreativeAnalyticsDashboard.js
+// Find the section around line 400-430 where creativePerformance is mapped
+
+// 5. Map insights to ads with creatives
+const creativePerformance = ads
+.filter(ad => ad.creative)
+.map(ad => {
+  const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+  
+  // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
+  const creativeLibData = creativesMap[ad.creative.id];
+  
+  console.log(`🔍 PROCESSING AD ${ad.id}:`, {
+    adName: ad.name,
+    creativeId: ad.creative.id,
+    adsAPI_image_url: ad.creative.image_url,
+    adsAPI_thumbnail_url: ad.creative.thumbnail_url,
+    adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
+    creativeLib_image_url: creativeLibData?.image_url,
+    creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
+    creativeLib_video_id: creativeLibData?.video_id
+  });
+  
+  // Enhanced thumbnail logic
+  const thumbnailUrl = (() => {
+    // Try multiple sources in order of preference
+    const candidates = [
+      creativeLibData?.image_url,                                    // Creative Library high-res
+      ad.creative.image_url,                                         // Ads API image
+      creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
+      ad.creative.thumbnail_url,                                     // Ads API thumbnail
+      creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
+      ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
+      ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
+      creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
+    ];
+    
+    const finalUrl = candidates.find(url => url && url.length > 0);
+    
+    console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
+      candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
+      selected: finalUrl || 'NONE FOUND'
+    });
+    
+    return finalUrl || null;
+  })();
+  
+  // 🔧 NEW: Calculate ROAS for this specific creative
+  const spend = insight ? parseFloat(insight.spend || 0) : 0;
+  const purchases = insight && insight.actions ? 
+    parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+  
+  // Calculate revenue from purchase value
+  const purchaseValue = insight && insight.action_values ? 
+    parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+  
+  // Calculate ROAS: Revenue / Spend
+  const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
+  
+  // 🚨 DEBUG: Log ROAS calculation
+  console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
+    spend,
+    purchases,
+    purchaseValue,
+    roas: roas.toFixed(2)
+  });
+  
+  return {
+    adId: ad.id,
+    adName: ad.name,
+    adsetName: ad.adset ? ad.adset.name : 'Unknown',
+    creativeId: ad.creative.id,
+    thumbnailUrl: thumbnailUrl,  // This should now have better URLs
+    objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
+    accountId: selectedAccountId,
+    // Performance metrics
+    impressions: insight ? parseInt(insight.impressions || 0) : 0,
+    clicks: insight ? parseInt(insight.clicks || 0) : 0,
+    spend: spend,
+    ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+    cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+    cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+    // Add conversion metrics
+    purchases: purchases,
+    landingPageViews: insight && insight.actions ? 
+      parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+    addToCarts: insight && insight.actions ? 
+      parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+    // 🔧 NEW: Add ROAS calculation
+    roas: roas,
+    revenue: purchaseValue
+  };
+});
 
       // 🚨 DEBUG: Final summary
       const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
