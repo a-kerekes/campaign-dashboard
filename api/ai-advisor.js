@@ -476,7 +476,7 @@ Please analyze the visual elements that might contribute to this performance lev
     
     // Use Claude 3 Sonnet for vision capabilities
     const response = await anthropic.messages.create({
-      model: 'claude-3-sonnet-20240229',
+      model: 'claude-3-5-sonnet-20241022',
       system: systemMessage,
       messages: visionMessages,
       max_tokens: 2000
@@ -491,7 +491,7 @@ Please analyze the visual elements that might contribute to this performance lev
     // Fallback to text-only analysis
     console.log('🔄 Falling back to text-only analysis');
     const fallbackResponse = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-3-5-sonnet-20241022',
       system: systemMessage + '\n\nNOTE: Image analysis was unavailable, providing text-based insights only.',
       messages: chatMessages,
       max_tokens: 1000
