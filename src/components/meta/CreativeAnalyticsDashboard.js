@@ -254,130 +254,145 @@ try {
         }
       );
       
-      // 3. Fetch ads with their creative info
-      const adsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
-        {
-          params: {
-            access_token: accessToken,
-            fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec},adset{name}',
-            limit: 500
-          }
-        }
-      );
+      // Add this debug logging to your CreativeAnalyticsDashboard.js 
+// Around line 200-250 where you fetch ads with creatives
 
-      // 3b. NEW: Fetch creative library for better video quality
-      const creativesResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
-        {
-          params: {
-            access_token: accessToken,
-            fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops',
-            limit: 250
-          }
-        }
-      );
+// 3. Fetch ads with their creative info
+const adsResponse = await axios.get(
+  `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
+  {
+    params: {
+      access_token: accessToken,
+      fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
+      limit: 500
+    }
+  }
+);
 
-      // Create a lookup map for creative library data
-      const creativesMap = {};
-      if (creativesResponse.data.data) {
-        creativesResponse.data.data.forEach(creative => {
-          creativesMap[creative.id] = creative;
-        });
-      }
+// 🚨 DEBUG: Log the raw creative data
+console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
+console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
+
+// 3b. NEW: Fetch creative library for better video quality
+const creativesResponse = await axios.get(
+  `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+  {
+    params: {
+      access_token: accessToken,
+      fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
+      limit: 250
+    }
+  }
+);
+
+// 🚨 DEBUG: Log creative library data
+console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
+console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
+console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
+
+// Create a lookup map for creative library data
+const creativesMap = {};
+if (creativesResponse.data.data) {
+  creativesResponse.data.data.forEach(creative => {
+    creativesMap[creative.id] = creative;
+    
+    // 🚨 DEBUG: Log each creative's available image fields
+    console.log(`🔍 CREATIVE ${creative.id}:`, {
+      image_url: creative.image_url,
+      thumbnail_url: creative.thumbnail_url,
+      video_id: creative.video_id,
+      has_object_story_spec: !!creative.object_story_spec,
+      object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
+            });
+
+      // 🚨 DEBUG: Final summary
+      const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
+      console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
+        totalCreatives: creativePerformance.length,
+        creativesWithThumbnails: creativesWithThumbnails.length,
+        sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
+          creativeId: c.creativeId,
+          adName: c.adName,
+          thumbnailUrl: c.thumbnailUrl
+        }))
+      });
+  });
+}
+
+// 5. Map insights to ads with creatives
+const creativePerformance = ads
+  .filter(ad => ad.creative)
+  .map(ad => {
+    const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+    
+    // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
+    const creativeLibData = creativesMap[ad.creative.id];
+    
+    console.log(`🔍 PROCESSING AD ${ad.id}:`, {
+      adName: ad.name,
+      creativeId: ad.creative.id,
+      adsAPI_image_url: ad.creative.image_url,
+      adsAPI_thumbnail_url: ad.creative.thumbnail_url,
+      adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
+      creativeLib_image_url: creativeLibData?.image_url,
+      creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
+      creativeLib_video_id: creativeLibData?.video_id
+    });
+    
+    // Enhanced thumbnail logic
+    const thumbnailUrl = (() => {
+      // Try multiple sources in order of preference
+      const candidates = [
+        creativeLibData?.image_url,                                    // Creative Library high-res
+        ad.creative.image_url,                                         // Ads API image
+        creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
+        ad.creative.thumbnail_url,                                     // Ads API thumbnail
+        creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
+        ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
+        ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
+        creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
+      ];
       
-      // Get all the ad IDs to use for filtering insights
-      const ads = adsResponse.data.data;
-      const adIds = ads.filter(ad => ad.creative).map(ad => ad.id);
+      const finalUrl = candidates.find(url => url && url.length > 0);
       
-      if (adIds.length === 0) {
-        throw new Error('No ads with creatives found for this account');
-      }
+      console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
+        candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
+        selected: finalUrl || 'NONE FOUND'
+      });
       
-      // 4. Now fetch insights directly at the ad level, filtering for these specific ads
-      const adInsightsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
-        {
-          params: {
-            access_token: accessToken,
-            level: 'ad',
-            fields: 'ad_id,ad_name,impressions,clicks,spend,ctr,cpc,cpm,actions,action_values',
-            filtering: JSON.stringify([{
-              field: 'ad.id',
-              operator: 'IN',
-              value: adIds
-            }]),
-            time_range: JSON.stringify({
-              since,
-              until
-            }),
-            limit: 500
-          }
-        }
-      );
-      
-      console.log('Ad insights response:', adInsightsResponse.data);
-      
-      // 5. Map insights to ads with creatives
-      const creativePerformance = ads
-        .filter(ad => ad.creative)
-        .map(ad => {
-          const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
-          
-          // Find purchase actions if available
-          const purchases = insight && insight.actions 
-            ? insight.actions.find(a => a.action_type === 'purchase')?.value || 0 
-            : 0;
-          
-          // Find purchase value if available
-          const revenue = insight && insight.action_values 
-            ? insight.action_values.find(a => a.action_type === 'purchase')?.value || 0 
-            : 0;
-          
-          // Calculate ROAS if both spend and revenue are available
-          const roas = (insight && parseFloat(insight.spend) > 0 && revenue > 0) 
-            ? revenue / parseFloat(insight.spend) 
-            : 0;
-          
-          // Calculate cost per purchase if both spend and purchases are available
-          const costPerPurchase = (insight && parseFloat(insight.spend) > 0 && purchases > 0) 
-            ? parseFloat(insight.spend) / purchases 
-            : 0;
-          
-          return {
-            adId: ad.id,
-            adName: ad.name,
-            adsetName: ad.adset ? ad.adset.name : 'Unknown',
-            creativeId: ad.creative.id,
-            // Enhanced thumbnail logic using Creative Library
-            thumbnailUrl: (() => {
-              const creativeLibData = creativesMap[ad.creative.id];
-              return creativeLibData?.image_url ||           // Creative Library high-res
-                     ad.creative.image_url ||                // Ads API image
-                     creativeLibData?.thumbnail_url ||       // Creative Library thumbnail  
-                     ad.creative.thumbnail_url ||            // Ads API thumbnail
-                     (creativeLibData?.object_story_spec?.video_data?.image_url) ||
-                     (ad.creative.object_story_spec?.video_data?.image_url) ||
-                     (ad.creative.object_story_spec?.link_data?.picture) ||
-                     null;
-            })(),
-            objectStorySpec: ad.creative.object_story_spec || null,
-            accountId: selectedAccountId, // Add this to track which account each creative belongs to
-            impressions: insight ? parseInt(insight.impressions || 0) : 0,
-            clicks: insight ? parseInt(insight.clicks || 0) : 0,
-            spend: insight ? parseFloat(insight.spend || 0) : 0,
-            ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-            cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-            cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-            purchases: purchases,
-            revenue: revenue,
-            roas: roas,
-            costPerPurchase: costPerPurchase,
-            conversionRate: insight && parseInt(insight.clicks) > 0 && purchases > 0 
-              ? (purchases / parseInt(insight.clicks)) * 100 
-              : 0
-          };
-        });
+      return finalUrl || null;
+    })();
+    
+    return {
+      adId: ad.id,
+      adName: ad.name,
+      adsetName: ad.adset ? ad.adset.name : 'Unknown',
+      creativeId: ad.creative.id,
+      thumbnailUrl: thumbnailUrl,  // This should now have better URLs
+      objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
+      accountId: selectedAccountId,
+      // ... rest of your performance metrics
+      impressions: insight ? parseInt(insight.impressions || 0) : 0,
+      clicks: insight ? parseInt(insight.clicks || 0) : 0,
+      spend: insight ? parseFloat(insight.spend || 0) : 0,
+      ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+      cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+      cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+      // Add conversion metrics...
+    };
+  });
+
+// 🚨 DEBUG: Final summary
+const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
+console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
+  totalCreatives: creativePerformance.length,
+  creativesWithThumbnails: creativesWithThumbnails.length,
+  sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
+    creativeId: c.creativeId,
+    adName: c.adName,
+    thumbnailUrl: c.thumbnailUrl
+  }))
+});
       
       // Prepare summary metrics from account insights
       const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
