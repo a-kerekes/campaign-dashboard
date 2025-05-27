@@ -303,67 +303,27 @@ if (creativesResponse.data.data) {
       video_id: creative.video_id,
       has_object_story_spec: !!creative.object_story_spec,
       object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
-    });
+            });
+
+      // 🚨 DEBUG: Final summary
+      const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
+      console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
+        totalCreatives: creativePerformance.length,
+        creativesWithThumbnails: creativesWithThumbnails.length,
+        sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
+          creativeId: c.creativeId,
+          adName: c.adName,
+          thumbnailUrl: c.thumbnailUrl
+        }))
+      });
   });
 }
-
-// Get all the ad IDs to use for filtering insights
-const ads = adsResponse.data.data;
-const adIds = ads.filter(ad => ad.creative).map(ad => ad.id);
-
-if (adIds.length === 0) {
-  throw new Error('No ads with creatives found for this account');
-}
-
-// 4. Now fetch insights directly at the ad level, filtering for these specific ads
-const adInsightsResponse = await axios.get(
-  `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
-  {
-    params: {
-      access_token: accessToken,
-      level: 'ad',
-      fields: 'ad_id,ad_name,impressions,clicks,spend,ctr,cpc,cpm,actions,action_values',
-      filtering: JSON.stringify([{
-        field: 'ad.id',
-        operator: 'IN',
-        value: adIds
-      }]),
-      time_range: JSON.stringify({
-        since,
-        until
-      }),
-      limit: 500
-    }
-  }
-);
-
-console.log('Ad insights response:', adInsightsResponse.data);
 
 // 5. Map insights to ads with creatives
 const creativePerformance = ads
   .filter(ad => ad.creative)
   .map(ad => {
     const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
-    
-    // Find purchase actions if available
-    const purchases = insight && insight.actions 
-      ? insight.actions.find(a => a.action_type === 'purchase')?.value || 0 
-      : 0;
-    
-    // Find purchase value if available
-    const revenue = insight && insight.action_values 
-      ? insight.action_values.find(a => a.action_type === 'purchase')?.value || 0 
-      : 0;
-    
-    // Calculate ROAS if both spend and revenue are available
-    const roas = (insight && parseFloat(insight.spend) > 0 && revenue > 0) 
-      ? revenue / parseFloat(insight.spend) 
-      : 0;
-    
-    // Calculate cost per purchase if both spend and purchases are available
-    const costPerPurchase = (insight && parseFloat(insight.spend) > 0 && purchases > 0) 
-      ? parseFloat(insight.spend) / purchases 
-      : 0;
     
     // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
     const creativeLibData = creativesMap[ad.creative.id];
@@ -408,22 +368,17 @@ const creativePerformance = ads
       adName: ad.name,
       adsetName: ad.adset ? ad.adset.name : 'Unknown',
       creativeId: ad.creative.id,
-      thumbnailUrl: thumbnailUrl,
+      thumbnailUrl: thumbnailUrl,  // This should now have better URLs
       objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
       accountId: selectedAccountId,
+      // ... rest of your performance metrics
       impressions: insight ? parseInt(insight.impressions || 0) : 0,
       clicks: insight ? parseInt(insight.clicks || 0) : 0,
       spend: insight ? parseFloat(insight.spend || 0) : 0,
       ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
       cpm: insight ? parseFloat(insight.cpm || 0) : 0,
       cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-      purchases: purchases,
-      revenue: revenue,
-      roas: roas,
-      costPerPurchase: costPerPurchase,
-      conversionRate: insight && parseInt(insight.clicks) > 0 && purchases > 0 
-        ? (purchases / parseInt(insight.clicks)) * 100 
-        : 0
+      // Add conversion metrics...
     };
   });
 
@@ -1067,11 +1022,20 @@ console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
                       onDateRangeChange={(newDateRange) => setDateRange(newDateRange)}
                     />
                   </div>
+                </div>
                   
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <AiAdvisor analyticsData={analyticsData} />
-                  </div>
-                </div>
+  <AiAdvisor 
+    analyticsData={analyticsData}
+    creativePerformanceData={analyticsData?.creativePerformance}
+    audienceInsightsData={{
+      ageData: ageBreakdown,
+      genderData: genderBreakdown,
+      platformData: platformBreakdown,
+      placementData: placementBreakdown
+    }}
+  />
+</div>
                             
                 {/* Breakdown Charts Section */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
