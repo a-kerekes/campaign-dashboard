@@ -122,108 +122,108 @@ const CreativeAnalyticsDashboard = () => {
       }
       
       // FETCH BREAKDOWN DATA - FIX: Use metaAPI.fetchBreakdownMetrics directly
-try {
-  // Fetch age breakdown
-  let ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
-  // Add purchase and conversion metrics to each breakdown item
-  ageData = ageData.map(item => {
-    const impressions = parseInt(item.impressions || 0);
-    const clicks = parseInt(item.clicks || 0);
-    // Estimate CTR if not provided or ensure it's a percentage
-    let ctr = item.ctr || 0;
-    if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-      ctr = (clicks / impressions) * 100;
-    } else if (ctr > 0 && ctr < 1) {
-      // If CTR is decimal (0.0123) convert to percentage (1.23)
-      ctr = ctr * 100;
-    }
-    // Add purchase metrics (estimating based on clicks if not available)
-    return {
-      ...item,
-      ctr: ctr,
-      cpc: parseFloat(item.cpc || 0),
-      cpm: parseFloat(item.cpm || 0),
-      purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-      landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-      addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-    };
-  });
-  setAgeBreakdown(ageData);
-  
-  // Fetch gender breakdown and enhance with conversion metrics
-  let genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId, accessToken);
-  genderData = genderData.map(item => {
-    const impressions = parseInt(item.impressions || 0);
-    const clicks = parseInt(item.clicks || 0);
-    let ctr = item.ctr || 0;
-    if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-      ctr = (clicks / impressions) * 100;
-    } else if (ctr > 0 && ctr < 1) {
-      ctr = ctr * 100;
-    }
-    return {
-      ...item,
-      ctr: ctr,
-      cpc: parseFloat(item.cpc || 0),
-      cpm: parseFloat(item.cpm || 0),
-      purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-      landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-      addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-    };
-  });
-  setGenderBreakdown(genderData);
-  
-  // Fetch platform breakdown and enhance with conversion metrics
-  let platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId, accessToken);
-  platformData = platformData.map(item => {
-    const impressions = parseInt(item.impressions || 0);
-    const clicks = parseInt(item.clicks || 0);
-    let ctr = item.ctr || 0;
-    if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-      ctr = (clicks / impressions) * 100;
-    } else if (ctr > 0 && ctr < 1) {
-      ctr = ctr * 100;
-    }
-    return {
-      ...item,
-      ctr: ctr,
-      cpc: parseFloat(item.cpc || 0),
-      cpm: parseFloat(item.cpm || 0),
-      purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-      landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-      addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-    };
-  });
-  setPlatformBreakdown(platformData);
-  
-  // Fetch placement breakdown and enhance with conversion metrics
-  let placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId, accessToken);
-  placementData = placementData.map(item => {
-    const impressions = parseInt(item.impressions || 0);
-    const clicks = parseInt(item.clicks || 0);
-    let ctr = item.ctr || 0;
-    if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-      ctr = (clicks / impressions) * 100;
-    } else if (ctr > 0 && ctr < 1) {
-      ctr = ctr * 100;
-    }
-    return {
-      ...item,
-      ctr: ctr,
-      cpc: parseFloat(item.cpc || 0),
-      cpm: parseFloat(item.cpm || 0),
-      purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-      landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-      addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-    };
-  });
-  setPlacementBreakdown(placementData);
-  
-  console.log('Successfully loaded and enhanced all breakdown data');
-} catch (breakdownError) {
-  console.error('Error loading breakdown data:', breakdownError);
-  // Continue with other data loading even if breakdowns fail
-}
+      try {
+        // Fetch age breakdown
+        let ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
+        // Add purchase and conversion metrics to each breakdown item
+        ageData = ageData.map(item => {
+          const impressions = parseInt(item.impressions || 0);
+          const clicks = parseInt(item.clicks || 0);
+          // Estimate CTR if not provided or ensure it's a percentage
+          let ctr = item.ctr || 0;
+          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
+            ctr = (clicks / impressions) * 100;
+          } else if (ctr > 0 && ctr < 1) {
+            // If CTR is decimal (0.0123) convert to percentage (1.23)
+            ctr = ctr * 100;
+          }
+          // Add purchase metrics (estimating based on clicks if not available)
+          return {
+            ...item,
+            ctr: ctr,
+            cpc: parseFloat(item.cpc || 0),
+            cpm: parseFloat(item.cpm || 0),
+            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
+            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
+            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
+          };
+        });
+        setAgeBreakdown(ageData);
+        
+        // Fetch gender breakdown and enhance with conversion metrics
+        let genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId, accessToken);
+        genderData = genderData.map(item => {
+          const impressions = parseInt(item.impressions || 0);
+          const clicks = parseInt(item.clicks || 0);
+          let ctr = item.ctr || 0;
+          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
+            ctr = (clicks / impressions) * 100;
+          } else if (ctr > 0 && ctr < 1) {
+            ctr = ctr * 100;
+          }
+          return {
+            ...item,
+            ctr: ctr,
+            cpc: parseFloat(item.cpc || 0),
+            cpm: parseFloat(item.cpm || 0),
+            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
+            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
+            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
+          };
+        });
+        setGenderBreakdown(genderData);
+        
+        // Fetch platform breakdown and enhance with conversion metrics
+        let platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId, accessToken);
+        platformData = platformData.map(item => {
+          const impressions = parseInt(item.impressions || 0);
+          const clicks = parseInt(item.clicks || 0);
+          let ctr = item.ctr || 0;
+          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
+            ctr = (clicks / impressions) * 100;
+          } else if (ctr > 0 && ctr < 1) {
+            ctr = ctr * 100;
+          }
+          return {
+            ...item,
+            ctr: ctr,
+            cpc: parseFloat(item.cpc || 0),
+            cpm: parseFloat(item.cpm || 0),
+            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
+            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
+            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
+          };
+        });
+        setPlatformBreakdown(platformData);
+        
+        // Fetch placement breakdown and enhance with conversion metrics
+        let placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId, accessToken);
+        placementData = placementData.map(item => {
+          const impressions = parseInt(item.impressions || 0);
+          const clicks = parseInt(item.clicks || 0);
+          let ctr = item.ctr || 0;
+          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
+            ctr = (clicks / impressions) * 100;
+          } else if (ctr > 0 && ctr < 1) {
+            ctr = ctr * 100;
+          }
+          return {
+            ...item,
+            ctr: ctr,
+            cpc: parseFloat(item.cpc || 0),
+            cpm: parseFloat(item.cpm || 0),
+            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
+            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
+            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
+          };
+        });
+        setPlacementBreakdown(placementData);
+        
+        console.log('Successfully loaded and enhanced all breakdown data');
+      } catch (breakdownError) {
+        console.error('Error loading breakdown data:', breakdownError);
+        // Continue with other data loading even if breakdowns fail
+      }
       
       // 1. Fetch account insights
       const insightsResponse = await axios.get(
@@ -254,56 +254,144 @@ try {
         }
       );
       
-      // Add this debug logging to your CreativeAnalyticsDashboard.js 
-// Around line 200-250 where you fetch ads with creatives
+      // 3. Fetch ads with their creative info
+      const adsResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
+            limit: 500
+          }
+        }
+      );
 
-// 3. Fetch ads with their creative info
-const adsResponse = await axios.get(
-  `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
-  {
-    params: {
-      access_token: accessToken,
-      fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
-      limit: 500
-    }
-  }
-);
+      // 🚨 DEBUG: Log the raw creative data
+      console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
+      console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
-// 🚨 DEBUG: Log the raw creative data
-console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
-console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
+      // 3b. NEW: Fetch creative library for better video quality
+      const creativesResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
+            limit: 250
+          }
+        }
+      );
 
-// 3b. NEW: Fetch creative library for better video quality
-const creativesResponse = await axios.get(
-  `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
-  {
-    params: {
-      access_token: accessToken,
-      fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
-      limit: 250
-    }
-  }
-);
+      // 🚨 DEBUG: Log creative library data
+      console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
+      console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
+      console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
 
-// 🚨 DEBUG: Log creative library data
-console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
-console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
-console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
+      // Create a lookup map for creative library data
+      const creativesMap = {};
+      if (creativesResponse.data.data) {
+        creativesResponse.data.data.forEach(creative => {
+          creativesMap[creative.id] = creative;
+          
+          // 🚨 DEBUG: Log each creative's available image fields
+          console.log(`🔍 CREATIVE ${creative.id}:`, {
+            image_url: creative.image_url,
+            thumbnail_url: creative.thumbnail_url,
+            video_id: creative.video_id,
+            has_object_story_spec: !!creative.object_story_spec,
+            object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
+          });
+        });
+      }
 
-// Create a lookup map for creative library data
-const creativesMap = {};
-if (creativesResponse.data.data) {
-  creativesResponse.data.data.forEach(creative => {
-    creativesMap[creative.id] = creative;
-    
-    // 🚨 DEBUG: Log each creative's available image fields
-    console.log(`🔍 CREATIVE ${creative.id}:`, {
-      image_url: creative.image_url,
-      thumbnail_url: creative.thumbnail_url,
-      video_id: creative.video_id,
-      has_object_story_spec: !!creative.object_story_spec,
-      object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
+      // 4. Fetch ad insights for performance data
+      const adInsightsResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
+        {
+          params: {
+            access_token: accessToken,
+            time_range: JSON.stringify({
+              since,
+              until
+            }),
+            fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
+            level: 'ad',
+            limit: 500
+          }
+        }
+      );
+
+      // Extract ads from response
+      const ads = adsResponse.data.data;
+
+      // 5. Map insights to ads with creatives
+      const creativePerformance = ads
+        .filter(ad => ad.creative)
+        .map(ad => {
+          const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+          
+          // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
+          const creativeLibData = creativesMap[ad.creative.id];
+          
+          console.log(`🔍 PROCESSING AD ${ad.id}:`, {
+            adName: ad.name,
+            creativeId: ad.creative.id,
+            adsAPI_image_url: ad.creative.image_url,
+            adsAPI_thumbnail_url: ad.creative.thumbnail_url,
+            adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
+            creativeLib_image_url: creativeLibData?.image_url,
+            creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
+            creativeLib_video_id: creativeLibData?.video_id
+          });
+          
+          // Enhanced thumbnail logic
+          const thumbnailUrl = (() => {
+            // Try multiple sources in order of preference
+            const candidates = [
+              creativeLibData?.image_url,                                    // Creative Library high-res
+              ad.creative.image_url,                                         // Ads API image
+              creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
+              ad.creative.thumbnail_url,                                     // Ads API thumbnail
+              creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
+              ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
+              ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
+              creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
+            ];
+            
+            const finalUrl = candidates.find(url => url && url.length > 0);
+            
+            console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
+              candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
+              selected: finalUrl || 'NONE FOUND'
             });
+            
+            return finalUrl || null;
+          })();
+          
+          return {
+            adId: ad.id,
+            adName: ad.name,
+            adsetName: ad.adset ? ad.adset.name : 'Unknown',
+            creativeId: ad.creative.id,
+            thumbnailUrl: thumbnailUrl,  // This should now have better URLs
+            objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
+            accountId: selectedAccountId,
+            // Performance metrics
+            impressions: insight ? parseInt(insight.impressions || 0) : 0,
+            clicks: insight ? parseInt(insight.clicks || 0) : 0,
+            spend: insight ? parseFloat(insight.spend || 0) : 0,
+            ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+            cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+            cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+            // Add conversion metrics
+            purchases: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0,
+            landingPageViews: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+            addToCarts: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0
+          };
+        });
 
       // 🚨 DEBUG: Final summary
       const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
@@ -316,83 +404,6 @@ if (creativesResponse.data.data) {
           thumbnailUrl: c.thumbnailUrl
         }))
       });
-  });
-}
-
-// 5. Map insights to ads with creatives
-const creativePerformance = ads
-  .filter(ad => ad.creative)
-  .map(ad => {
-    const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
-    
-    // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
-    const creativeLibData = creativesMap[ad.creative.id];
-    
-    console.log(`🔍 PROCESSING AD ${ad.id}:`, {
-      adName: ad.name,
-      creativeId: ad.creative.id,
-      adsAPI_image_url: ad.creative.image_url,
-      adsAPI_thumbnail_url: ad.creative.thumbnail_url,
-      adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
-      creativeLib_image_url: creativeLibData?.image_url,
-      creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
-      creativeLib_video_id: creativeLibData?.video_id
-    });
-    
-    // Enhanced thumbnail logic
-    const thumbnailUrl = (() => {
-      // Try multiple sources in order of preference
-      const candidates = [
-        creativeLibData?.image_url,                                    // Creative Library high-res
-        ad.creative.image_url,                                         // Ads API image
-        creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
-        ad.creative.thumbnail_url,                                     // Ads API thumbnail
-        creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
-        ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
-        ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
-        creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
-      ];
-      
-      const finalUrl = candidates.find(url => url && url.length > 0);
-      
-      console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
-        candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
-        selected: finalUrl || 'NONE FOUND'
-      });
-      
-      return finalUrl || null;
-    })();
-    
-    return {
-      adId: ad.id,
-      adName: ad.name,
-      adsetName: ad.adset ? ad.adset.name : 'Unknown',
-      creativeId: ad.creative.id,
-      thumbnailUrl: thumbnailUrl,  // This should now have better URLs
-      objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
-      accountId: selectedAccountId,
-      // ... rest of your performance metrics
-      impressions: insight ? parseInt(insight.impressions || 0) : 0,
-      clicks: insight ? parseInt(insight.clicks || 0) : 0,
-      spend: insight ? parseFloat(insight.spend || 0) : 0,
-      ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-      cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-      cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-      // Add conversion metrics...
-    };
-  });
-
-// 🚨 DEBUG: Final summary
-const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
-console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
-  totalCreatives: creativePerformance.length,
-  creativesWithThumbnails: creativesWithThumbnails.length,
-  sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
-    creativeId: c.creativeId,
-    adName: c.adName,
-    thumbnailUrl: c.thumbnailUrl
-  }))
-});
       
       // Prepare summary metrics from account insights
       const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
@@ -1022,20 +1033,20 @@ console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
                       onDateRangeChange={(newDateRange) => setDateRange(newDateRange)}
                     />
                   </div>
-                </div>
                   
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-  <AiAdvisor 
-    analyticsData={analyticsData}
-    creativePerformanceData={analyticsData?.creativePerformance}
-    audienceInsightsData={{
-      ageData: ageBreakdown,
-      genderData: genderBreakdown,
-      platformData: platformBreakdown,
-      placementData: placementBreakdown
-    }}
-  />
-</div>
+                    <AiAdvisor 
+                      analyticsData={analyticsData}
+                      creativePerformanceData={analyticsData?.creativePerformance}
+                      audienceInsightsData={{
+                        ageData: ageBreakdown,
+                        genderData: genderBreakdown,
+                        platformData: platformBreakdown,
+                        placementData: placementBreakdown
+                      }}
+                    />
+                  </div>
+                </div>
                             
                 {/* Breakdown Charts Section */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
