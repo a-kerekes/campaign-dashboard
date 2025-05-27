@@ -97,7 +97,7 @@ export default async function handler(req, res) {
       
       // Standard text-only analysis
       response = await anthropic.messages.create({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-sonnet-20241022',
         system: systemMessage,
         messages: chatMessages,
         max_tokens: 1000
