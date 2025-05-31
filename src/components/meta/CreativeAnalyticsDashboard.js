@@ -464,131 +464,145 @@ const CreativeAnalyticsDashboard = () => {
         // Continue with other data loading even if breakdowns fail
       }
       
-      // 🔧 HELPER FUNCTION: Build clean URL with fetch to bypass axios bug
-      const buildCleanURL = (baseURL, params) => {
-        const url = new URL(baseURL);
-        Object.keys(params).forEach(key => {
-          const value = params[key];
-          if (value !== null && value !== undefined) {
-            url.searchParams.append(key, String(value));
-          }
-        });
-        console.log('🔧 CLEAN URL BUILT:', url.toString());
-        return url.toString();
-      };
-
-      const fetchWithCleanURL = async (baseURL, params) => {
-        const cleanURL = buildCleanURL(baseURL, params);
-        const response = await fetch(cleanURL);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return { data: await response.json() };
-      };
-
       // 1. Fetch account insights
-      console.log('🔍 BEFORE INSIGHTS FETCH CALL:');
+      console.log('🔍 BEFORE INSIGHTS AXIOS CALL:');
       console.log('🔍 About to fetch insights with limit 500');
       
-      const insightsResponse = await fetchWithCleanURL(
+      const insightsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
         {
-          access_token: accessToken,
-          time_range: JSON.stringify({
-            since,
-            until
-          }),
-          fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
-          level: 'account',
-          limit: 500
+          params: {
+            access_token: accessToken,
+            time_range: JSON.stringify({
+              since,
+              until
+            }),
+            fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
+            level: 'account',
+            limit: parseInt('500')  // Force clean number
+          }
         }
       );
       
       // 2. Fetch campaigns
-      console.log('🔍 BEFORE CAMPAIGNS FETCH CALL:');
+      console.log('🔍 BEFORE CAMPAIGNS AXIOS CALL:');
       console.log('🔍 About to fetch campaigns with limit 500');
       
-      const campaignsResponse = await fetchWithCleanURL(
+      const campaignsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/campaigns`,
         {
-          access_token: accessToken,
-          fields: 'name,status,objective',
-          limit: 500
+          params: {
+            access_token: accessToken,
+            fields: 'name,status,objective',
+            limit: parseInt('500')  // Force clean number
+          }
         }
       );
       
-      // 3. Fetch ads with their creative info - WITH FALLBACK AND ENHANCED ERROR HANDLING
-      console.log('🔍 BEFORE ADS FETCH CALL:');
+      // 3. Fetch ads with their creative info
+      console.log('🔍 BEFORE ADS AXIOS CALL:');
       console.log('🔍 About to fetch ads with limit 500');
       
-      let adsResponse = { data: { data: [] } };
-      try {
-        adsResponse = await fetchWithCleanURL(
-          `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
-          {
+      const adsResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
+        {
+          params: {
             access_token: accessToken,
             fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
-            limit: 500
+            limit: parseInt('500')  // Force clean number
           }
-        );
-        console.log(`✅ Successfully loaded ${adsResponse.data.data.length} ads`);
-      } catch (adsError) {
-        console.warn('⚠️ Main ads call failed, trying smaller batch:', adsError.message);
-        
-        // Fallback: Try smaller batch
-        try {
-          adsResponse = await fetchWithCleanURL(
-            `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
-            {
-              access_token: accessToken,
-              fields: 'name,creative{id},adset{name}', // Simplified fields
-              limit: 100 // Smaller batch
-            }
-          );
-          console.log(`✅ Fallback loaded ${adsResponse.data.data.length} ads with basic info`);
-        } catch (fallbackError) {
-          console.error('❌ Both ads calls failed, continuing with limited data:', fallbackError.message);
-          // Continue with empty ads - we'll create dummy data from insights
         }
+      );
+
+      // 🚨 DEBUG: Log the raw creative data
+      console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
+      console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
+
+      // 3b. NEW: Fetch creative library for better video quality
+      console.log('🔍 BEFORE AXIOS CALL:');
+      console.log('🔍 META_API_VERSION:', META_API_VERSION);
+      console.log('🔍 formattedAccountId:', formattedAccountId);
+      console.log('🔍 accessToken length:', accessToken?.length);
+
+      const debugParams = {
+        access_token: accessToken,
+        fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
+        limit: 250
+      };
+
+      console.log('🔍 EXACT PARAMS OBJECT:', debugParams);
+      console.log('🔍 LIMIT VALUE TYPE:', typeof debugParams.limit);
+      console.log('🔍 LIMIT VALUE:', debugParams.limit);
+
+      const creativesResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
+            limit: parseInt('250')  // Force clean number
+          }
+        }
+      );
+
+      // 🚨 DEBUG: Log creative library data
+      console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
+      console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
+      console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
+
+      // Create a lookup map for creative library data
+      const creativesMap = {};
+      if (creativesResponse.data.data) {
+        creativesResponse.data.data.forEach(creative => {
+          creativesMap[creative.id] = creative;
+          
+          // 🚨 DEBUG: Log each creative's available image fields
+          console.log(`🔍 CREATIVE ${creative.id}:`, {
+            image_url: creative.image_url,
+            thumbnail_url: creative.thumbnail_url,
+            video_id: creative.video_id,
+            has_object_story_spec: !!creative.object_story_spec,
+            object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
+          });
+        });
       }
 
-      // Extract ads from response - WITH SAFETY CHECKS
-      const ads = adsResponse?.data?.data || [];
-      console.log(`📊 Working with ${ads.length} ads for insights batching`);
+      // Extract ads from response - MOVED BEFORE BATCHING
+      const ads = adsResponse.data.data;
 
-      // 4. Fetch ad insights for performance data - ENHANCED WITH FALLBACK
+      // 4. Fetch ad insights for performance data - WITH BATCHING - MOVED TO CORRECT LOCATION
       console.log('🔍 Fetching ad insights with batching...');
       let adInsightsResponse = { data: { data: [] } };
 
-      if (ads.length > 0) {
-        try {
-          // Get all ad IDs
-          const allAdIds = ads.map(ad => ad.id);
-          console.log(`📊 Need insights for ${allAdIds.length} ads`);
+      try {
+        // Get all ad IDs
+        const allAdIds = ads.map(ad => ad.id);
+        console.log(`📊 Need insights for ${allAdIds.length} ads`);
+        
+        // Batch the requests - Meta API can handle ~50 ads per request
+        const batchSize = 50;
+        const batches = [];
+        
+        for (let i = 0; i < allAdIds.length; i += batchSize) {
+          const batchAdIds = allAdIds.slice(i, i + batchSize);
+          batches.push(batchAdIds);
+        }
+        
+        console.log(`📦 Split into ${batches.length} batches of ~${batchSize} ads each`);
+        
+        // Process each batch
+        const allInsightsData = [];
+        
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+          const batchAdIds = batches[batchIndex];
           
-          // Batch the requests - Meta API can handle ~50 ads per request
-          const batchSize = 50;
-          const batches = [];
-          
-          for (let i = 0; i < allAdIds.length; i += batchSize) {
-            const batchAdIds = allAdIds.slice(i, i + batchSize);
-            batches.push(batchAdIds);
-          }
-          
-          console.log(`📦 Split into ${batches.length} batches of ~${batchSize} ads each`);
-          
-          // Process each batch
-          const allInsightsData = [];
-          
-          for (let batchIndex = 0; batchIndex < Math.min(batches.length, 3); batchIndex++) { // Limit to 3 batches for now
-            const batchAdIds = batches[batchIndex];
-          
-            try {
-              console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
-              
-              const batchResponse = await fetchWithCleanURL(
-                `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
-                {
+          try {
+            console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
+            
+            const batchResponse = await axios.get(
+              `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
+              {
+                params: {
                   access_token: accessToken,
                   time_range: JSON.stringify({
                     since,
@@ -603,194 +617,142 @@ const CreativeAnalyticsDashboard = () => {
                       value: batchAdIds
                     }
                   ]),
-                  limit: batchSize
-                }
-              );
-              
-              if (batchResponse.data && batchResponse.data.data) {
-                allInsightsData.push(...batchResponse.data.data);
-                console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
-              }
-              
-              // Add a small delay between batches to avoid rate limiting
-              if (batchIndex < batches.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-              
-            } catch (batchError) {
-              console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
-              // Continue with other batches even if one fails
-              
-              // If this is a 500 error (our :1 bug), try with a smaller batch
-              if (batchError.message.includes('500')) {
-                console.log(`🔄 Retrying batch ${batchIndex + 1} with individual requests...`);
-                
-                // Try each ad individually as a fallback
-                for (const adId of batchAdIds.slice(0, 5)) { // Only try first 5 to avoid too many requests
-                  try {
-                    const singleResponse = await fetchWithCleanURL(
-                      `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
-                      {
-                        access_token: accessToken,
-                        time_range: JSON.stringify({
-                          since,
-                          until
-                        }),
-                        fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
-                        level: 'ad',
-                        filtering: JSON.stringify([
-                          {
-                            field: 'ad.id',
-                            operator: 'IN',
-                            value: [adId]
-                          }
-                        ]),
-                        limit: 1
-                      }
-                    );
-                    
-                    if (singleResponse.data && singleResponse.data.data) {
-                      allInsightsData.push(...singleResponse.data.data);
-                    }
-                  } catch (singleError) {
-                    console.error(`❌ Individual ad ${adId} failed:`, singleError.message);
-                  }
+                  limit: parseInt(String(batchSize))  // Force clean number conversion
                 }
               }
+            );
+            
+            if (batchResponse.data && batchResponse.data.data) {
+              allInsightsData.push(...batchResponse.data.data);
+              console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
             }
+            
+            // Add a small delay between batches to avoid rate limiting
+            if (batchIndex < batches.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+          } catch (batchError) {
+            console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
+            // Continue with other batches even if one fails
           }
-        
-          // Reconstruct the response format
-          adInsightsResponse = {
-            data: {
-              data: allInsightsData
-            }
-          };
-          
-          console.log(`🎉 Successfully fetched insights for ${allInsightsData.length} ads total`);
-          
-        } catch (insightsError) {
-          console.error('❌ Error fetching ad insights:', insightsError);
-          console.log('⚠️ Continuing without individual ad insights - will use aggregated data');
-          
-          // Fallback: continue without ad-level insights
-          adInsightsResponse = { data: { data: [] } };
         }
-      } else {
-        console.log('⚠️ No ads data available, skipping insights batching');
+        
+        // Reconstruct the response format
+        adInsightsResponse = {
+          data: {
+            data: allInsightsData
+          }
+        };
+        
+        console.log(`🎉 Successfully fetched insights for ${allInsightsData.length} ads total`);
+        
+      } catch (insightsError) {
+        console.error('❌ Error fetching ad insights:', insightsError);
+        console.log('⚠️  Continuing without individual ad insights - will use aggregated data');
+        
+        // Fallback: continue without ad-level insights
+        adInsightsResponse = { data: { data: [] } };
       }
 
-      // 5. Create creative performance data - ENHANCED WITH FALLBACKS
-      let creativePerformance = [];
-      
-      if (ads.length > 0) {
-        // Normal flow: we have ads data
-        creativePerformance = ads
-          .filter(ad => ad.creative || ad.name) // Accept ads with either creative or name
-          .map(ad => {
-            const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+      // 5. Map insights to ads with creatives - ENHANCED WITH SMART GROUPING
+      const creativePerformance = ads
+        .filter(ad => ad.creative)
+        .map(ad => {
+          const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+          
+          // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
+          const creativeLibData = creativesMap[ad.creative.id];
+          
+          console.log(`🔍 PROCESSING AD ${ad.id}:`, {
+            adName: ad.name,
+            creativeId: ad.creative.id,
+            adsAPI_image_url: ad.creative.image_url,
+            adsAPI_thumbnail_url: ad.creative.thumbnail_url,
+            adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
+            creativeLib_image_url: creativeLibData?.image_url,
+            creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
+            creativeLib_video_id: creativeLibData?.video_id
+          });
+          
+          // Enhanced thumbnail logic
+          const thumbnailUrl = (() => {
+            // Try multiple sources in order of preference
+            const candidates = [
+              creativeLibData?.image_url,                                    // Creative Library high-res
+              ad.creative.image_url,                                         // Ads API image
+              creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
+              ad.creative.thumbnail_url,                                     // Ads API thumbnail
+              creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
+              ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
+              ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
+              creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
+            ];
             
-            // Basic creative info from ads API
-            const thumbnailUrl = ad.creative?.thumbnail_url || ad.creative?.image_url || null;
+            const finalUrl = candidates.find(url => url && url.length > 0);
             
-            // Calculate ROAS for this specific creative
-            const spend = insight ? parseFloat(insight.spend || 0) : 0;
-            const purchases = insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const purchaseValue = insight && insight.action_values ? 
-              parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
-            
-            console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
-              spend,
-              purchases,
-              purchaseValue,
-              roas: roas.toFixed(2)
+            console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
+              candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
+              selected: finalUrl || 'NONE FOUND'
             });
             
-            // Apply smart grouping for this creative
-            const groupingResult = extractPostIdWithFallback(ad.name);
-            console.log(`🏷️ Smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
-            
-            return {
-              adId: ad.id,
-              adName: ad.name,
-              adsetName: ad.adset ? ad.adset.name : 'Unknown',
-              creativeId: ad.creative?.id || `gen_${ad.id}`,
-              thumbnailUrl: thumbnailUrl,
-              objectStorySpec: ad.creative?.object_story_spec || null,
-              accountId: selectedAccountId,
-              // Performance metrics
-              impressions: insight ? parseInt(insight.impressions || 0) : 0,
-              clicks: insight ? parseInt(insight.clicks || 0) : 0,
-              spend: spend,
-              ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-              cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-              cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-              // Add conversion metrics
-              purchases: purchases,
-              landingPageViews: insight && insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-              addToCarts: insight && insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-              // Add ROAS calculation
-              roas: roas,
-              revenue: purchaseValue,
-              // Add smart grouping info
-              smartGroupKey: groupingResult.groupKey,
-              groupingMethod: groupingResult.method,
-              postId: groupingResult.postId || null
-            };
+            return finalUrl || null;
+          })();
+          
+          // 🔧 NEW: Calculate ROAS for this specific creative
+          const spend = insight ? parseFloat(insight.spend || 0) : 0;
+          const purchases = insight && insight.actions ? 
+            parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+          
+          // Calculate revenue from purchase value
+          const purchaseValue = insight && insight.action_values ? 
+            parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+          
+          // Calculate ROAS: Revenue / Spend
+          const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
+          
+          // 🚨 DEBUG: Log ROAS calculation
+          console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
+            spend,
+            purchases,
+            purchaseValue,
+            roas: roas.toFixed(2)
           });
-      } else {
-        // Fallback: create dummy creative entries from insights if available
-        console.log('⚠️ Creating creative entries from available insights data');
-        
-        if (adInsightsResponse.data.data.length > 0) {
-          creativePerformance = adInsightsResponse.data.data.map(insight => {
-            const spend = parseFloat(insight.spend || 0);
-            const purchases = insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const purchaseValue = insight.action_values ? 
-              parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
-            
-            const dummyAdName = `Ad ${insight.ad_id}`;
-            const groupingResult = extractPostIdWithFallback(dummyAdName);
-            
-            return {
-              adId: insight.ad_id,
-              adName: dummyAdName,
-              adsetName: 'Unknown',
-              creativeId: `gen_${insight.ad_id}`,
-              thumbnailUrl: null,
-              objectStorySpec: null,
-              accountId: selectedAccountId,
-              // Performance metrics from insights
-              impressions: parseInt(insight.impressions || 0),
-              clicks: parseInt(insight.clicks || 0),
-              spend: spend,
-              ctr: parseFloat(insight.ctr || 0) * 100,
-              cpm: parseFloat(insight.cpm || 0),
-              cpc: parseFloat(insight.cpc || 0),
-              purchases: purchases,
-              landingPageViews: insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-              addToCarts: insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-              roas: roas,
-              revenue: purchaseValue,
-              smartGroupKey: groupingResult.groupKey,
-              groupingMethod: groupingResult.method,
-              postId: groupingResult.postId || null
-            };
-          });
-        }
-      }
+          
+          // 🔧 NEW: Apply smart grouping for this creative
+          const groupingResult = extractPostIdWithFallback(ad.name);
+          console.log(`🏷️ Smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
+          
+          return {
+            adId: ad.id,
+            adName: ad.name,
+            adsetName: ad.adset ? ad.adset.name : 'Unknown',
+            creativeId: ad.creative.id,
+            thumbnailUrl: thumbnailUrl,  // This should now have better URLs
+            objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
+            accountId: selectedAccountId,
+            // Performance metrics
+            impressions: insight ? parseInt(insight.impressions || 0) : 0,
+            clicks: insight ? parseInt(insight.clicks || 0) : 0,
+            spend: spend,
+            ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+            cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+            cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+            // Add conversion metrics
+            purchases: purchases,
+            landingPageViews: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+            addToCarts: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+            // 🔧 NEW: Add ROAS calculation
+            roas: roas,
+            revenue: purchaseValue,
+            // 🔧 NEW: Add smart grouping info
+            smartGroupKey: groupingResult.groupKey,
+            groupingMethod: groupingResult.method,
+            postId: groupingResult.postId || null
+          };
+        });
 
       // 🚨 DEBUG: Final summary
       const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
