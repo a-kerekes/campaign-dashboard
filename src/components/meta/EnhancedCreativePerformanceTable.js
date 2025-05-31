@@ -873,131 +873,146 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
 
-      {/* Creative Cards Grid - FIXED LAYOUT WITH DEFENSIVE STYLING */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      {/* ORIGINAL LARGE CARD LAYOUT - RESTORED */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredCreatives.map((creative) => (
           <div
             key={creative.id}
-            className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden flex flex-col ${
+            className={`bg-white rounded-lg border-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden ${
               selectedCreativeId === creative.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
             }`}
-            style={{ 
-              minHeight: '384px', // 96 * 4 = 384px (equivalent to min-h-96)
-              maxHeight: '600px',  // Prevent cards from becoming too tall
-              height: 'auto'
-            }}
             onClick={() => setSelectedCreativeId(creative.id)}
           >
-            {/* Creative Thumbnail - FIXED WITH DEFENSIVE CONSTRAINTS */}
+            {/* Creative Thumbnail - FIXED WITH PROPER CONSTRAINTS */}
             {creative.thumbnailUrl && (
-              <div 
-                className="bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0"
-                style={{
-                  height: '160px', // Fixed height equivalent to h-40
-                  minHeight: '160px',
-                  maxHeight: '160px'
-                }}
-              >
+              <div className="w-full bg-gray-50 flex items-center justify-center overflow-hidden" style={{ height: '200px' }}>
                 <img 
                   src={creative.thumbnailUrl} 
                   alt="Creative thumbnail"
-                  className="object-contain"
                   style={{
                     maxWidth: '100%',
                     maxHeight: '100%',
                     width: 'auto',
-                    height: 'auto'
+                    height: 'auto',
+                    objectFit: 'contain'
                   }}
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><span class="text-2xl">🖼️</span></div>';
+                    e.target.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9CA3AF; font-size: 3rem;">🖼️</div>';
                   }}
                 />
               </div>
             )}
             
-            {/* Content Container - FIXED FLEX LAYOUT */}
-            <div className="p-3 flex-1 flex flex-col min-h-0">
+            {/* Content Section - LARGE LAYOUT RESTORED */}
+            <div className="p-4">
               {/* Ad Name */}
-              <div className="mb-2 flex-shrink-0">
-                <h4 className="text-sm font-medium text-gray-900 leading-tight" style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  wordBreak: 'break-word'
-                }}>
+              <div className="mb-3">
+                <h4 className="text-sm font-semibold text-gray-900 leading-tight line-clamp-3">
                   {creative.adName}
                 </h4>
               </div>
               
               {/* Copy Text - Show based on view mode and aggregation level */}
               {(viewMode === VIEW_MODES.COPY || aggregationLevel >= 3) && (
-                <div className="mb-3 flex-1 min-h-0">
-                  <div 
-                    className="text-xs text-gray-600 bg-gray-50 rounded p-2 overflow-hidden"
-                    style={{
-                      maxHeight: '80px',
-                      minHeight: '60px'
-                    }}
-                  >
-                    {creative.extractedCopy.split('\n').slice(0, 3).map((line, index) => (
-                      <div key={index} className="leading-relaxed" style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {line.substring(0, 80)}{line.length > 80 ? '...' : ''}
+                <div className="mb-4">
+                  <div className="text-xs text-gray-600 bg-gray-50 rounded p-3 min-h-[60px]">
+                    {creative.extractedCopy && creative.extractedCopy.split('\n').slice(0, 4).map((line, index) => (
+                      <div key={index} className="leading-relaxed mb-1">
+                        {line.substring(0, 100)}{line.length > 100 ? '...' : ''}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               
-              {/* Metrics Grid - FIXED POSITION AT BOTTOM */}
-              <div className="mt-auto space-y-2 flex-shrink-0">
-                {currentMetrics.reduce((rows, metric, index) => {
-                  if (index % 2 === 0) {
-                    const nextMetric = currentMetrics[index + 1];
-                    rows.push(
-                      <div key={metric} className="flex justify-between text-xs">
-                        <div className="flex-1 pr-2 min-w-0">
-                          <div className="text-gray-500 uppercase font-medium text-xs mb-1 truncate">
-                            {metric === 'thumbstopRate' ? 'Thumbstop' : 
-                             metric === 'seeMoreRate' ? 'See More' :
-                             metric === 'adsetCount' ? 'Ad Sets' :
-                             metric === 'creativeCount' ? 'Creatives' :
-                             metric.replace(/([A-Z])/g, ' $1').toUpperCase()}
-                          </div>
-                          <div 
-                            className="font-semibold truncate"
-                            style={{ color: getBenchmarkColor(metric, creative[metric]) }}
-                          >
-                            {formatMetricValue(metric, creative[metric])}
-                          </div>
-                        </div>
-                        {nextMetric && (
-                          <div className="flex-1 text-right pl-2 min-w-0">
-                            <div className="text-gray-500 uppercase font-medium text-xs mb-1 truncate">
-                              {nextMetric === 'thumbstopRate' ? 'Thumbstop' : 
-                               nextMetric === 'seeMoreRate' ? 'See More' :
-                               nextMetric === 'adsetCount' ? 'Ad Sets' :
-                               nextMetric === 'creativeCount' ? 'Creatives' :
-                               nextMetric.replace(/([A-Z])/g, ' $1').toUpperCase()}
-                            </div>
-                            <div 
-                              className="font-semibold truncate"
-                              style={{ color: getBenchmarkColor(nextMetric, creative[nextMetric]) }}
-                            >
-                              {formatMetricValue(nextMetric, creative[nextMetric])}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return rows;
-                }, [])}
+              {/* Metrics Section - LARGE FORMAT RESTORED */}
+              <div className="space-y-3">
+                {/* Primary Metrics Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 uppercase font-medium mb-1">ROAS</div>
+                    <div 
+                      className="text-lg font-bold"
+                      style={{ color: getBenchmarkColor('roas', creative.roas) }}
+                    >
+                      {formatMetricValue('roas', creative.roas)}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 uppercase font-medium mb-1">REVENUE</div>
+                    <div 
+                      className="text-lg font-bold"
+                      style={{ color: getBenchmarkColor('revenue', creative.revenue) }}
+                    >
+                      {formatMetricValue('revenue', creative.revenue)}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Secondary Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <div className="text-gray-500 uppercase font-medium mb-1">CPM</div>
+                    <div 
+                      className="font-semibold"
+                      style={{ color: getBenchmarkColor('cpm', creative.cpm) }}
+                    >
+                      {formatMetricValue('cpm', creative.cpm)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 uppercase font-medium mb-1">CTR</div>
+                    <div 
+                      className="font-semibold"
+                      style={{ color: getBenchmarkColor('ctr', creative.ctr) }}
+                    >
+                      {formatMetricValue('ctr', creative.ctr)}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Additional Metrics */}
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <div className="text-gray-500 uppercase font-medium mb-1">
+                      {viewMode === VIEW_MODES.COPY ? 'CREATIVES' : 'THUMBSTOP'}
+                    </div>
+                    <div className="font-semibold text-gray-700">
+                      {viewMode === VIEW_MODES.COPY 
+                        ? formatMetricValue('creativeCount', creative.creativeCount)
+                        : formatMetricValue('thumbstopRate', creative.thumbstopRate)
+                      }
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 uppercase font-medium mb-1">SPEND</div>
+                    <div className="font-semibold text-gray-700">
+                      {formatMetricValue('spend', creative.spend)}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Bottom Metrics */}
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <div className="text-gray-500 uppercase font-medium mb-1">PURCHASES</div>
+                    <div className="font-semibold text-gray-700">
+                      {formatMetricValue('purchases', creative.purchases)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 uppercase font-medium mb-1">
+                      {viewMode === VIEW_MODES.COPY ? '# AD SETS' : '# AD SETS'}
+                    </div>
+                    <div className="font-semibold text-gray-700">
+                      {viewMode === VIEW_MODES.COPY 
+                        ? `${creative.adsetCount || 0} Ad Sets`
+                        : `${creative.adsetCount || 0} Ad Sets`
+                      }
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
