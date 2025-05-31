@@ -69,6 +69,245 @@ const CreativeAnalyticsDashboard = () => {
     }
   }, [isConnected, selectedAccountId, fetchBenchmarks]);
 
+  // Enhanced Post ID extraction with intelligent fallback grouping
+  const extractPostIdWithFallback = useCallback((adName) => {
+    if (!adName) return { groupKey: 'unknown', method: 'fallback' };
+    
+    console.log(`🔍 SMART GROUPING: Analyzing "${adName}"`);
+    
+    // STRATEGY 1: Try to extract Post ID (original logic)
+    const tryExtractPostId = (adName) => {
+      const patterns = [
+        // Pattern 1: Number at the very end after |
+        /\|\s*(\d{10,})\s*\|?\s*$/,
+        // Pattern 2: Number after technical suffix  
+        /\|\s*[\w-_]+\s*\|\s*(\d{10,})\s*\|?\s*$/,
+        // Pattern 3: Long number anywhere (13+ digits)
+        /(\d{13,})/,
+        // Pattern 4: Facebook post ID patterns
+        /post[_-]?id[_-]?:?\s*(\d{10,})/i,
+        // Pattern 5: Creative ID patterns
+        /creative[_-]?id[_-]?:?\s*(\d{10,})/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = adName.match(pattern);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+      return null;
+    };
+
+    // Helper Functions
+    const isPartTechnical = (part) => {
+      const technicalPatterns = [
+        /^\d+_/, // Starts with number_
+        /^(24_|25_)/, // Date prefixes
+        /LP\s*\|?\s*$/, // Landing page suffix
+        /Homepage/, // Technical indicators
+        /Copy\s*\|?\s*$/, // Copy suffix
+        /^(Do|Try)\//, // Action prefixes
+      ];
+      
+      return technicalPatterns.some(pattern => pattern.test(part));
+    };
+
+    const isPartProductName = (part) => {
+      // Heuristics for product names
+      return part.length > 2 && 
+             part.length < 50 && 
+             !isPartTechnical(part) &&
+             !/^\d+$/.test(part) && // Not just numbers
+             !/^[A-Z]{2,}$/.test(part); // Not all caps abbreviations
+    };
+
+    const isPartVisualTheme = (part) => {
+      const visualThemes = [
+        'white', 'black', 'blue', 'red', 'green', 'orange', 'purple', 'yellow',
+        'award', 'total', 'premium', 'classic', 'modern', 'clean', 'bold',
+        'bright', 'dark', 'light', 'minimal', 'vibrant'
+      ];
+      
+      return visualThemes.some(theme => 
+        part.toLowerCase().includes(theme.toLowerCase())
+      );
+    };
+
+    const isPartVariation = (part) => {
+      const variationPatterns = [
+        /v\d+/i, // v1, v2, etc.
+        /version/i,
+        /test/i,
+        /variant/i,
+        /copy/i,
+        /creative/i
+      ];
+      
+      return variationPatterns.some(pattern => pattern.test(part)) ||
+             isPartVisualTheme(part);
+    };
+
+    const findCreativeType = (parts) => {
+      const typeIndicators = ['IMG', 'VID', 'GIF', 'VIDEO', 'IMAGE', 'CAROUSEL', 'COLLECTION'];
+      return parts.find(part => 
+        typeIndicators.some(type => part.toUpperCase().includes(type))
+      );
+    };
+
+    const findProductName = (parts) => {
+      // Look for parts that seem like product names
+      return parts.find(part => 
+        isPartProductName(part) && !isPartTechnical(part)
+      );
+    };
+
+    const findVariation = (parts) => {
+      const variationIndicators = [
+        'white', 'black', 'blue', 'red', 'green', 'orange', 'award', 'total', 'premium',
+        'v1', 'v2', 'v3', 'version', 'test', 'variant', 'copy', 'creative',
+        'bloat', 'testimonial', 'support', 'clinic'
+      ];
+      
+      return parts.find(part =>
+        variationIndicators.some(indicator => 
+          part.toLowerCase().includes(indicator.toLowerCase())
+        )
+      );
+    };
+
+    const findVariationInParts = (parts) => {
+      return parts.find(part => 
+        isPartVariation(part) && !isPartTechnical(part)
+      );
+    };
+
+    // STRATEGY 2: Group by Creative Type + Core Product
+    const tryCreativeTypeGrouping = (adName) => {
+      const parts = adName.split('|').map(p => p.trim());
+      
+      // Look for creative type indicators
+      const creativeType = findCreativeType(parts);
+      const productName = findProductName(parts);
+      const variation = findVariation(parts);
+      
+      if (creativeType && productName) {
+        let groupKey = `${creativeType}_${productName}`;
+        if (variation) {
+          groupKey += `_${variation}`;
+        }
+        return groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      }
+      
+      return null;
+    };
+
+    // STRATEGY 3: Group by Product/Campaign Name
+    const tryProductGrouping = (adName) => {
+      const parts = adName.split('|').map(p => p.trim());
+      
+      // Common product name indicators (first few parts usually contain product info)
+      for (let i = 0; i < Math.min(3, parts.length); i++) {
+        const part = parts[i];
+        
+        // Skip technical prefixes
+        if (isPartTechnical(part)) continue;
+        
+        // If this looks like a product name, use it
+        if (isPartProductName(part)) {
+          // Look for variations in subsequent parts
+          const variation = findVariationInParts(parts.slice(i + 1));
+          let groupKey = `product_${part}`;
+          if (variation) {
+            groupKey += `_${variation}`;
+          }
+          return groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        }
+      }
+      
+      return null;
+    };
+
+    // STRATEGY 4: Group by Visual Theme/Variation
+    const tryThemeGrouping = (adName) => {
+      const parts = adName.split('|').map(p => p.trim());
+      
+      // Look for visual/theme indicators
+      const themes = [];
+      const productBase = [];
+      
+      parts.forEach(part => {
+        if (isPartVisualTheme(part)) {
+          themes.push(part);
+        } else if (isPartProductName(part) && !isPartTechnical(part)) {
+          productBase.push(part);
+        }
+      });
+      
+      if (productBase.length > 0) {
+        let groupKey = `theme_${productBase[0]}`;
+        if (themes.length > 0) {
+          groupKey += `_${themes[0]}`;
+        }
+        return groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      }
+      
+      return null;
+    };
+
+    // STRATEGY 5: Group by Brand/Campaign
+    const tryBrandGrouping = (adName) => {
+      const parts = adName.split('|').map(p => p.trim());
+      
+      // Usually brand/campaign name is in the first part
+      const firstPart = parts[0];
+      if (firstPart && !isPartTechnical(firstPart)) {
+        return `brand_${firstPart.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
+      }
+      
+      return null;
+    };
+
+    const postId = tryExtractPostId(adName);
+    if (postId) {
+      console.log(`✅ Strategy 1 SUCCESS: Found Post ID "${postId}"`);
+      return { groupKey: `post_${postId}`, method: 'post_id', postId };
+    }
+    
+    // STRATEGY 2: Creative Type + Product/Campaign grouping
+    const creativeGroup = tryCreativeTypeGrouping(adName);
+    if (creativeGroup) {
+      console.log(`✅ Strategy 2 SUCCESS: Creative grouping "${creativeGroup}"`);
+      return { groupKey: creativeGroup, method: 'creative_type' };
+    }
+    
+    // STRATEGY 3: Product/Campaign name grouping
+    const productGroup = tryProductGrouping(adName);
+    if (productGroup) {
+      console.log(`✅ Strategy 3 SUCCESS: Product grouping "${productGroup}"`);
+      return { groupKey: productGroup, method: 'product_name' };
+    }
+    
+    // STRATEGY 4: Visual/Theme grouping (for image variations)
+    const themeGroup = tryThemeGrouping(adName);
+    if (themeGroup) {
+      console.log(`✅ Strategy 4 SUCCESS: Theme grouping "${themeGroup}"`);
+      return { groupKey: themeGroup, method: 'theme_group' };
+    }
+    
+    // STRATEGY 5: Brand/Campaign fallback
+    const brandGroup = tryBrandGrouping(adName);
+    if (brandGroup) {
+      console.log(`✅ Strategy 5 SUCCESS: Brand grouping "${brandGroup}"`);
+      return { groupKey: brandGroup, method: 'brand_group' };
+    }
+    
+    // FINAL FALLBACK: Use cleaned first part
+    const fallbackGroup = `name_${adName.split('|')[0]?.trim() || 'unknown'}`;
+    console.log(`⚠️ Using final fallback: "${fallbackGroup}"`);
+    return { groupKey: fallbackGroup, method: 'fallback' };
+  }, []);
+
   // Function to load performance data wrapped in useCallback
   const loadPerformanceData = useCallback(async () => {
     if (!accessToken || !selectedAccountId) return;
@@ -392,99 +631,104 @@ const CreativeAnalyticsDashboard = () => {
         adInsightsResponse = { data: { data: [] } };
       }
 
-      // REPLACE THIS SECTION in CreativeAnalyticsDashboard.js
-// Find the section around line 400-430 where creativePerformance is mapped
-
-// 5. Map insights to ads with creatives
-const creativePerformance = ads
-.filter(ad => ad.creative)
-.map(ad => {
-  const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
-  
-  // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
-  const creativeLibData = creativesMap[ad.creative.id];
-  
-  console.log(`🔍 PROCESSING AD ${ad.id}:`, {
-    adName: ad.name,
-    creativeId: ad.creative.id,
-    adsAPI_image_url: ad.creative.image_url,
-    adsAPI_thumbnail_url: ad.creative.thumbnail_url,
-    adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
-    creativeLib_image_url: creativeLibData?.image_url,
-    creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
-    creativeLib_video_id: creativeLibData?.video_id
-  });
-  
-  // Enhanced thumbnail logic
-  const thumbnailUrl = (() => {
-    // Try multiple sources in order of preference
-    const candidates = [
-      creativeLibData?.image_url,                                    // Creative Library high-res
-      ad.creative.image_url,                                         // Ads API image
-      creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
-      ad.creative.thumbnail_url,                                     // Ads API thumbnail
-      creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
-      ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
-      ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
-      creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
-    ];
-    
-    const finalUrl = candidates.find(url => url && url.length > 0);
-    
-    console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
-      candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
-      selected: finalUrl || 'NONE FOUND'
-    });
-    
-    return finalUrl || null;
-  })();
-  
-  // 🔧 NEW: Calculate ROAS for this specific creative
-  const spend = insight ? parseFloat(insight.spend || 0) : 0;
-  const purchases = insight && insight.actions ? 
-    parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-  
-  // Calculate revenue from purchase value
-  const purchaseValue = insight && insight.action_values ? 
-    parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-  
-  // Calculate ROAS: Revenue / Spend
-  const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
-  
-  // 🚨 DEBUG: Log ROAS calculation
-  console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
-    spend,
-    purchases,
-    purchaseValue,
-    roas: roas.toFixed(2)
-  });
-  
-  return {
-    adId: ad.id,
-    adName: ad.name,
-    adsetName: ad.adset ? ad.adset.name : 'Unknown',
-    creativeId: ad.creative.id,
-    thumbnailUrl: thumbnailUrl,  // This should now have better URLs
-    objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
-    accountId: selectedAccountId,
-    // Performance metrics
-    impressions: insight ? parseInt(insight.impressions || 0) : 0,
-    clicks: insight ? parseInt(insight.clicks || 0) : 0,
-    spend: spend,
-    ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-    cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-    cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-    // Add conversion metrics
-    purchases: purchases,
-    landingPageViews: insight && insight.actions ? 
-      parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-    addToCarts: insight && insight.actions ? 
-      parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-    // 🔧 NEW: Add ROAS calculation
-    roas: roas,
-    revenue: purchaseValue
-  };
-});
+      // 5. Map insights to ads with creatives - ENHANCED WITH SMART GROUPING
+      const creativePerformance = ads
+        .filter(ad => ad.creative)
+        .map(ad => {
+          const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+          
+          // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
+          const creativeLibData = creativesMap[ad.creative.id];
+          
+          console.log(`🔍 PROCESSING AD ${ad.id}:`, {
+            adName: ad.name,
+            creativeId: ad.creative.id,
+            adsAPI_image_url: ad.creative.image_url,
+            adsAPI_thumbnail_url: ad.creative.thumbnail_url,
+            adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
+            creativeLib_image_url: creativeLibData?.image_url,
+            creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
+            creativeLib_video_id: creativeLibData?.video_id
+          });
+          
+          // Enhanced thumbnail logic
+          const thumbnailUrl = (() => {
+            // Try multiple sources in order of preference
+            const candidates = [
+              creativeLibData?.image_url,                                    // Creative Library high-res
+              ad.creative.image_url,                                         // Ads API image
+              creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
+              ad.creative.thumbnail_url,                                     // Ads API thumbnail
+              creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
+              ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
+              ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
+              creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
+            ];
+            
+            const finalUrl = candidates.find(url => url && url.length > 0);
+            
+            console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
+              candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
+              selected: finalUrl || 'NONE FOUND'
+            });
+            
+            return finalUrl || null;
+          })();
+          
+          // 🔧 NEW: Calculate ROAS for this specific creative
+          const spend = insight ? parseFloat(insight.spend || 0) : 0;
+          const purchases = insight && insight.actions ? 
+            parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+          
+          // Calculate revenue from purchase value
+          const purchaseValue = insight && insight.action_values ? 
+            parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+          
+          // Calculate ROAS: Revenue / Spend
+          const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
+          
+          // 🚨 DEBUG: Log ROAS calculation
+          console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
+            spend,
+            purchases,
+            purchaseValue,
+            roas: roas.toFixed(2)
+          });
+          
+          // 🔧 NEW: Apply smart grouping for this creative
+          const groupingResult = extractPostIdWithFallback(ad.name);
+          console.log(`🏷️ Smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
+          
+          return {
+            adId: ad.id,
+            adName: ad.name,
+            adsetName: ad.adset ? ad.adset.name : 'Unknown',
+            creativeId: ad.creative.id,
+            thumbnailUrl: thumbnailUrl,  // This should now have better URLs
+            objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
+            accountId: selectedAccountId,
+            // Performance metrics
+            impressions: insight ? parseInt(insight.impressions || 0) : 0,
+            clicks: insight ? parseInt(insight.clicks || 0) : 0,
+            spend: spend,
+            ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+            cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+            cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+            // Add conversion metrics
+            purchases: purchases,
+            landingPageViews: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+            addToCarts: insight && insight.actions ? 
+              parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+            // 🔧 NEW: Add ROAS calculation
+            roas: roas,
+            revenue: purchaseValue,
+            // 🔧 NEW: Add smart grouping info
+            smartGroupKey: groupingResult.groupKey,
+            groupingMethod: groupingResult.method,
+            postId: groupingResult.postId || null
+          };
+        });
 
       // 🚨 DEBUG: Final summary
       const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
@@ -497,6 +741,14 @@ const creativePerformance = ads
           thumbnailUrl: c.thumbnailUrl
         }))
       });
+
+      // 🔧 NEW: Log smart grouping statistics
+      const groupingStats = {};
+      creativePerformance.forEach(creative => {
+        const method = creative.groupingMethod;
+        groupingStats[method] = (groupingStats[method] || 0) + 1;
+      });
+      console.log('📊 SMART GROUPING STATISTICS:', groupingStats);
       
       // Prepare summary metrics from account insights
       const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
@@ -569,7 +821,7 @@ const creativePerformance = ads
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange]);
+  }, [accessToken, selectedAccountId, dateRange, extractPostIdWithFallback]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
