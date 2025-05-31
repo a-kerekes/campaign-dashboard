@@ -1,4 +1,4 @@
-// src/components/meta/CreativeAnalyticsDashboard.js
+export default CreativeAnalyticsDashboard;// src/components/meta/CreativeAnalyticsDashboard.js
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AdMetricsChart from './AdMetricsChart';
@@ -517,7 +517,7 @@ const CreativeAnalyticsDashboard = () => {
         }
       );
       
-      // 3. Fetch ads with their creative info - WITH FALLBACK
+      // 3. Fetch ads with their creative info - WITH FALLBACK AND ENHANCED ERROR HANDLING
       console.log('🔍 BEFORE ADS FETCH CALL:');
       console.log('🔍 About to fetch ads with limit 500');
       
@@ -693,927 +693,925 @@ const CreativeAnalyticsDashboard = () => {
             // Basic creative info from ads API
             const thumbnailUrl = ad.creative?.thumbnail_url || ad.creative?.image_url || null;
             
-            // Calculate ROAS for this specific creative
-            const spend = insight ? parseFloat(insight.spend || 0) : 0;
-            const purchases = insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const purchaseValue = insight && insight.action_values ? 
-              parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
-            
-            console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
-              spend,
-              purchases,
-              purchaseValue,
-              roas: roas.toFixed(2)
-            });
-            
-            // Apply smart grouping for this creative
-            const groupingResult = extractPostIdWithFallback(ad.name);
-            console.log(`🏷️ Smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
-            
-            return {
-              adId: ad.id,
-              adName: ad.name,
-              adsetName: ad.adset ? ad.adset.name : 'Unknown',
-              creativeId: ad.creative?.id || `gen_${ad.id}`,
-              thumbnailUrl: thumbnailUrl,
-              objectStorySpec: ad.creative?.object_story_spec || null,
-              accountId: selectedAccountId,
-              // Performance metrics
-              impressions: insight ? parseInt(insight.impressions || 0) : 0,
-              clicks: insight ? parseInt(insight.clicks || 0) : 0,
-              spend: spend,
-              ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-              cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-              cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-              // Add conversion metrics
-              purchases: purchases,
-              landingPageViews: insight && insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-              addToCarts: insight && insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-              // Add ROAS calculation
-              roas: roas,
-              revenue: purchaseValue,
-              // Add smart grouping info
-              smartGroupKey: groupingResult.groupKey,
-              groupingMethod: groupingResult.method,
-              postId: groupingResult.postId || null
-            };
-          });
-      } else {
-        // Fallback: create dummy creative entries from insights if available
-        console.log('⚠️ Creating creative entries from available insights data');
-        
-        if (adInsightsResponse.data.data.length > 0) {
-          creativePerformance = adInsightsResponse.data.data.map(insight => {
-            const spend = parseFloat(insight.spend || 0);
-            const purchases = insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const purchaseValue = insight.action_values ? 
-              parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-            
-            const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
-            
-            const dummyAdName = `Ad ${insight.ad_id}`;
-            const groupingResult = extractPostIdWithFallback(dummyAdName);
-            
-            return {
-              adId: insight.ad_id,
-              adName: dummyAdName,
-              adsetName: 'Unknown',
-              creativeId: `gen_${insight.ad_id}`,
-              thumbnailUrl: null,
-              objectStorySpec: null,
-              accountId: selectedAccountId,
-              // Performance metrics from insights
-              impressions: parseInt(insight.impressions || 0),
-              clicks: parseInt(insight.clicks || 0),
-              spend: spend,
-              ctr: parseFloat(insight.ctr || 0) * 100,
-              cpm: parseFloat(insight.cpm || 0),
-              cpc: parseFloat(insight.cpc || 0),
-              purchases: purchases,
-              landingPageViews: insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-              addToCarts: insight.actions ? 
-                parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-              roas: roas,
-              revenue: purchaseValue,
-              smartGroupKey: groupingResult.groupKey,
-              groupingMethod: groupingResult.method,
-              postId: groupingResult.postId || null
-            };
-          });
-        }
-      }
-
-      // 🚨 DEBUG: Final summary
-      const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
-      console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
-        totalCreatives: creativePerformance.length,
-        creativesWithThumbnails: creativesWithThumbnails.length,
-        sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
-          creativeId: c.creativeId,
-          adName: c.adName,
-          thumbnailUrl: c.thumbnailUrl
-        }))
-      });
-
-      // 🔧 NEW: Log smart grouping statistics
-      const groupingStats = {};
-      creativePerformance.forEach(creative => {
-        const method = creative.groupingMethod;
-        groupingStats[method] = (groupingStats[method] || 0) + 1;
-      });
-      console.log('📊 SMART GROUPING STATISTICS:', groupingStats);
-      
-      // Prepare summary metrics from account insights
-      const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
-        ? insightsResponse.data.data[0] 
-        : {};
-      
-      const summary = {
-        totalImpressions: parseInt(accountInsights.impressions || 0),
-        totalClicks: parseInt(accountInsights.clicks || 0),
-        totalSpend: parseFloat(accountInsights.spend || 0),
-        avgCtr: accountInsights.ctr ? parseFloat(accountInsights.ctr) * 100 : 0,
-        avgCpc: parseFloat(accountInsights.cpc || 0),
-        avgCpm: parseFloat(accountInsights.cpm || 0),
-        campaigns: campaignsResponse.data.data.length,
-        activeCreatives: ads.filter(ad => ad.creative).length
-      };
-      
-      // Calculate estimated funnel data if conversions aren't directly available
-      const purchaseAction = accountInsights.actions?.find(a => a.action_type === 'purchase');
-      const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1); // Assuming 10% conversion rate
-      
-      const landingPageViewAction = accountInsights.actions?.find(a => a.action_type === 'landing_page_view');
-      const estimatedLandingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value) : Math.round(summary.totalClicks * 0.8); // Assuming 80% land on the page
-      
-      const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
-      const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3); // Assuming 30% add to cart
-
-      // Add funnel data to analytics
-      const funnel = {
-        impressions: summary.totalImpressions,
-        clicks: summary.totalClicks,
-        landingPageViews: estimatedLandingPageViews,
-        addToCarts: estimatedAddToCarts,
-        purchases: estimatedPurchases
-      };
-
-      // Add revenue data if available
-      const purchaseValueAction = accountInsights.action_values?.find(a => a.action_type === 'purchase');
-      const revenue = purchaseValueAction ? parseFloat(purchaseValueAction.value) : 0;
-
-      // Add more advanced metrics
-      const advancedMetrics = {
-        cpm: summary.avgCpm,
-        cpc: summary.avgCpc,
-        costPerPurchase: funnel.purchases > 0 ? summary.totalSpend / funnel.purchases : 0,
-        roas: revenue > 0 ? revenue / summary.totalSpend : 0,
-        linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
-      };
-      
-      // Find top performing creatives by spend
-      const topCreatives = [...creativePerformance]
-        .sort((a, b) => b.spend - a.spend)
-        .slice(0, 5);
-      
-      setAnalyticsData({
-        summary,
-        funnel,
-        advancedMetrics,
-        creativePerformance,
-        topCreatives,
-        campaigns: campaignsResponse.data.data,
-        accountInsights: insightsResponse.data.data
-      });
-      
-      console.log('Performance data and time series data loaded successfully');
-      
-    } catch (error) {
-      console.error('Error loading performance data:', error);
-      setError('Error loading data from Meta API. Please check console for details.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accessToken, selectedAccountId, dateRange, extractPostIdWithFallback]);
-
-  // Load performance data when account or date range changes
-  useEffect(() => {
-    if (isConnected && selectedAccountId && accessToken) {
-      loadPerformanceData();
-    }
-  }, [isConnected, selectedAccountId, dateRange, accessToken, loadPerformanceData]);
-
-  const handleAccountChange = (e) => {
-    const accountId = e.target.value;
-    setSelectedAccountId(accountId);
-  };
-
-  const toggleDiagnostic = () => {
-    setShowDiagnostic(!showDiagnostic);
-  };
-
-  // Handle toggling between real and mock data
-  const handleToggleDataSource = () => {
-    // Since we don't have access to shouldUseMockData or notifyMockDataChange,
-    // we'll just toggle the isRealData state and refresh the data
-    setIsRealData(!isRealData);
-    
-    // Let other components know about this change
-    const event = new CustomEvent('dataSourceChanged', { 
-      detail: { isRealData: !isRealData }
-    });
-    window.dispatchEvent(event);
-    
-    // Force refresh
-    setTimeout(() => {
-      if (isConnected && selectedAccountId && accessToken) {
-        loadPerformanceData();
-      }
-    }, 100);
-  };
-
-  const runDiagnostics = async (token = accessToken) => {
-    if (!token) {
-      setError('Please connect with Facebook first to generate an access token');
-      return;
-    }
-
-    setIsLoading(true);
-    setTestResults({});
-    
-    try {
-      // Test 1: Verify token validity
-      const results = {
-        tokenTest: { status: 'pending', message: 'Testing token validity...' }
-      };
-      setTestResults(results);
-      
-      const meResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me`, {
-        params: { access_token: token }
-      });
-
-      if (meResponse.data.error) {
-        results.tokenTest = { 
-          status: 'failed', 
-          message: `Invalid token: ${meResponse.data.error.message}`,
-          data: meResponse.data.error
-        };
-        setTestResults({...results});
-        setIsLoading(false);
-        return;
-      }
-      
-      results.tokenTest = { 
-        status: 'success', 
-        message: `Valid token for user: ${meResponse.data.name} (ID: ${meResponse.data.id})`,
-        data: meResponse.data
-      };
-      setTestResults({...results});
-
-      // Test 2: Check permissions
-      results.permissionsTest = { status: 'pending', message: 'Checking token permissions...' };
-      setTestResults({...results});
-      
-      const permissionsResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me/permissions`, {
-        params: { access_token: token }
-      });
-      
-      if (permissionsResponse.data.error) {
-        results.permissionsTest = { 
-          status: 'failed', 
-          message: `Failed to fetch permissions: ${permissionsResponse.data.error.message}`,
-          data: permissionsResponse.data.error
-        };
-        setTestResults({...results});
-      } else {
-        const adPermissions = permissionsResponse.data.data.filter(p => 
-          ['ads_management', 'ads_read', 'read_insights', 'business_management', 'pages_show_list'].includes(p.permission)
-        );
-        
-        const missingPermissions = ['ads_management', 'ads_read', 'read_insights', 'business_management', 'pages_show_list'].filter(
-          p => !adPermissions.some(granted => granted.permission === p && granted.status === 'granted')
-        );
-        
-        if (missingPermissions.length > 0) {
-          results.permissionsTest = { 
-            status: 'warning', 
-            message: `Missing permissions: ${missingPermissions.join(', ')}`,
-            data: permissionsResponse.data.data
-          };
-        } else {
-          results.permissionsTest = { 
-            status: 'success', 
-            message: 'All required permissions granted',
-            data: adPermissions
-          };
-        }
-        setTestResults({...results});
-      }
-
-      // Test 3: Fetch Ad Accounts
-      results.accountsTest = { status: 'pending', message: 'Fetching ad accounts...' };
-      setTestResults({...results});
-      
-      const accountsResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`, {
-        params: {
-          access_token: token,
-          fields: 'name,account_id,account_status',
-          limit: 100
-        }
-      });
-      
-      if (accountsResponse.data.error) {
-        results.accountsTest = { 
-          status: 'failed', 
-          message: `Failed to fetch ad accounts: ${accountsResponse.data.error.message}`,
-          data: accountsResponse.data.error
-        };
-        setTestResults({...results});
-      } else if (!accountsResponse.data.data || accountsResponse.data.data.length === 0) {
-        results.accountsTest = { 
-          status: 'warning', 
-          message: 'No ad accounts found for this user',
-          data: accountsResponse.data
-        };
-        setTestResults({...results});
-      } else {
-        const accountsList = accountsResponse.data.data.map(account => ({
-          id: account.id,
-          name: account.name,
-          accountId: account.account_id,
-          status: account.account_status === 1 ? 'Active' : 'Inactive'
-        }));
-        
-        // Store for diagnostic tool
-        setDiagnosticSelectedAccount(accountsList[0].id);
-        
-        results.accountsTest = { 
-          status: 'success', 
-          message: `Found ${accountsList.length} ad accounts`,
-          data: accountsList
-        };
-        setTestResults({...results});
-      }
-
-    } catch (error) {
-      console.error('Error during diagnostics:', error);
-      setTestResults({
-        error: {
-          status: 'failed',
-          message: `Error running diagnostics: ${error.message}`,
-          data: error.response?.data || error
-        }
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const testAccountInsights = async () => {
-    if (!diagnosticSelectedAccount) return;
-    
-    setIsLoading(true);
-    const updatedResults = {...testResults};
-    updatedResults.insightsTest = { status: 'pending', message: 'Fetching account insights...' };
-    setTestResults(updatedResults);
-    
-    try {
-      // Format account ID to ensure it starts with "act_"
-      const accountId = diagnosticSelectedAccount.replace('act_', '');
-      
-      // Attempt to fetch basic account insights
-      const today = new Date();
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      const since = thirtyDaysAgo.toISOString().split('T')[0];
-      const until = today.toISOString().split('T')[0];
-      
-      const insightsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/insights`,
-        {
-          params: {
-            access_token: accessToken,
-            time_range: JSON.stringify({
-              since,
-              until
-            }),
-            fields: 'impressions,clicks,spend',
-            limit: 100
-          }
-        }
-      );
-      
-      if (insightsResponse.data.error) {
-        updatedResults.insightsTest = { 
-          status: 'failed', 
-          message: `Failed to fetch insights: ${insightsResponse.data.error.message}`,
-          data: insightsResponse.data.error
-        };
-      } else if (!insightsResponse.data.data || insightsResponse.data.data.length === 0) {
-        updatedResults.insightsTest = { 
-          status: 'warning', 
-          message: 'No insights data found for the specified time period',
-          data: insightsResponse.data
-        };
-      } else {
-        updatedResults.insightsTest = { 
-          status: 'success', 
-          message: 'Successfully retrieved insights data',
-          data: insightsResponse.data.data
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching insights:', error);
-      updatedResults.insightsTest = { 
-        status: 'failed', 
-        message: `Error fetching insights: ${error.message}`,
-        data: error.response?.data || error
-      };
-    } finally {
-      setTestResults(updatedResults);
-      setIsLoading(false);
-    }
-  };
-
-  const testCampaigns = async () => {
-    if (!diagnosticSelectedAccount) return;
-    
-    setIsLoading(true);
-    const updatedResults = {...testResults};
-    updatedResults.campaignsTest = { status: 'pending', message: 'Fetching campaigns...' };
-    setTestResults(updatedResults);
-    
-    try {
-      // Format account ID to ensure it starts with "act_"
-      const accountId = diagnosticSelectedAccount.replace('act_', '');
-      
-      // Attempt to fetch campaigns
-      const campaignsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/campaigns`,
-        {
-          params: {
-            access_token: accessToken,
-            fields: 'name,status,objective',
-            limit: 100
-          }
-        }
-      );
-      
-      if (campaignsResponse.data.error) {
-        updatedResults.campaignsTest = { 
-          status: 'failed', 
-          message: `Failed to fetch campaigns: ${campaignsResponse.data.error.message}`,
-          data: campaignsResponse.data.error
-        };
-      } else if (!campaignsResponse.data.data || campaignsResponse.data.data.length === 0) {
-        updatedResults.campaignsTest = { 
-          status: 'warning', 
-          message: 'No campaigns found for this account',
-          data: campaignsResponse.data
-        };
-      } else {
-        updatedResults.campaignsTest = { 
-          status: 'success', 
-          message: `Found ${campaignsResponse.data.data.length} campaigns`,
-          data: campaignsResponse.data.data
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching campaigns:', error);
-      updatedResults.campaignsTest = { 
-        status: 'failed', 
-        message: `Error fetching campaigns: ${error.message}`,
-        data: error.response?.data || error
-      };
-    } finally {
-      setTestResults(updatedResults);
-      setIsLoading(false);
-    }
-  };
-
-  const testAdCreatives = async () => {
-    if (!diagnosticSelectedAccount) return;
-    
-    setIsLoading(true);
-    const updatedResults = {...testResults};
-    updatedResults.creativesTest = { status: 'pending', message: 'Fetching ad creatives...' };
-    setTestResults(updatedResults);
-    
-    try {
-      // Format account ID to ensure it starts with "act_"
-      const accountId = diagnosticSelectedAccount.replace('act_', '');
-      
-      // Attempt to fetch ad creatives
-      const adsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/ads`,
-        {
-          params: {
-            access_token: accessToken,
-            fields: 'name,creative{id,thumbnail_url,object_story_spec}',
-            limit: 50
-          }
-        }
-      );
-      
-      if (adsResponse.data.error) {
-        updatedResults.creativesTest = { 
-          status: 'failed', 
-          message: `Failed to fetch ads with creatives: ${adsResponse.data.error.message}`,
-          data: adsResponse.data.error
-        };
-      } else if (!adsResponse.data.data || adsResponse.data.data.length === 0) {
-        updatedResults.creativesTest = { 
-          status: 'warning', 
-          message: 'No ads found for this account',
-          data: adsResponse.data
-        };
-      } else {
-        // Extract creatives from ads response
-        const ads = adsResponse.data.data;
-        const creatives = ads
-          .filter(ad => ad.creative)
-          .map(ad => ({
-            adId: ad.id,
-            adName: ad.name,
-            creativeId: ad.creative.id,
-            thumbnailUrl: ad.creative.thumbnail_url || null,
-            objectStorySpec: ad.creative.object_story_spec || null
-          }));
-          
-        if (creatives.length === 0) {
-          updatedResults.creativesTest = { 
-            status: 'warning', 
-            message: 'No creatives found in the ads for this account',
-            data: ads
-          };
-        } else {
-          updatedResults.creativesTest = { 
-            status: 'success', 
-            message: `Found ${creatives.length} ad creatives`,
-            data: creatives
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching ad creatives:', error);
-      updatedResults.creativesTest = { 
-        status: 'failed', 
-        message: `Error fetching ad creatives: ${error.message}`,
-        data: error.response?.data || error
-      };
-    } finally {
-      setTestResults(updatedResults);
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Section */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Meta Ads Creative Analytics</h1>
-                <p className="mt-2 text-sm text-gray-600">Analyze your creative performance and optimize ad campaigns</p>
-              </div>
-              
-              {/* Data Source Indicator - Moved to header */}
-              {isConnected && (
-                <div className="flex items-center space-x-4">
-                  <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${isRealData ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
-                    <div className={`w-2 h-2 rounded-full mr-2 ${isRealData ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-                    {isRealData ? 'Live API Data' : 'Sample Data'}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!isConnected ? (
-          /* Connection Section */
-          <div className="max-w-md mx-auto">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-8 text-center">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Connect Your Meta Account</h3>
-                <p className="text-blue-100">Get started by connecting your Meta Ads account to analyze creative performance</p>
-              </div>
-              
-              <div className="px-6 py-6 text-center">
-                <MetaAuthButton 
-                  onAuthSuccess={(token) => {
-                    console.log("Auth success callback with token:", token);
-                    setAccessToken(token);
-                    
-                    // Fetch accounts after successful login
-                    axios.get(
-                      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`,
-                      {
-                        params: {
-                          access_token: token,
-                          fields: 'id,name,account_id,account_status',
-                          limit: 50
-                        }
-                      }
-                    )
-                    .then(response => {
-                      if (response.data && response.data.data && response.data.data.length > 0) {
-                        setAccounts(response.data.data);
-                        setSelectedAccountId(response.data.data[0].id);
-                        setIsConnected(true);
+                        // Calculate ROAS for this specific creative
+                        const spend = insight ? parseFloat(insight.spend || 0) : 0;
+                        const purchases = insight && insight.actions ? 
+                          parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
                         
-                        // Automatically run diagnostics after login
-                        runDiagnostics(token);
-                      } else {
-                        setError('No ad accounts found for this user.');
-                      }
-                    })
-                    .catch(error => {
-                      console.error('Error fetching accounts:', error);
-                      setError('Error fetching accounts: ' + error.message);
-                    });
-                  }} 
-                />
-                
-                {error && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                )}
-                
-                <p className="text-xs text-gray-500 mt-4">
-                  Secure connection via Facebook OAuth
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Controls Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex flex-wrap items-end gap-4">
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ad Account</label>
-                  <select
-                    value={selectedAccountId}
-                    onChange={handleAccountChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {accounts.map(account => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                  <select
-                    value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Last 7 Days">Last 7 Days</option>
-                    <option value="Last 30 Days">Last 30 Days</option>
-                    <option value="Last 60 Days">Last 60 Days</option>
-                    <option value="Last 90 Days">Last 90 Days</option>
-                  </select>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleToggleDataSource}
-                    className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors duration-200 text-sm font-medium"
-                  >
-                    {isRealData ? 'Switch to Sample Data' : 'Try Real Data'}
-                  </button>
-                  
-                  <button
-                    onClick={toggleDiagnostic}
-                    className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors duration-200 text-sm font-medium"
-                  >
-                    {showDiagnostic ? 'Hide Diagnostics' : 'Show Diagnostics'}
-                  </button>
-                </div>
-              </div>
-              
-              {isLoading && (
-                <div className="mt-4 flex items-center text-blue-600">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Loading analytics data...
-                </div>
-              )}
-            </div>
-            
-            {/* Error Alert */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Analytics Content */}
-            {analyticsData && (
-              <div className="space-y-8">
-                {/* Charts Section */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <AdMetricsChart 
-                      analyticsData={analyticsData} 
-                      dateRange={dateRange}
-                      timeSeriesData={timeSeriesData} 
-                      accessToken={accessToken}
-                      isRealData={isRealData}
-                      onDateRangeChange={(newDateRange) => setDateRange(newDateRange)}
-                    />
-                  </div>
-                  
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <AiAdvisor 
-                      analyticsData={analyticsData}
-                      creativePerformanceData={analyticsData?.creativePerformance}
-                      audienceInsightsData={{
-                        ageData: ageBreakdown,
-                        genderData: genderBreakdown,
-                        platformData: platformBreakdown,
-                        placementData: placementBreakdown
-                      }}
-                    />
-                  </div>
-                </div>
-                            
-                {/* Breakdown Charts Section */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <BreakdownChart 
-                    ageData={ageBreakdown}
-                    genderData={genderBreakdown}
-                    platformData={platformBreakdown}
-                    placementData={placementBreakdown}
-                    isRealData={isRealData}
-                    dateRange={dateRange}
-                  />
-                </div>
-                            
-                {/* Creative Performance Table Section */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <EnhancedCreativePerformanceTable 
-                    analyticsData={analyticsData}
-                    selectedAccountId={selectedAccountId}
-                    benchmarks={benchmarks}
-                    isRealData={isRealData}
-                    dateRange={dateRange}
-                    onCreativeSelect={(creative) => {
-                      console.log("Selected creative:", creative);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Diagnostic Tool Section */}
-            {showDiagnostic && (
-              <div className="bg-white rounded-xl shadow-sm border-2 border-blue-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Meta API Diagnostic Tool</h3>
-                  <p className="text-sm text-gray-600 mt-1">Test your API connection and permissions</p>
-                </div>
-                
-                <div className="p-6">
-                  <div className="mb-6">
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                      <p className="text-sm text-gray-700 mb-2">
-                        <span className="font-medium">Access Token:</span> 
-                        <span className="font-mono text-xs ml-2">{accessToken ? `${accessToken.substring(0, 20)}...` : 'Not Available'}</span>
-                      </p>
-                    </div>
+                        const purchaseValue = insight && insight.action_values ? 
+                          parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+                        
+                        const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
+                        
+                        console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
+                          spend,
+                          purchases,
+                          purchaseValue,
+                          roas: roas.toFixed(2)
+                        });
+                        
+                        // Apply smart grouping for this creative
+                        const groupingResult = extractPostIdWithFallback(ad.name);
+                        console.log(`🏷️ Smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
+                        
+                        return {
+                          adId: ad.id,
+                          adName: ad.name,
+                          adsetName: ad.adset ? ad.adset.name : 'Unknown',
+                          creativeId: ad.creative?.id || `gen_${ad.id}`,
+                          thumbnailUrl: thumbnailUrl,
+                          objectStorySpec: ad.creative?.object_story_spec || null,
+                          accountId: selectedAccountId,
+                          // Performance metrics
+                          impressions: insight ? parseInt(insight.impressions || 0) : 0,
+                          clicks: insight ? parseInt(insight.clicks || 0) : 0,
+                          spend: spend,
+                          ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+                          cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+                          cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+                          // Add conversion metrics
+                          purchases: purchases,
+                          landingPageViews: insight && insight.actions ? 
+                            parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+                          addToCarts: insight && insight.actions ? 
+                            parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+                          // Add ROAS calculation
+                          roas: roas,
+                          revenue: purchaseValue,
+                          // Add smart grouping info
+                          smartGroupKey: groupingResult.groupKey,
+                          groupingMethod: groupingResult.method,
+                          postId: groupingResult.postId || null
+                        };
+                      });
+                  } else {
+                    // Fallback: create dummy creative entries from insights if available
+                    console.log('⚠️ Creating creative entries from available insights data');
                     
-                    <button
-                      onClick={() => runDiagnostics()}
-                      disabled={isLoading || !accessToken}
-                      className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-200"
-                    >
-                      {isLoading ? (
-                        <span className="flex items-center">
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Running...
-                        </span>
-                      ) : 'Run Diagnostics'}
-                    </button>
-                  </div>
+                    if (adInsightsResponse.data.data.length > 0) {
+                      creativePerformance = adInsightsResponse.data.data.map(insight => {
+                        const spend = parseFloat(insight.spend || 0);
+                        const purchases = insight.actions ? 
+                          parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+                        
+                        const purchaseValue = insight.action_values ? 
+                          parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+                        
+                        const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
+                        
+                        const dummyAdName = `Ad ${insight.ad_id}`;
+                        const groupingResult = extractPostIdWithFallback(dummyAdName);
+                        
+                        return {
+                          adId: insight.ad_id,
+                          adName: dummyAdName,
+                          adsetName: 'Unknown',
+                          creativeId: `gen_${insight.ad_id}`,
+                          thumbnailUrl: null,
+                          objectStorySpec: null,
+                          accountId: selectedAccountId,
+                          // Performance metrics from insights
+                          impressions: parseInt(insight.impressions || 0),
+                          clicks: parseInt(insight.clicks || 0),
+                          spend: spend,
+                          ctr: parseFloat(insight.ctr || 0) * 100,
+                          cpm: parseFloat(insight.cpm || 0),
+                          cpc: parseFloat(insight.cpc || 0),
+                          purchases: purchases,
+                          landingPageViews: insight.actions ? 
+                            parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+                          addToCarts: insight.actions ? 
+                            parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+                          roas: roas,
+                          revenue: purchaseValue,
+                          smartGroupKey: groupingResult.groupKey,
+                          groupingMethod: groupingResult.method,
+                          postId: groupingResult.postId || null
+                        };
+                      });
+                    }
+                  }
+            
+                  // 🚨 DEBUG: Final summary
+                  const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
+                  console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
+                    totalCreatives: creativePerformance.length,
+                    creativesWithThumbnails: creativesWithThumbnails.length,
+                    sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
+                      creativeId: c.creativeId,
+                      adName: c.adName,
+                      thumbnailUrl: c.thumbnailUrl
+                    }))
+                  });
+            
+                  // 🔧 NEW: Log smart grouping statistics
+                  const groupingStats = {};
+                  creativePerformance.forEach(creative => {
+                    const method = creative.groupingMethod;
+                    groupingStats[method] = (groupingStats[method] || 0) + 1;
+                  });
+                  console.log('📊 SMART GROUPING STATISTICS:', groupingStats);
                   
-                  {/* Test Results */}
-                  {Object.keys(testResults).length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-900 text-lg">Diagnostic Results</h4>
+                  // Prepare summary metrics from account insights
+                  const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
+                    ? insightsResponse.data.data[0] 
+                    : {};
+                  
+                  const summary = {
+                    totalImpressions: parseInt(accountInsights.impressions || 0),
+                    totalClicks: parseInt(accountInsights.clicks || 0),
+                    totalSpend: parseFloat(accountInsights.spend || 0),
+                    avgCtr: accountInsights.ctr ? parseFloat(accountInsights.ctr) * 100 : 0,
+                    avgCpc: parseFloat(accountInsights.cpc || 0),
+                    avgCpm: parseFloat(accountInsights.cpm || 0),
+                    campaigns: campaignsResponse.data.data.length,
+                    activeCreatives: ads.filter(ad => ad.creative).length
+                  };
+                  
+                  // Calculate estimated funnel data if conversions aren't directly available
+                  const purchaseAction = accountInsights.actions?.find(a => a.action_type === 'purchase');
+                  const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1); // Assuming 10% conversion rate
+                  
+                  const landingPageViewAction = accountInsights.actions?.find(a => a.action_type === 'landing_page_view');
+                  const estimatedLandingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value) : Math.round(summary.totalClicks * 0.8); // Assuming 80% land on the page
+                  
+                  const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
+                  const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3); // Assuming 30% add to cart
+            
+                  // Add funnel data to analytics
+                  const funnel = {
+                    impressions: summary.totalImpressions,
+                    clicks: summary.totalClicks,
+                    landingPageViews: estimatedLandingPageViews,
+                    addToCarts: estimatedAddToCarts,
+                    purchases: estimatedPurchases
+                  };
+            
+                  // Add revenue data if available
+                  const purchaseValueAction = accountInsights.action_values?.find(a => a.action_type === 'purchase');
+                  const revenue = purchaseValueAction ? parseFloat(purchaseValueAction.value) : 0;
+            
+                  // Add more advanced metrics
+                  const advancedMetrics = {
+                    cpm: summary.avgCpm,
+                    cpc: summary.avgCpc,
+                    costPerPurchase: funnel.purchases > 0 ? summary.totalSpend / funnel.purchases : 0,
+                    roas: revenue > 0 ? revenue / summary.totalSpend : 0,
+                    linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
+                  };
+                  
+                  // Find top performing creatives by spend
+                  const topCreatives = [...creativePerformance]
+                    .sort((a, b) => b.spend - a.spend)
+                    .slice(0, 5);
+                  
+                  setAnalyticsData({
+                    summary,
+                    funnel,
+                    advancedMetrics,
+                    creativePerformance,
+                    topCreatives,
+                    campaigns: campaignsResponse.data.data,
+                    accountInsights: insightsResponse.data.data
+                  });
+                  
+                  console.log('Performance data and time series data loaded successfully');
+                  
+                } catch (error) {
+                  console.error('Error loading performance data:', error);
+                  setError('Error loading data from Meta API. Please check console for details.');
+                } finally {
+                  setIsLoading(false);
+                }
+              }, [accessToken, selectedAccountId, dateRange, extractPostIdWithFallback]);
+            
+              // Load performance data when account or date range changes
+              useEffect(() => {
+                if (isConnected && selectedAccountId && accessToken) {
+                  loadPerformanceData();
+                }
+              }, [isConnected, selectedAccountId, dateRange, accessToken, loadPerformanceData]);
+            
+              const handleAccountChange = (e) => {
+                const accountId = e.target.value;
+                setSelectedAccountId(accountId);
+              };
+            
+              const toggleDiagnostic = () => {
+                setShowDiagnostic(!showDiagnostic);
+              };
+            
+              // Handle toggling between real and mock data
+              const handleToggleDataSource = () => {
+                // Since we don't have access to shouldUseMockData or notifyMockDataChange,
+                // we'll just toggle the isRealData state and refresh the data
+                setIsRealData(!isRealData);
+                
+                // Let other components know about this change
+                const event = new CustomEvent('dataSourceChanged', { 
+                  detail: { isRealData: !isRealData }
+                });
+                window.dispatchEvent(event);
+                
+                // Force refresh
+                setTimeout(() => {
+                  if (isConnected && selectedAccountId && accessToken) {
+                    loadPerformanceData();
+                  }
+                }, 100);
+              };
+            
+              const runDiagnostics = async (token = accessToken) => {
+                if (!token) {
+                  setError('Please connect with Facebook first to generate an access token');
+                  return;
+                }
+            
+                setIsLoading(true);
+                setTestResults({});
+                
+                try {
+                  // Test 1: Verify token validity
+                  const results = {
+                    tokenTest: { status: 'pending', message: 'Testing token validity...' }
+                  };
+                  setTestResults(results);
+                  
+                  const meResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me`, {
+                    params: { access_token: token }
+                  });
+            
+                  if (meResponse.data.error) {
+                    results.tokenTest = { 
+                      status: 'failed', 
+                      message: `Invalid token: ${meResponse.data.error.message}`,
+                      data: meResponse.data.error
+                    };
+                    setTestResults({...results});
+                    setIsLoading(false);
+                    return;
+                  }
+                  
+                  results.tokenTest = { 
+                    status: 'success', 
+                    message: `Valid token for user: ${meResponse.data.name} (ID: ${meResponse.data.id})`,
+                    data: meResponse.data
+                  };
+                  setTestResults({...results});
+            
+                  // Test 2: Check permissions
+                  results.permissionsTest = { status: 'pending', message: 'Checking token permissions...' };
+                  setTestResults({...results});
+                  
+                  const permissionsResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me/permissions`, {
+                    params: { access_token: token }
+                  });
+                  
+                  if (permissionsResponse.data.error) {
+                    results.permissionsTest = { 
+                      status: 'failed', 
+                      message: `Failed to fetch permissions: ${permissionsResponse.data.error.message}`,
+                      data: permissionsResponse.data.error
+                    };
+                    setTestResults({...results});
+                  } else {
+                    const adPermissions = permissionsResponse.data.data.filter(p => 
+                      ['ads_management', 'ads_read', 'read_insights', 'business_management', 'pages_show_list'].includes(p.permission)
+                    );
+                    
+                    const missingPermissions = ['ads_management', 'ads_read', 'read_insights', 'business_management', 'pages_show_list'].filter(
+                      p => !adPermissions.some(granted => granted.permission === p && granted.status === 'granted')
+                    );
+                    
+                    if (missingPermissions.length > 0) {
+                      results.permissionsTest = { 
+                        status: 'warning', 
+                        message: `Missing permissions: ${missingPermissions.join(', ')}`,
+                        data: permissionsResponse.data.data
+                      };
+                    } else {
+                      results.permissionsTest = { 
+                        status: 'success', 
+                        message: 'All required permissions granted',
+                        data: adPermissions
+                      };
+                    }
+                    setTestResults({...results});
+                  }
+            
+                  // Test 3: Fetch Ad Accounts
+                  results.accountsTest = { status: 'pending', message: 'Fetching ad accounts...' };
+                  setTestResults({...results});
+                  
+                  const accountsResponse = await axios.get(`https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`, {
+                    params: {
+                      access_token: token,
+                      fields: 'name,account_id,account_status',
+                      limit: 100
+                    }
+                  });
+                  
+                  if (accountsResponse.data.error) {
+                    results.accountsTest = { 
+                      status: 'failed', 
+                      message: `Failed to fetch ad accounts: ${accountsResponse.data.error.message}`,
+                      data: accountsResponse.data.error
+                    };
+                    setTestResults({...results});
+                  } else if (!accountsResponse.data.data || accountsResponse.data.data.length === 0) {
+                    results.accountsTest = { 
+                      status: 'warning', 
+                      message: 'No ad accounts found for this user',
+                      data: accountsResponse.data
+                    };
+                    setTestResults({...results});
+                  } else {
+                    const accountsList = accountsResponse.data.data.map(account => ({
+                      id: account.id,
+                      name: account.name,
+                      accountId: account.account_id,
+                      status: account.account_status === 1 ? 'Active' : 'Inactive'
+                    }));
+                    
+                    // Store for diagnostic tool
+                    setDiagnosticSelectedAccount(accountsList[0].id);
+                    
+                    results.accountsTest = { 
+                      status: 'success', 
+                      message: `Found ${accountsList.length} ad accounts`,
+                      data: accountsList
+                    };
+                    setTestResults({...results});
+                  }
+            
+                } catch (error) {
+                  console.error('Error during diagnostics:', error);
+                  setTestResults({
+                    error: {
+                      status: 'failed',
+                      message: `Error running diagnostics: ${error.message}`,
+                      data: error.response?.data || error
+                    }
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
+              };
+            
+              const testAccountInsights = async () => {
+                if (!diagnosticSelectedAccount) return;
+                
+                setIsLoading(true);
+                const updatedResults = {...testResults};
+                updatedResults.insightsTest = { status: 'pending', message: 'Fetching account insights...' };
+                setTestResults(updatedResults);
+                
+                try {
+                  // Format account ID to ensure it starts with "act_"
+                  const accountId = diagnosticSelectedAccount.replace('act_', '');
+                  
+                  // Attempt to fetch basic account insights
+                  const today = new Date();
+                  const thirtyDaysAgo = new Date(today);
+                  thirtyDaysAgo.setDate(today.getDate() - 30);
+                  
+                  const since = thirtyDaysAgo.toISOString().split('T')[0];
+                  const until = today.toISOString().split('T')[0];
+                  
+                  const insightsResponse = await axios.get(
+                    `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/insights`,
+                    {
+                      params: {
+                        access_token: accessToken,
+                        time_range: JSON.stringify({
+                          since,
+                          until
+                        }),
+                        fields: 'impressions,clicks,spend',
+                        limit: 100
+                      }
+                    }
+                  );
+                  
+                  if (insightsResponse.data.error) {
+                    updatedResults.insightsTest = { 
+                      status: 'failed', 
+                      message: `Failed to fetch insights: ${insightsResponse.data.error.message}`,
+                      data: insightsResponse.data.error
+                    };
+                  } else if (!insightsResponse.data.data || insightsResponse.data.data.length === 0) {
+                    updatedResults.insightsTest = { 
+                      status: 'warning', 
+                      message: 'No insights data found for the specified time period',
+                      data: insightsResponse.data
+                    };
+                  } else {
+                    updatedResults.insightsTest = { 
+                      status: 'success', 
+                      message: 'Successfully retrieved insights data',
+                      data: insightsResponse.data.data
+                    };
+                  }
+                } catch (error) {
+                  console.error('Error fetching insights:', error);
+                  updatedResults.insightsTest = { 
+                    status: 'failed', 
+                    message: `Error fetching insights: ${error.message}`,
+                    data: error.response?.data || error
+                  };
+                } finally {
+                  setTestResults(updatedResults);
+                  setIsLoading(false);
+                }
+              };
+            
+              const testCampaigns = async () => {
+                if (!diagnosticSelectedAccount) return;
+                
+                setIsLoading(true);
+                const updatedResults = {...testResults};
+                updatedResults.campaignsTest = { status: 'pending', message: 'Fetching campaigns...' };
+                setTestResults(updatedResults);
+                
+                try {
+                  // Format account ID to ensure it starts with "act_"
+                  const accountId = diagnosticSelectedAccount.replace('act_', '');
+                  
+                  // Attempt to fetch campaigns
+                  const campaignsResponse = await axios.get(
+                    `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/campaigns`,
+                    {
+                      params: {
+                        access_token: accessToken,
+                        fields: 'name,status,objective',
+                        limit: 100
+                      }
+                    }
+                  );
+                  
+                  if (campaignsResponse.data.error) {
+                    updatedResults.campaignsTest = { 
+                      status: 'failed', 
+                      message: `Failed to fetch campaigns: ${campaignsResponse.data.error.message}`,
+                      data: campaignsResponse.data.error
+                    };
+                  } else if (!campaignsResponse.data.data || campaignsResponse.data.data.length === 0) {
+                    updatedResults.campaignsTest = { 
+                      status: 'warning', 
+                      message: 'No campaigns found for this account',
+                      data: campaignsResponse.data
+                    };
+                  } else {
+                    updatedResults.campaignsTest = { 
+                      status: 'success', 
+                      message: `Found ${campaignsResponse.data.data.length} campaigns`,
+                      data: campaignsResponse.data.data
+                    };
+                  }
+                } catch (error) {
+                  console.error('Error fetching campaigns:', error);
+                  updatedResults.campaignsTest = { 
+                    status: 'failed', 
+                    message: `Error fetching campaigns: ${error.message}`,
+                    data: error.response?.data || error
+                  };
+                } finally {
+                  setTestResults(updatedResults);
+                  setIsLoading(false);
+                }
+              };
+            
+              const testAdCreatives = async () => {
+                if (!diagnosticSelectedAccount) return;
+                
+                setIsLoading(true);
+                const updatedResults = {...testResults};
+                updatedResults.creativesTest = { status: 'pending', message: 'Fetching ad creatives...' };
+                setTestResults(updatedResults);
+                
+                try {
+                  // Format account ID to ensure it starts with "act_"
+                  const accountId = diagnosticSelectedAccount.replace('act_', '');
+                  
+                  // Attempt to fetch ad creatives
+                  const adsResponse = await axios.get(
+                    `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/ads`,
+                    {
+                      params: {
+                        access_token: accessToken,
+                        fields: 'name,creative{id,thumbnail_url,object_story_spec}',
+                        limit: 50
+                      }
+                    }
+                  );
+                  
+                  if (adsResponse.data.error) {
+                    updatedResults.creativesTest = { 
+                      status: 'failed', 
+                      message: `Failed to fetch ads with creatives: ${adsResponse.data.error.message}`,
+                      data: adsResponse.data.error
+                    };
+                  } else if (!adsResponse.data.data || adsResponse.data.data.length === 0) {
+                    updatedResults.creativesTest = { 
+                      status: 'warning', 
+                      message: 'No ads found for this account',
+                      data: adsResponse.data
+                    };
+                  } else {
+                    // Extract creatives from ads response
+                    const ads = adsResponse.data.data;
+                    const creatives = ads
+                      .filter(ad => ad.creative)
+                      .map(ad => ({
+                        adId: ad.id,
+                        adName: ad.name,
+                        creativeId: ad.creative.id,
+                        thumbnailUrl: ad.creative.thumbnail_url || null,
+                        objectStorySpec: ad.creative.object_story_spec || null
+                      }));
                       
-                      <div className="grid gap-4">
-                        {Object.entries(testResults).map(([testName, result]) => (
-                          <div key={testName} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center mb-2">
-                              <div className={`w-3 h-3 rounded-full mr-3 ${
-                                result.status === 'success' ? 'bg-green-500' : 
-                                result.status === 'warning' ? 'bg-yellow-500' : 
-                                result.status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
-                              }`}></div>
-                              <h5 className="font-medium text-gray-900">
-                                {testName === 'tokenTest' ? 'Access Token Validation' : 
-                                 testName === 'permissionsTest' ? 'Permissions Check' :
-                                 testName === 'accountsTest' ? 'Ad Accounts Access' :
-                                 testName === 'insightsTest' ? 'Insights Data Access' :
-                                 testName === 'campaignsTest' ? 'Campaigns Access' :
-                                 testName === 'creativesTest' ? 'Ad Creatives Access' : testName}
-                              </h5>
+                    if (creatives.length === 0) {
+                      updatedResults.creativesTest = { 
+                        status: 'warning', 
+                        message: 'No creatives found in the ads for this account',
+                        data: ads
+                      };
+                    } else {
+                      updatedResults.creativesTest = { 
+                        status: 'success', 
+                        message: `Found ${creatives.length} ad creatives`,
+                        data: creatives
+                      };
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error fetching ad creatives:', error);
+                  updatedResults.creativesTest = { 
+                    status: 'failed', 
+                    message: `Error fetching ad creatives: ${error.message}`,
+                    data: error.response?.data || error
+                  };
+                } finally {
+                  setTestResults(updatedResults);
+                  setIsLoading(false);
+                }
+              };
+            
+              return (
+                <div className="min-h-screen bg-gray-50">
+                  {/* Header Section */}
+                  <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                      <div className="py-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h1 className="text-3xl font-bold text-gray-900">Meta Ads Creative Analytics</h1>
+                            <p className="mt-2 text-sm text-gray-600">Analyze your creative performance and optimize ad campaigns</p>
+                          </div>
+                          
+                          {/* Data Source Indicator - Moved to header */}
+                          {isConnected && (
+                            <div className="flex items-center space-x-4">
+                              <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${isRealData ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                                <div className={`w-2 h-2 rounded-full mr-2 ${isRealData ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+                                {isRealData ? 'Live API Data' : 'Sample Data'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+            
+                  {/* Main Content */}
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {!isConnected ? (
+                      /* Connection Section */
+                      <div className="max-w-md mx-auto">
+                        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                          <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-8 text-center">
+                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                              </svg>
+                            </div>
+                            <h3 className="text-xl font-semibold text-white mb-2">Connect Your Meta Account</h3>
+                            <p className="text-blue-100">Get started by connecting your Meta Ads account to analyze creative performance</p>
+                          </div>
+                          
+                          <div className="px-6 py-6 text-center">
+                            <MetaAuthButton 
+                              onAuthSuccess={(token) => {
+                                console.log("Auth success callback with token:", token);
+                                setAccessToken(token);
+                                
+                                // Fetch accounts after successful login
+                                axios.get(
+                                  `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`,
+                                  {
+                                    params: {
+                                      access_token: token,
+                                      fields: 'id,name,account_id,account_status',
+                                      limit: 50
+                                    }
+                                  }
+                                )
+                                .then(response => {
+                                  if (response.data && response.data.data && response.data.data.length > 0) {
+                                    setAccounts(response.data.data);
+                                    setSelectedAccountId(response.data.data[0].id);
+                                    setIsConnected(true);
+                                    
+                                    // Automatically run diagnostics after login
+                                    runDiagnostics(token);
+                                  } else {
+                                    setError('No ad accounts found for this user.');
+                                  }
+                                })
+                                .catch(error => {
+                                  console.error('Error fetching accounts:', error);
+                                  setError('Error fetching accounts: ' + error.message);
+                                });
+                              }} 
+                            />
+                            
+                            {error && (
+                              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <p className="text-sm text-red-600">{error}</p>
+                              </div>
+                            )}
+                            
+                            <p className="text-xs text-gray-500 mt-4">
+                              Secure connection via Facebook OAuth
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-8">
+                        {/* Controls Section */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                          <div className="flex flex-wrap items-end gap-4">
+                            <div className="flex-1 min-w-[200px]">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Ad Account</label>
+                              <select
+                                value={selectedAccountId}
+                                onChange={handleAccountChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                {accounts.map(account => (
+                                  <option key={account.id} value={account.id}>
+                                    {account.name}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             
-                            <p className="text-sm text-gray-600 mb-2">{result.message}</p>
+                            <div className="flex-1 min-w-[200px]">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                              <select
+                                value={dateRange}
+                                onChange={(e) => setDateRange(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="Last 7 Days">Last 7 Days</option>
+                                <option value="Last 30 Days">Last 30 Days</option>
+                                <option value="Last 60 Days">Last 60 Days</option>
+                                <option value="Last 90 Days">Last 90 Days</option>
+                              </select>
+                            </div>
                             
-                            {result.data && (
-                              <details className="text-sm">
-                                <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
-                                  View Details
-                                </summary>
-                                <pre className="mt-2 p-3 bg-gray-100 rounded-md overflow-auto max-h-40 text-xs border">
-                                  {JSON.stringify(result.data, null, 2)}
-                                </pre>
-                              </details>
-                            )}
+                            <div className="flex gap-3">
+                              <button
+                                onClick={handleToggleDataSource}
+                                className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors duration-200 text-sm font-medium"
+                              >
+                                {isRealData ? 'Switch to Sample Data' : 'Try Real Data'}
+                              </button>
+                              
+                              <button
+                                onClick={toggleDiagnostic}
+                                className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors duration-200 text-sm font-medium"
+                              >
+                                {showDiagnostic ? 'Hide Diagnostics' : 'Show Diagnostics'}
+                              </button>
+                            </div>
                           </div>
-                        ))}
+                          
+                          {isLoading && (
+                            <div className="mt-4 flex items-center text-blue-600">
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Loading analytics data...
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Error Alert */}
+                        {error && (
+                          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                            <div className="flex">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="ml-3">
+                                <p className="text-sm text-red-700">{error}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Analytics Content */}
+                        {analyticsData && (
+                          <div className="space-y-8">
+                            {/* Charts Section */}
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <AdMetricsChart 
+                                  analyticsData={analyticsData} 
+                                  dateRange={dateRange}
+                                  timeSeriesData={timeSeriesData} 
+                                  accessToken={accessToken}
+                                  isRealData={isRealData}
+                                  onDateRangeChange={(newDateRange) => setDateRange(newDateRange)}
+                                />
+                              </div>
+                              
+                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <AiAdvisor 
+                                  analyticsData={analyticsData}
+                                  creativePerformanceData={analyticsData?.creativePerformance}
+                                  audienceInsightsData={{
+                                    ageData: ageBreakdown,
+                                    genderData: genderBreakdown,
+                                    platformData: platformBreakdown,
+                                    placementData: placementBreakdown
+                                  }}
+                                />
+                              </div>
+                            </div>
+                                        
+                            {/* Breakdown Charts Section */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                              <BreakdownChart 
+                                ageData={ageBreakdown}
+                                genderData={genderBreakdown}
+                                platformData={platformBreakdown}
+                                placementData={placementBreakdown}
+                                isRealData={isRealData}
+                                dateRange={dateRange}
+                              />
+                            </div>
+                                        
+                            {/* Creative Performance Table Section */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                              <EnhancedCreativePerformanceTable 
+                                analyticsData={analyticsData}
+                                selectedAccountId={selectedAccountId}
+                                benchmarks={benchmarks}
+                                isRealData={isRealData}
+                                dateRange={dateRange}
+                                onCreativeSelect={(creative) => {
+                                  console.log("Selected creative:", creative);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Diagnostic Tool Section */}
+                        {showDiagnostic && (
+                          <div className="bg-white rounded-xl shadow-sm border-2 border-blue-200 overflow-hidden">
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-200">
+                              <h3 className="text-lg font-semibold text-gray-900">Meta API Diagnostic Tool</h3>
+                              <p className="text-sm text-gray-600 mt-1">Test your API connection and permissions</p>
+                            </div>
+                            
+                            <div className="p-6">
+                              <div className="mb-6">
+                                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                                  <p className="text-sm text-gray-700 mb-2">
+                                    <span className="font-medium">Access Token:</span> 
+                                    <span className="font-mono text-xs ml-2">{accessToken ? `${accessToken.substring(0, 20)}...` : 'Not Available'}</span>
+                                  </p>
+                                </div>
+                                
+                                <button
+                                  onClick={() => runDiagnostics()}
+                                  disabled={isLoading || !accessToken}
+                                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-200"
+                                >
+                                  {isLoading ? (
+                                    <span className="flex items-center">
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Running...
+                                    </span>
+                                  ) : 'Run Diagnostics'}
+                                </button>
+                              </div>
+                              
+                              {/* Test Results */}
+                              {Object.keys(testResults).length > 0 && (
+                                <div className="space-y-4">
+                                  <h4 className="font-medium text-gray-900 text-lg">Diagnostic Results</h4>
+                                  
+                                  <div className="grid gap-4">
+                                    {Object.entries(testResults).map(([testName, result]) => (
+                                      <div key={testName} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                                        <div className="flex items-center mb-2">
+                                          <div className={`w-3 h-3 rounded-full mr-3 ${
+                                            result.status === 'success' ? 'bg-green-500' : 
+                                            result.status === 'warning' ? 'bg-yellow-500' : 
+                                            result.status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
+                                          }`}></div>
+                                          <h5 className="font-medium text-gray-900">
+                                            {testName === 'tokenTest' ? 'Access Token Validation' : 
+                                             testName === 'permissionsTest' ? 'Permissions Check' :
+                                             testName === 'accountsTest' ? 'Ad Accounts Access' :
+                                             testName === 'insightsTest' ? 'Insights Data Access' :
+                                             testName === 'campaignsTest' ? 'Campaigns Access' :
+                                             testName === 'creativesTest' ? 'Ad Creatives Access' : testName}
+                                          </h5>
+                                        </div>
+                                        
+                                        <p className="text-sm text-gray-600 mb-2">{result.message}</p>
+                                        
+                                        {result.data && (
+                                          <details className="text-sm">
+                                            <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+                                              View Details
+                                            </summary>
+                                            <pre className="mt-2 p-3 bg-gray-100 rounded-md overflow-auto max-h-40 text-xs border">
+                                              {JSON.stringify(result.data, null, 2)}
+                                            </pre>
+                                          </details>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Advanced Testing Section */}
+                              {testResults.accountsTest && testResults.accountsTest.status === 'success' && (
+                                <div className="mt-8 pt-6 border-t border-gray-200">
+                                  <h4 className="font-medium text-gray-900 text-lg mb-4">Advanced Testing</h4>
+                                  
+                                  <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Select Ad Account for Testing
+                                    </label>
+                                    <select
+                                      value={diagnosticSelectedAccount}
+                                      onChange={(e) => setDiagnosticSelectedAccount(e.target.value)}
+                                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                      {testResults.accountsTest.data.map(account => (
+                                        <option key={account.id} value={account.id}>
+                                          {account.name} ({account.accountId}) - {account.status}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  
+                                  <div className="flex flex-wrap gap-3">
+                                    <button
+                                      onClick={testAccountInsights}
+                                      disabled={isLoading}
+                                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                                    >
+                                      Test Insights Access
+                                    </button>
+                                    <button
+                                      onClick={testCampaigns}
+                                      disabled={isLoading}
+                                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                                    >
+                                      Test Campaigns Access
+                                    </button>
+                                    <button
+                                      onClick={testAdCreatives}
+                                      disabled={isLoading}
+                                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                                    >
+                                      Test Ad Creatives Access
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                  
-                  {/* Advanced Testing Section */}
-                  {testResults.accountsTest && testResults.accountsTest.status === 'success' && (
-                    <div className="mt-8 pt-6 border-t border-gray-200">
-                      <h4 className="font-medium text-gray-900 text-lg mb-4">Advanced Testing</h4>
-                      
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Select Ad Account for Testing
-                        </label>
-                        <select
-                          value={diagnosticSelectedAccount}
-                          onChange={(e) => setDiagnosticSelectedAccount(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          {testResults.accountsTest.data.map(account => (
-                            <option key={account.id} value={account.id}>
-                              {account.name} ({account.accountId}) - {account.status}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          onClick={testAccountInsights}
-                          disabled={isLoading}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                        >
-                          Test Insights Access
-                        </button>
-                        <button
-                          onClick={testCampaigns}
-                          disabled={isLoading}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                        >
-                          Test Campaigns Access
-                        </button>
-                        <button
-                          onClick={testAdCreatives}
-                          disabled={isLoading}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-                        >
-                          Test Ad Creatives Access
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default CreativeAnalyticsDashboard;
+              );
+            };
