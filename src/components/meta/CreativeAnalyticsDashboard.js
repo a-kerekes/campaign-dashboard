@@ -477,56 +477,69 @@ const CreativeAnalyticsDashboard = () => {
         // Continue with other data loading even if breakdowns fail
       }
       
+      // 🔧 HELPER FUNCTION: Build clean URL with fetch to bypass axios bug
+      const buildCleanURL = (baseURL, params) => {
+        const url = new URL(baseURL);
+        Object.keys(params).forEach(key => {
+          const value = params[key];
+          if (value !== null && value !== undefined) {
+            url.searchParams.append(key, String(value));
+          }
+        });
+        console.log('🔧 CLEAN URL BUILT:', url.toString());
+        return url.toString();
+      };
+
+      const fetchWithCleanURL = async (baseURL, params) => {
+        const cleanURL = buildCleanURL(baseURL, params);
+        const response = await fetch(cleanURL);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return { data: await response.json() };
+      };
+
       // 1. Fetch account insights
-      console.log('🔍 BEFORE INSIGHTS AXIOS CALL:');
+      console.log('🔍 BEFORE INSIGHTS FETCH CALL:');
       console.log('🔍 About to fetch insights with limit 500');
       
-      const insightsResponse = await axios.get(
+      const insightsResponse = await fetchWithCleanURL(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
         {
-          params: {
-            access_token: accessToken,
-            time_range: JSON.stringify({
-              since,
-              until
-            }),
-            fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
-            level: 'account',
-            limit: parseInt('500')  // Force clean number
-          },
-          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
+          access_token: accessToken,
+          time_range: JSON.stringify({
+            since,
+            until
+          }),
+          fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
+          level: 'account',
+          limit: 500
         }
       );
       
       // 2. Fetch campaigns
-      console.log('🔍 BEFORE CAMPAIGNS AXIOS CALL:');
+      console.log('🔍 BEFORE CAMPAIGNS FETCH CALL:');
       console.log('🔍 About to fetch campaigns with limit 500');
       
-      const campaignsResponse = await axios.get(
+      const campaignsResponse = await fetchWithCleanURL(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/campaigns`,
         {
-          params: {
-            access_token: accessToken,
-            fields: 'name,status,objective',
-            limit: parseInt('500')  // Force clean number
-          },
-          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
+          access_token: accessToken,
+          fields: 'name,status,objective',
+          limit: 500
         }
       );
       
       // 3. Fetch ads with their creative info
-      console.log('🔍 BEFORE ADS AXIOS CALL:');
+      console.log('🔍 BEFORE ADS FETCH CALL:');
       console.log('🔍 About to fetch ads with limit 500');
       
-      const adsResponse = await axios.get(
+      const adsResponse = await fetchWithCleanURL(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
         {
-          params: {
-            access_token: accessToken,
-            fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
-            limit: parseInt('500')  // Force clean number
-          },
-          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
+          access_token: accessToken,
+          fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
+          limit: 500
         }
       );
 
@@ -535,30 +548,17 @@ const CreativeAnalyticsDashboard = () => {
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
       // 3b. NEW: Fetch creative library for better video quality
-      console.log('🔍 BEFORE AXIOS CALL:');
+      console.log('🔍 BEFORE FETCH CALL:');
       console.log('🔍 META_API_VERSION:', META_API_VERSION);
       console.log('🔍 formattedAccountId:', formattedAccountId);
       console.log('🔍 accessToken length:', accessToken?.length);
 
-      const debugParams = {
-        access_token: accessToken,
-        fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
-        limit: 250
-      };
-
-      console.log('🔍 EXACT PARAMS OBJECT:', debugParams);
-      console.log('🔍 LIMIT VALUE TYPE:', typeof debugParams.limit);
-      console.log('🔍 LIMIT VALUE:', debugParams.limit);
-
-      const creativesResponse = await axios.get(
+      const creativesResponse = await fetchWithCleanURL(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
         {
-          params: {
-            access_token: accessToken,
-            fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
-            limit: parseInt('250')  // Force clean number
-          },
-          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
+          access_token: accessToken,
+          fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
+          limit: 250
         }
       );
 
@@ -616,27 +616,24 @@ const CreativeAnalyticsDashboard = () => {
           try {
             console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
             
-            const batchResponse = await axios.get(
+            const batchResponse = await fetchWithCleanURL(
               `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
               {
-                params: {
-                  access_token: accessToken,
-                  time_range: JSON.stringify({
-                    since,
-                    until
-                  }),
-                  fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
-                  level: 'ad',
-                  filtering: JSON.stringify([
-                    {
-                      field: 'ad.id',
-                      operator: 'IN',
-                      value: batchAdIds
-                    }
-                  ]),
-                  limit: parseInt(String(batchSize))  // Force clean number conversion
-                },
-                paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
+                access_token: accessToken,
+                time_range: JSON.stringify({
+                  since,
+                  until
+                }),
+                fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
+                level: 'ad',
+                filtering: JSON.stringify([
+                  {
+                    field: 'ad.id',
+                    operator: 'IN',
+                    value: batchAdIds
+                  }
+                ]),
+                limit: batchSize
               }
             );
             
