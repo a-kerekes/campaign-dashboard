@@ -499,7 +499,7 @@ const CreativeAnalyticsDashboard = () => {
         {
           params: {
             access_token: accessToken,
-            fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
+            fields: 'name,creative{id},adset{name}',
             limit: 500
           }
         }
