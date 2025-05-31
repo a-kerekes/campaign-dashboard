@@ -1,4 +1,5 @@
-export default CreativeAnalyticsDashboard;// src/components/meta/CreativeAnalyticsDashboard.js
+// src/components/meta/CreativeAnalyticsDashboard.js
+export default CreativeAnalyticsDashboard;
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AdMetricsChart from './AdMetricsChart';
