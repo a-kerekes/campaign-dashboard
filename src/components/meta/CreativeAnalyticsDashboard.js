@@ -315,6 +315,19 @@ const CreativeAnalyticsDashboard = () => {
     setIsLoading(true);
     setError(null);
     
+    // 🔧 CUSTOM PARAMETER SERIALIZER to fix :1 bug
+    const customParamsSerializer = (params) => {
+      const searchParams = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        const value = params[key];
+        if (value !== null && value !== undefined) {
+          // Force clean string conversion to prevent :1 appending
+          searchParams.append(key, String(value));
+        }
+      });
+      return searchParams.toString();
+    };
+    
     try {
       // Format account ID to ensure proper format
       const formattedAccountId = selectedAccountId.toString().replace('act_', '');
@@ -480,7 +493,8 @@ const CreativeAnalyticsDashboard = () => {
             fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
             level: 'account',
             limit: parseInt('500')  // Force clean number
-          }
+          },
+          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
         }
       );
       
@@ -495,7 +509,8 @@ const CreativeAnalyticsDashboard = () => {
             access_token: accessToken,
             fields: 'name,status,objective',
             limit: parseInt('500')  // Force clean number
-          }
+          },
+          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
         }
       );
       
@@ -510,7 +525,8 @@ const CreativeAnalyticsDashboard = () => {
             access_token: accessToken,
             fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
             limit: parseInt('500')  // Force clean number
-          }
+          },
+          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
         }
       );
 
@@ -541,7 +557,8 @@ const CreativeAnalyticsDashboard = () => {
             access_token: accessToken,
             fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
             limit: parseInt('250')  // Force clean number
-          }
+          },
+          paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
         }
       );
 
@@ -618,7 +635,8 @@ const CreativeAnalyticsDashboard = () => {
                     }
                   ]),
                   limit: parseInt(String(batchSize))  // Force clean number conversion
-                }
+                },
+                paramsSerializer: customParamsSerializer  // 🔧 Use custom serializer
               }
             );
             
