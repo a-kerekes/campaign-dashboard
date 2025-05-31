@@ -547,29 +547,31 @@ const CreativeAnalyticsDashboard = () => {
       console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
-      // 3b. NEW: Fetch creative library for better video quality
+      // 3b. TRY creative library with error handling - SKIP IF FAILS
       console.log('🔍 BEFORE FETCH CALL:');
       console.log('🔍 META_API_VERSION:', META_API_VERSION);
       console.log('🔍 formattedAccountId:', formattedAccountId);
       console.log('🔍 accessToken length:', accessToken?.length);
 
-      const creativesResponse = await fetchWithCleanURL(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
-        {
-          access_token: accessToken,
-          fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
-          limit: 250
-        }
-      );
-
-      // 🚨 DEBUG: Log creative library data
-      console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
-      console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
-      console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
+      let creativesResponse = { data: { data: [] } };
+      try {
+        creativesResponse = await fetchWithCleanURL(
+          `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+          {
+            access_token: accessToken,
+            fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
+            limit: 250
+          }
+        );
+        console.log('✅ Creative library loaded successfully');
+      } catch (error) {
+        console.warn('⚠️ Creative library failed, continuing without enhanced thumbnails:', error.message);
+        // Continue without creative library data - ads still have basic creative info
+      }
 
       // Create a lookup map for creative library data
       const creativesMap = {};
-      if (creativesResponse.data.data) {
+      if (creativesResponse.data && creativesResponse.data.data) {
         creativesResponse.data.data.forEach(creative => {
           creativesMap[creative.id] = creative;
           
@@ -582,6 +584,9 @@ const CreativeAnalyticsDashboard = () => {
             object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
           });
         });
+        console.log(`✅ Processed ${Object.keys(creativesMap).length} creative library entries`);
+      } else {
+        console.log('⚠️ No creative library data available, using ads API thumbnails only');
       }
 
       // Extract ads from response - MOVED BEFORE BATCHING
@@ -613,44 +618,81 @@ const CreativeAnalyticsDashboard = () => {
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
           const batchAdIds = batches[batchIndex];
           
-          try {
-            console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
-            
-            const batchResponse = await fetchWithCleanURL(
-              `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
-              {
-                access_token: accessToken,
-                time_range: JSON.stringify({
-                  since,
-                  until
-                }),
-                fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
-                level: 'ad',
-                filtering: JSON.stringify([
-                  {
-                    field: 'ad.id',
-                    operator: 'IN',
-                    value: batchAdIds
-                  }
-                ]),
-                limit: batchSize
+            try {
+              console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
+              
+              const batchResponse = await fetchWithCleanURL(
+                `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
+                {
+                  access_token: accessToken,
+                  time_range: JSON.stringify({
+                    since,
+                    until
+                  }),
+                  fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
+                  level: 'ad',
+                  filtering: JSON.stringify([
+                    {
+                      field: 'ad.id',
+                      operator: 'IN',
+                      value: batchAdIds
+                    }
+                  ]),
+                  limit: batchSize
+                }
+              );
+              
+              if (batchResponse.data && batchResponse.data.data) {
+                allInsightsData.push(...batchResponse.data.data);
+                console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
               }
-            );
-            
-            if (batchResponse.data && batchResponse.data.data) {
-              allInsightsData.push(...batchResponse.data.data);
-              console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
+              
+              // Add a small delay between batches to avoid rate limiting
+              if (batchIndex < batches.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              
+            } catch (batchError) {
+              console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
+              // Continue with other batches even if one fails
+              
+              // If this is a 500 error (our :1 bug), try with a smaller batch
+              if (batchError.message.includes('500')) {
+                console.log(`🔄 Retrying batch ${batchIndex + 1} with individual requests...`);
+                
+                // Try each ad individually as a fallback
+                for (const adId of batchAdIds.slice(0, 5)) { // Only try first 5 to avoid too many requests
+                  try {
+                    const singleResponse = await fetchWithCleanURL(
+                      `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
+                      {
+                        access_token: accessToken,
+                        time_range: JSON.stringify({
+                          since,
+                          until
+                        }),
+                        fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
+                        level: 'ad',
+                        filtering: JSON.stringify([
+                          {
+                            field: 'ad.id',
+                            operator: 'IN',
+                            value: [adId]
+                          }
+                        ]),
+                        limit: 1
+                      }
+                    );
+                    
+                    if (singleResponse.data && singleResponse.data.data) {
+                      allInsightsData.push(...singleResponse.data.data);
+                    }
+                  } catch (singleError) {
+                    console.error(`❌ Individual ad ${adId} failed:`, singleError.message);
+                  }
+                }
+              }
             }
-            
-            // Add a small delay between batches to avoid rate limiting
-            if (batchIndex < batches.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-          } catch (batchError) {
-            console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
-            // Continue with other batches even if one fails
-          }
         }
         
         // Reconstruct the response format
