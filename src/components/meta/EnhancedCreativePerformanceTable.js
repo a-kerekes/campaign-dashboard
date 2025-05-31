@@ -873,19 +873,19 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
 
-      {/* ORIGINAL LARGE CARD LAYOUT - 6 CARDS PER ROW */}
+      {/* CREATIVE CARDS GRID - 6 CARDS PER ROW LAYOUT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
         {filteredCreatives.map((creative) => (
           <div
             key={creative.id}
-            className={`bg-white rounded-lg border-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden ${
+            className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden ${
               selectedCreativeId === creative.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
             }`}
             onClick={() => setSelectedCreativeId(creative.id)}
           >
-            {/* Creative Thumbnail - FIXED WITH PROPER CONSTRAINTS */}
+            {/* Creative Thumbnail - CONSTRAINED */}
             {creative.thumbnailUrl && (
-              <div className="w-full bg-gray-50 flex items-center justify-center overflow-hidden" style={{ height: '200px' }}>
+              <div className="w-full bg-gray-50 flex items-center justify-center overflow-hidden" style={{ height: '140px' }}>
                 <img 
                   src={creative.thumbnailUrl} 
                   alt="Creative thumbnail"
@@ -898,51 +898,42 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   }}
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9CA3AF; font-size: 3rem;">🖼️</div>';
+                    e.target.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9CA3AF; font-size: 2rem;">🖼️</div>';
                   }}
                 />
               </div>
             )}
             
-            {/* Content Section - LARGE LAYOUT RESTORED */}
-            <div className="p-4">
+            {/* Card Content */}
+            <div className="p-3">
               {/* Ad Name */}
               <div className="mb-3">
-                <h4 className="text-sm font-semibold text-gray-900 leading-tight line-clamp-3">
+                <h4 className="text-xs font-medium text-gray-900 leading-tight" style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}>
                   {creative.adName}
                 </h4>
               </div>
               
-              {/* Copy Text - Show based on view mode and aggregation level */}
-              {(viewMode === VIEW_MODES.COPY || aggregationLevel >= 3) && (
-                <div className="mb-4">
-                  <div className="text-xs text-gray-600 bg-gray-50 rounded p-3 min-h-[60px]">
-                    {creative.extractedCopy && creative.extractedCopy.split('\n').slice(0, 4).map((line, index) => (
-                      <div key={index} className="leading-relaxed mb-1">
-                        {line.substring(0, 100)}{line.length > 100 ? '...' : ''}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Metrics Section - LARGE FORMAT RESTORED */}
-              <div className="space-y-3">
-                {/* Primary Metrics Row */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 uppercase font-medium mb-1">ROAS</div>
+              {/* Primary Metrics */}
+              <div className="space-y-2 mb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase font-medium">ROAS</div>
                     <div 
-                      className="text-lg font-bold"
+                      className="text-sm font-bold"
                       style={{ color: getBenchmarkColor('roas', creative.roas) }}
                     >
                       {formatMetricValue('roas', creative.roas)}
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 uppercase font-medium mb-1">REVENUE</div>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase font-medium">REVENUE</div>
                     <div 
-                      className="text-lg font-bold"
+                      className="text-sm font-bold"
                       style={{ color: getBenchmarkColor('revenue', creative.revenue) }}
                     >
                       {formatMetricValue('revenue', creative.revenue)}
@@ -950,21 +941,20 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   </div>
                 </div>
                 
-                {/* Secondary Metrics Grid */}
-                <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-gray-500 uppercase font-medium mb-1">CPM</div>
+                    <div className="text-xs text-gray-500 uppercase font-medium">CPM</div>
                     <div 
-                      className="font-semibold"
+                      className="text-xs font-semibold"
                       style={{ color: getBenchmarkColor('cpm', creative.cpm) }}
                     >
                       {formatMetricValue('cpm', creative.cpm)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500 uppercase font-medium mb-1">CTR</div>
+                    <div className="text-xs text-gray-500 uppercase font-medium">CTR</div>
                     <div 
-                      className="font-semibold"
+                      className="text-xs font-semibold"
                       style={{ color: getBenchmarkColor('ctr', creative.ctr) }}
                     >
                       {formatMetricValue('ctr', creative.ctr)}
@@ -972,44 +962,32 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   </div>
                 </div>
                 
-                {/* Additional Metrics */}
-                <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-gray-500 uppercase font-medium mb-1">
-                      {viewMode === VIEW_MODES.COPY ? 'CREATIVES' : 'THUMBSTOP'}
-                    </div>
-                    <div className="font-semibold text-gray-700">
-                      {viewMode === VIEW_MODES.COPY 
-                        ? formatMetricValue('creativeCount', creative.creativeCount)
-                        : formatMetricValue('thumbstopRate', creative.thumbstopRate)
-                      }
+                    <div className="text-xs text-gray-500 uppercase font-medium">THUMBSTOP</div>
+                    <div className="text-xs font-semibold text-gray-700">
+                      {formatMetricValue('thumbstopRate', creative.thumbstopRate)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500 uppercase font-medium mb-1">SPEND</div>
-                    <div className="font-semibold text-gray-700">
+                    <div className="text-xs text-gray-500 uppercase font-medium">SPEND</div>
+                    <div className="text-xs font-semibold text-gray-700">
                       {formatMetricValue('spend', creative.spend)}
                     </div>
                   </div>
                 </div>
                 
-                {/* Bottom Metrics */}
-                <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-gray-500 uppercase font-medium mb-1">PURCHASES</div>
-                    <div className="font-semibold text-gray-700">
+                    <div className="text-xs text-gray-500 uppercase font-medium">PURCHASES</div>
+                    <div className="text-xs font-semibold text-gray-700">
                       {formatMetricValue('purchases', creative.purchases)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500 uppercase font-medium mb-1">
-                      {viewMode === VIEW_MODES.COPY ? '# AD SETS' : '# AD SETS'}
-                    </div>
-                    <div className="font-semibold text-gray-700">
-                      {viewMode === VIEW_MODES.COPY 
-                        ? `${creative.adsetCount || 0} Ad Sets`
-                        : `${creative.adsetCount || 0} Ad Sets`
-                      }
+                    <div className="text-xs text-gray-500 uppercase font-medium"># AD SETS</div>
+                    <div className="text-xs font-semibold text-gray-700">
+                      {creative.adsetCount || 0} Ad Sets
                     </div>
                   </div>
                 </div>
