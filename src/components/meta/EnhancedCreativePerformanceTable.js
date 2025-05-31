@@ -873,23 +873,41 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
       )}
 
-      {/* Creative Cards Grid - FIXED LAYOUT */}
+      {/* Creative Cards Grid - FIXED LAYOUT WITH DEFENSIVE STYLING */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {filteredCreatives.map((creative) => (
           <div
             key={creative.id}
-            className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden min-h-96 flex flex-col ${
+            className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden flex flex-col ${
               selectedCreativeId === creative.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
             }`}
+            style={{ 
+              minHeight: '384px', // 96 * 4 = 384px (equivalent to min-h-96)
+              maxHeight: '600px',  // Prevent cards from becoming too tall
+              height: 'auto'
+            }}
             onClick={() => setSelectedCreativeId(creative.id)}
           >
-            {/* Creative Thumbnail */}
+            {/* Creative Thumbnail - FIXED WITH DEFENSIVE CONSTRAINTS */}
             {creative.thumbnailUrl && (
-              <div className="h-40 bg-gray-50 flex items-center justify-center overflow-hidden">
+              <div 
+                className="bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0"
+                style={{
+                  height: '160px', // Fixed height equivalent to h-40
+                  minHeight: '160px',
+                  maxHeight: '160px'
+                }}
+              >
                 <img 
                   src={creative.thumbnailUrl} 
                   alt="Creative thumbnail"
-                  className="max-w-full max-h-full object-contain"
+                  className="object-contain"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    width: 'auto',
+                    height: 'auto'
+                  }}
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><span class="text-2xl">🖼️</span></div>';
@@ -898,21 +916,37 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               </div>
             )}
             
-            {/* Content Container */}
-            <div className="p-3 flex-1 flex flex-col">
+            {/* Content Container - FIXED FLEX LAYOUT */}
+            <div className="p-3 flex-1 flex flex-col min-h-0">
               {/* Ad Name */}
-              <div className="mb-2">
-                <h4 className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">
+              <div className="mb-2 flex-shrink-0">
+                <h4 className="text-sm font-medium text-gray-900 leading-tight" style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  wordBreak: 'break-word'
+                }}>
                   {creative.adName}
                 </h4>
               </div>
               
               {/* Copy Text - Show based on view mode and aggregation level */}
               {(viewMode === VIEW_MODES.COPY || aggregationLevel >= 3) && (
-                <div className="mb-3 flex-1">
-                  <div className="text-xs text-gray-600 bg-gray-50 rounded p-2 max-h-20 overflow-hidden">
+                <div className="mb-3 flex-1 min-h-0">
+                  <div 
+                    className="text-xs text-gray-600 bg-gray-50 rounded p-2 overflow-hidden"
+                    style={{
+                      maxHeight: '80px',
+                      minHeight: '60px'
+                    }}
+                  >
                     {creative.extractedCopy.split('\n').slice(0, 3).map((line, index) => (
-                      <div key={index} className="leading-relaxed">
+                      <div key={index} className="leading-relaxed" style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                         {line.substring(0, 80)}{line.length > 80 ? '...' : ''}
                       </div>
                     ))}
@@ -920,15 +954,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 </div>
               )}
               
-              {/* Metrics Grid */}
-              <div className="mt-auto space-y-2">
+              {/* Metrics Grid - FIXED POSITION AT BOTTOM */}
+              <div className="mt-auto space-y-2 flex-shrink-0">
                 {currentMetrics.reduce((rows, metric, index) => {
                   if (index % 2 === 0) {
                     const nextMetric = currentMetrics[index + 1];
                     rows.push(
                       <div key={metric} className="flex justify-between text-xs">
-                        <div className="flex-1 pr-2">
-                          <div className="text-gray-500 uppercase font-medium text-xs mb-1">
+                        <div className="flex-1 pr-2 min-w-0">
+                          <div className="text-gray-500 uppercase font-medium text-xs mb-1 truncate">
                             {metric === 'thumbstopRate' ? 'Thumbstop' : 
                              metric === 'seeMoreRate' ? 'See More' :
                              metric === 'adsetCount' ? 'Ad Sets' :
@@ -936,15 +970,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                              metric.replace(/([A-Z])/g, ' $1').toUpperCase()}
                           </div>
                           <div 
-                            className="font-semibold"
+                            className="font-semibold truncate"
                             style={{ color: getBenchmarkColor(metric, creative[metric]) }}
                           >
                             {formatMetricValue(metric, creative[metric])}
                           </div>
                         </div>
                         {nextMetric && (
-                          <div className="flex-1 text-right pl-2">
-                            <div className="text-gray-500 uppercase font-medium text-xs mb-1">
+                          <div className="flex-1 text-right pl-2 min-w-0">
+                            <div className="text-gray-500 uppercase font-medium text-xs mb-1 truncate">
                               {nextMetric === 'thumbstopRate' ? 'Thumbstop' : 
                                nextMetric === 'seeMoreRate' ? 'See More' :
                                nextMetric === 'adsetCount' ? 'Ad Sets' :
@@ -952,7 +986,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                                nextMetric.replace(/([A-Z])/g, ' $1').toUpperCase()}
                             </div>
                             <div 
-                              className="font-semibold"
+                              className="font-semibold truncate"
                               style={{ color: getBenchmarkColor(nextMetric, creative[nextMetric]) }}
                             >
                               {formatMetricValue(nextMetric, creative[nextMetric])}
