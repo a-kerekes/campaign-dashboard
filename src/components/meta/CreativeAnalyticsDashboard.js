@@ -1,4 +1,4 @@
-// src/components/meta/CreativeAnalyticsDashboard.js
+export default CreativeAnalyticsDashboard;// src/components/meta/CreativeAnalyticsDashboard.js
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AdMetricsChart from './AdMetricsChart';
@@ -10,10 +10,6 @@ import EnhancedCreativePerformanceTable from './EnhancedCreativePerformanceTable
 
 // Meta API version constant
 const META_API_VERSION = 'v22.0';
-
-// IMPORTANT: Do NOT destructure metaAPI functions like this:
-// const { fetchDailyMetrics, fetchBreakdownMetrics } = metaAPI;
-// Instead, use metaAPI.fetchDailyMetrics and metaAPI.fetchBreakdownMetrics directly
 
 const CreativeAnalyticsDashboard = () => {
   // Dashboard state
@@ -69,24 +65,19 @@ const CreativeAnalyticsDashboard = () => {
     }
   }, [isConnected, selectedAccountId, fetchBenchmarks]);
 
-  // Enhanced Post ID extraction with intelligent fallback grouping
-  const extractPostIdWithFallback = useCallback((adName) => {
+  // Enhanced smart grouping with improved pattern recognition
+  const enhancedSmartGrouping = useCallback((adName) => {
     if (!adName) return { groupKey: 'unknown', method: 'fallback' };
     
-    console.log(`🔍 SMART GROUPING: Analyzing "${adName}"`);
+    console.log(`🔍 ENHANCED SMART GROUPING: Analyzing "${adName}"`);
     
     // STRATEGY 1: Try to extract Post ID (original logic)
     const tryExtractPostId = (adName) => {
       const patterns = [
-        // Pattern 1: Number at the very end after |
         /\|\s*(\d{10,})\s*\|?\s*$/,
-        // Pattern 2: Number after technical suffix  
         /\|\s*[\w-_]+\s*\|\s*(\d{10,})\s*\|?\s*$/,
-        // Pattern 3: Long number anywhere (13+ digits)
         /(\d{13,})/,
-        // Pattern 4: Facebook post ID patterns
         /post[_-]?id[_-]?:?\s*(\d{10,})/i,
-        // Pattern 5: Creative ID patterns
         /creative[_-]?id[_-]?:?\s*(\d{10,})/i
       ];
       
@@ -99,7 +90,7 @@ const CreativeAnalyticsDashboard = () => {
       return null;
     };
 
-    // Helper Functions
+    // Helper Functions for pattern recognition
     const isPartTechnical = (part) => {
       const technicalPatterns = [
         /^\d+_/, // Starts with number_
@@ -108,18 +99,20 @@ const CreativeAnalyticsDashboard = () => {
         /Homepage/, // Technical indicators
         /Copy\s*\|?\s*$/, // Copy suffix
         /^(Do|Try)\//, // Action prefixes
+        /^\d{10,}$/, // Long numbers
+        /^act_\d+$/, // Account IDs
+        /^\d+x\d+$/, // Dimensions
       ];
       
       return technicalPatterns.some(pattern => pattern.test(part));
     };
 
     const isPartProductName = (part) => {
-      // Heuristics for product names
       return part.length > 2 && 
              part.length < 50 && 
              !isPartTechnical(part) &&
-             !/^\d+$/.test(part) && // Not just numbers
-             !/^[A-Z]{2,}$/.test(part); // Not all caps abbreviations
+             !/^\d+$/.test(part) && 
+             !/^[A-Z]{2,}$/.test(part);
     };
 
     const isPartVisualTheme = (part) => {
@@ -156,7 +149,6 @@ const CreativeAnalyticsDashboard = () => {
     };
 
     const findProductName = (parts) => {
-      // Look for parts that seem like product names
       return parts.find(part => 
         isPartProductName(part) && !isPartTechnical(part)
       );
@@ -176,134 +168,83 @@ const CreativeAnalyticsDashboard = () => {
       );
     };
 
-    const findVariationInParts = (parts) => {
-      return parts.find(part => 
-        isPartVariation(part) && !isPartTechnical(part)
-      );
-    };
-
-    // STRATEGY 2: Group by Creative Type + Core Product
-    const tryCreativeTypeGrouping = (adName) => {
-      const parts = adName.split('|').map(p => p.trim());
-      
-      // Look for creative type indicators
-      const creativeType = findCreativeType(parts);
-      const productName = findProductName(parts);
-      const variation = findVariation(parts);
-      
-      if (creativeType && productName) {
-        let groupKey = `${creativeType}_${productName}`;
-        if (variation) {
-          groupKey += `_${variation}`;
+    // Auto-detect separator
+    const detectSeparator = (name) => {
+      const separators = ['|', ' | ', '_', '-', '  ', ' '];
+      for (const sep of separators) {
+        if (name.includes(sep)) {
+          return sep;
         }
-        return groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
       }
-      
       return null;
     };
 
-    // STRATEGY 3: Group by Product/Campaign Name
-    const tryProductGrouping = (adName) => {
-      const parts = adName.split('|').map(p => p.trim());
-      
-      // Common product name indicators (first few parts usually contain product info)
-      for (let i = 0; i < Math.min(3, parts.length); i++) {
-        const part = parts[i];
-        
-        // Skip technical prefixes
-        if (isPartTechnical(part)) continue;
-        
-        // If this looks like a product name, use it
-        if (isPartProductName(part)) {
-          // Look for variations in subsequent parts
-          const variation = findVariationInParts(parts.slice(i + 1));
-          let groupKey = `product_${part}`;
-          if (variation) {
-            groupKey += `_${variation}`;
-          }
-          return groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        }
-      }
-      
-      return null;
-    };
-
-    // STRATEGY 4: Group by Visual Theme/Variation
-    const tryThemeGrouping = (adName) => {
-      const parts = adName.split('|').map(p => p.trim());
-      
-      // Look for visual/theme indicators
-      const themes = [];
-      const productBase = [];
-      
-      parts.forEach(part => {
-        if (isPartVisualTheme(part)) {
-          themes.push(part);
-        } else if (isPartProductName(part) && !isPartTechnical(part)) {
-          productBase.push(part);
-        }
-      });
-      
-      if (productBase.length > 0) {
-        let groupKey = `theme_${productBase[0]}`;
-        if (themes.length > 0) {
-          groupKey += `_${themes[0]}`;
-        }
-        return groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-      }
-      
-      return null;
-    };
-
-    // STRATEGY 5: Group by Brand/Campaign
-    const tryBrandGrouping = (adName) => {
-      const parts = adName.split('|').map(p => p.trim());
-      
-      // Usually brand/campaign name is in the first part
-      const firstPart = parts[0];
-      if (firstPart && !isPartTechnical(firstPart)) {
-        return `brand_${firstPart.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
-      }
-      
-      return null;
-    };
-
+    // Main grouping logic
     const postId = tryExtractPostId(adName);
     if (postId) {
       console.log(`✅ Strategy 1 SUCCESS: Found Post ID "${postId}"`);
       return { groupKey: `post_${postId}`, method: 'post_id', postId };
     }
     
-    // STRATEGY 2: Creative Type + Product/Campaign grouping
-    const creativeGroup = tryCreativeTypeGrouping(adName);
-    if (creativeGroup) {
-      console.log(`✅ Strategy 2 SUCCESS: Creative grouping "${creativeGroup}"`);
-      return { groupKey: creativeGroup, method: 'creative_type' };
+    // Progressive pattern discovery
+    const separator = detectSeparator(adName);
+    let parts = [];
+    
+    if (separator) {
+      parts = adName.split(separator).map(s => s.trim()).filter(s => s.length > 0);
+    } else {
+      if (/[a-z][A-Z]/.test(adName)) {
+        parts = adName.split(/(?=[A-Z])/).filter(s => s.length > 0);
+      } else {
+        parts = [adName];
+      }
+    }
+
+    console.log(`🔧 Detected separator: "${separator}", Parts:`, parts);
+
+    // STRATEGY 2: Creative Type + Product grouping
+    const creativeType = findCreativeType(parts);
+    const productName = findProductName(parts);
+    const variation = findVariation(parts);
+    
+    if (creativeType && productName) {
+      let groupKey = `${creativeType}_${productName}`;
+      if (variation) {
+        groupKey += `_${variation}`;
+      }
+      const cleanKey = groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      console.log(`✅ Strategy 2 SUCCESS: Creative grouping "${cleanKey}"`);
+      return { groupKey: cleanKey, method: 'creative_type' };
     }
     
     // STRATEGY 3: Product/Campaign name grouping
-    const productGroup = tryProductGrouping(adName);
-    if (productGroup) {
-      console.log(`✅ Strategy 3 SUCCESS: Product grouping "${productGroup}"`);
-      return { groupKey: productGroup, method: 'product_name' };
+    for (let i = 0; i < Math.min(3, parts.length); i++) {
+      const part = parts[i];
+      
+      if (isPartTechnical(part)) continue;
+      
+      if (isPartProductName(part)) {
+        const variationPart = parts.slice(i + 1).find(p => isPartVariation(p));
+        let groupKey = `product_${part}`;
+        if (variationPart) {
+          groupKey += `_${variationPart}`;
+        }
+        const cleanKey = groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        console.log(`✅ Strategy 3 SUCCESS: Product grouping "${cleanKey}"`);
+        return { groupKey: cleanKey, method: 'product_name' };
+      }
     }
     
-    // STRATEGY 4: Visual/Theme grouping (for image variations)
-    const themeGroup = tryThemeGrouping(adName);
-    if (themeGroup) {
-      console.log(`✅ Strategy 4 SUCCESS: Theme grouping "${themeGroup}"`);
-      return { groupKey: themeGroup, method: 'theme_group' };
+    // STRATEGY 4: Brand/Campaign fallback
+    const firstPart = parts[0];
+    if (firstPart && !isPartTechnical(firstPart)) {
+      const cleanKey = `brand_${firstPart.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
+      console.log(`✅ Strategy 4 SUCCESS: Brand grouping "${cleanKey}"`);
+      return { groupKey: cleanKey, method: 'brand_group' };
     }
     
-    // STRATEGY 5: Brand/Campaign fallback
-    const brandGroup = tryBrandGrouping(adName);
-    if (brandGroup) {
-      console.log(`✅ Strategy 5 SUCCESS: Brand grouping "${brandGroup}"`);
-      return { groupKey: brandGroup, method: 'brand_group' };
-    }
-    
-    // FINAL FALLBACK: Use cleaned first part
-    const fallbackGroup = `name_${adName.split('|')[0]?.trim() || 'unknown'}`;
+    // FINAL FALLBACK
+    const fallbackGroup = `name_${adName.split(/[|_-]/)[0]?.trim() || 'unknown'}`;
     console.log(`⚠️ Using final fallback: "${fallbackGroup}"`);
     return { groupKey: fallbackGroup, method: 'fallback' };
   }, []);
@@ -321,7 +262,6 @@ const CreativeAnalyticsDashboard = () => {
       
       // Calculate date range
       const today = new Date();
-      // Create yesterday date
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
       
@@ -335,21 +275,19 @@ const CreativeAnalyticsDashboard = () => {
         daysAgo = 90;
       }
       
-      // Start from yesterday and go back daysAgo days
       const startDate = new Date(yesterday);
       startDate.setDate(yesterday.getDate() - (daysAgo - 1));
       
       const since = startDate.toISOString().split('T')[0];
-      const until = yesterday.toISOString().split('T')[0]; // End at yesterday, not today
+      const until = yesterday.toISOString().split('T')[0];
       
       console.log(`Date range: ${dateRange}, from ${since} to ${until}`);
       
-      // FETCH DAILY TIME SERIES DATA - FIX: Use metaAPI.fetchDailyMetrics directly
+      // FETCH DAILY TIME SERIES DATA
       try {
         console.log(`Fetching daily metrics for account ID: ${selectedAccountId}, date range: ${dateRange}`);
         const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId, accessToken);
         
-        // Check if data contains mock flags (you might need to adjust this based on your implementation)
         const isMockData = dailyData && dailyData.some(item => item._isMock === true || item.source === 'mock');
         setIsRealData(!isMockData);
         
@@ -357,26 +295,21 @@ const CreativeAnalyticsDashboard = () => {
         setTimeSeriesData(dailyData);
       } catch (timeSeriesError) {
         console.error('Error loading time series data:', timeSeriesError);
-        // Continue with other data loading even if time series fails
       }
       
-      // FETCH BREAKDOWN DATA - FIX: Use metaAPI.fetchBreakdownMetrics directly
+      // FETCH BREAKDOWN DATA
       try {
-        // Fetch age breakdown
+        // Fetch and enhance breakdown data
         let ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
-        // Add purchase and conversion metrics to each breakdown item
         ageData = ageData.map(item => {
           const impressions = parseInt(item.impressions || 0);
           const clicks = parseInt(item.clicks || 0);
-          // Estimate CTR if not provided or ensure it's a percentage
           let ctr = item.ctr || 0;
           if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
             ctr = (clicks / impressions) * 100;
           } else if (ctr > 0 && ctr < 1) {
-            // If CTR is decimal (0.0123) convert to percentage (1.23)
             ctr = ctr * 100;
           }
-          // Add purchase metrics (estimating based on clicks if not available)
           return {
             ...item,
             ctr: ctr,
@@ -389,7 +322,6 @@ const CreativeAnalyticsDashboard = () => {
         });
         setAgeBreakdown(ageData);
         
-        // Fetch gender breakdown and enhance with conversion metrics
         let genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId, accessToken);
         genderData = genderData.map(item => {
           const impressions = parseInt(item.impressions || 0);
@@ -412,7 +344,6 @@ const CreativeAnalyticsDashboard = () => {
         });
         setGenderBreakdown(genderData);
         
-        // Fetch platform breakdown and enhance with conversion metrics
         let platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId, accessToken);
         platformData = platformData.map(item => {
           const impressions = parseInt(item.impressions || 0);
@@ -435,7 +366,6 @@ const CreativeAnalyticsDashboard = () => {
         });
         setPlatformBreakdown(platformData);
         
-        // Fetch placement breakdown and enhance with conversion metrics
         let placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId, accessToken);
         placementData = placementData.map(item => {
           const impressions = parseInt(item.impressions || 0);
@@ -461,7 +391,6 @@ const CreativeAnalyticsDashboard = () => {
         console.log('Successfully loaded and enhanced all breakdown data');
       } catch (breakdownError) {
         console.error('Error loading breakdown data:', breakdownError);
-        // Continue with other data loading even if breakdowns fail
       }
       
       // 1. Fetch account insights
@@ -505,23 +434,21 @@ const CreativeAnalyticsDashboard = () => {
         }
       );
 
-      // 🚨 DEBUG: Log the raw creative data
       console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
-      // 3b. NEW: Fetch creative library for better video quality
+      // 3b. Fetch creative library for better video quality
       const creativesResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
         {
           params: {
             access_token: accessToken,
-            fields: 'image_url,thumbnail_url,video_id',
+            fields: 'image_url,thumbnail_url,video_id,object_story_spec',
             limit: 250
           }
         }
       );
 
-      // 🚨 DEBUG: Log creative library data
       console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
       console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
       console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
@@ -532,7 +459,6 @@ const CreativeAnalyticsDashboard = () => {
         creativesResponse.data.data.forEach(creative => {
           creativesMap[creative.id] = creative;
           
-          // 🚨 DEBUG: Log each creative's available image fields
           console.log(`🔍 CREATIVE ${creative.id}:`, {
             image_url: creative.image_url,
             thumbnail_url: creative.thumbnail_url,
@@ -543,19 +469,17 @@ const CreativeAnalyticsDashboard = () => {
         });
       }
 
-      // Extract ads from response - MOVED BEFORE BATCHING
+      // Extract ads from response
       const ads = adsResponse.data.data;
 
-      // 4. Fetch ad insights for performance data - WITH BATCHING - MOVED TO CORRECT LOCATION
+      // 4. Fetch ad insights for performance data - WITH BATCHING
       console.log('🔍 Fetching ad insights with batching...');
       let adInsightsResponse = { data: { data: [] } };
 
       try {
-        // Get all ad IDs
         const allAdIds = ads.map(ad => ad.id);
         console.log(`📊 Need insights for ${allAdIds.length} ads`);
         
-        // Batch the requests - Meta API can handle ~50 ads per request
         const batchSize = 50;
         const batches = [];
         
@@ -566,7 +490,6 @@ const CreativeAnalyticsDashboard = () => {
         
         console.log(`📦 Split into ${batches.length} batches of ~${batchSize} ads each`);
         
-        // Process each batch
         const allInsightsData = [];
         
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
@@ -603,18 +526,15 @@ const CreativeAnalyticsDashboard = () => {
               console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
             }
             
-            // Add a small delay between batches to avoid rate limiting
             if (batchIndex < batches.length - 1) {
               await new Promise(resolve => setTimeout(resolve, 100));
             }
             
           } catch (batchError) {
             console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
-            // Continue with other batches even if one fails
           }
         }
         
-        // Reconstruct the response format
         adInsightsResponse = {
           data: {
             data: allInsightsData
@@ -626,8 +546,6 @@ const CreativeAnalyticsDashboard = () => {
       } catch (insightsError) {
         console.error('❌ Error fetching ad insights:', insightsError);
         console.log('⚠️  Continuing without individual ad insights - will use aggregated data');
-        
-        // Fallback: continue without ad-level insights
         adInsightsResponse = { data: { data: [] } };
       }
 
@@ -637,7 +555,7 @@ const CreativeAnalyticsDashboard = () => {
         .map(ad => {
           const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
           
-          // 🚨 DEBUG: Enhanced thumbnail logic with detailed logging
+          // Enhanced thumbnail logic with detailed logging
           const creativeLibData = creativesMap[ad.creative.id];
           
           console.log(`🔍 PROCESSING AD ${ad.id}:`, {
@@ -653,16 +571,15 @@ const CreativeAnalyticsDashboard = () => {
           
           // Enhanced thumbnail logic
           const thumbnailUrl = (() => {
-            // Try multiple sources in order of preference
             const candidates = [
-              creativeLibData?.image_url,                                    // Creative Library high-res
-              ad.creative.image_url,                                         // Ads API image
-              creativeLibData?.thumbnail_url,                                // Creative Library thumbnail  
-              ad.creative.thumbnail_url,                                     // Ads API thumbnail
-              creativeLibData?.object_story_spec?.video_data?.image_url,     // Video thumbnail from Creative Lib
-              ad.creative.object_story_spec?.video_data?.image_url,          // Video thumbnail from Ads API
-              ad.creative.object_story_spec?.link_data?.picture,             // Link preview image
-              creativeLibData?.object_story_spec?.link_data?.picture         // Link preview from Creative Lib
+              creativeLibData?.image_url,
+              ad.creative.image_url,
+              creativeLibData?.thumbnail_url,
+              ad.creative.thumbnail_url,
+              creativeLibData?.object_story_spec?.video_data?.image_url,
+              ad.creative.object_story_spec?.video_data?.image_url,
+              ad.creative.object_story_spec?.link_data?.picture,
+              creativeLibData?.object_story_spec?.link_data?.picture
             ];
             
             const finalUrl = candidates.find(url => url && url.length > 0);
@@ -675,19 +592,16 @@ const CreativeAnalyticsDashboard = () => {
             return finalUrl || null;
           })();
           
-          // 🔧 NEW: Calculate ROAS for this specific creative
+          // Calculate ROAS for this specific creative
           const spend = insight ? parseFloat(insight.spend || 0) : 0;
           const purchases = insight && insight.actions ? 
             parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
           
-          // Calculate revenue from purchase value
           const purchaseValue = insight && insight.action_values ? 
             parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
           
-          // Calculate ROAS: Revenue / Spend
           const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
           
-          // 🚨 DEBUG: Log ROAS calculation
           console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
             spend,
             purchases,
@@ -695,16 +609,16 @@ const CreativeAnalyticsDashboard = () => {
             roas: roas.toFixed(2)
           });
           
-          // 🔧 NEW: Apply smart grouping for this creative
-          const groupingResult = extractPostIdWithFallback(ad.name);
-          console.log(`🏷️ Smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
+          // Apply enhanced smart grouping for this creative
+          const groupingResult = enhancedSmartGrouping(ad.name);
+          console.log(`🏷️ Enhanced smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
           
           return {
             adId: ad.id,
             adName: ad.name,
             adsetName: ad.adset ? ad.adset.name : 'Unknown',
             creativeId: ad.creative.id,
-            thumbnailUrl: thumbnailUrl,  // This should now have better URLs
+            thumbnailUrl: thumbnailUrl,
             objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
             accountId: selectedAccountId,
             // Performance metrics
@@ -720,17 +634,17 @@ const CreativeAnalyticsDashboard = () => {
               parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
             addToCarts: insight && insight.actions ? 
               parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-            // 🔧 NEW: Add ROAS calculation
+            // ROAS calculation
             roas: roas,
             revenue: purchaseValue,
-            // 🔧 NEW: Add smart grouping info
+            // Enhanced smart grouping info
             smartGroupKey: groupingResult.groupKey,
             groupingMethod: groupingResult.method,
             postId: groupingResult.postId || null
           };
         });
 
-      // 🚨 DEBUG: Final summary
+      // Final summary
       const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
       console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
         totalCreatives: creativePerformance.length,
@@ -742,13 +656,13 @@ const CreativeAnalyticsDashboard = () => {
         }))
       });
 
-      // 🔧 NEW: Log smart grouping statistics
+      // Log enhanced smart grouping statistics
       const groupingStats = {};
       creativePerformance.forEach(creative => {
         const method = creative.groupingMethod;
         groupingStats[method] = (groupingStats[method] || 0) + 1;
       });
-      console.log('📊 SMART GROUPING STATISTICS:', groupingStats);
+      console.log('📊 ENHANCED SMART GROUPING STATISTICS:', groupingStats);
       
       // Prepare summary metrics from account insights
       const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
@@ -768,13 +682,13 @@ const CreativeAnalyticsDashboard = () => {
       
       // Calculate estimated funnel data if conversions aren't directly available
       const purchaseAction = accountInsights.actions?.find(a => a.action_type === 'purchase');
-      const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1); // Assuming 10% conversion rate
+      const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1);
       
       const landingPageViewAction = accountInsights.actions?.find(a => a.action_type === 'landing_page_view');
-      const estimatedLandingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value) : Math.round(summary.totalClicks * 0.8); // Assuming 80% land on the page
+      const estimatedLandingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value) : Math.round(summary.totalClicks * 0.8);
       
       const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
-      const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3); // Assuming 30% add to cart
+      const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3);
 
       // Add funnel data to analytics
       const funnel = {
@@ -821,7 +735,7 @@ const CreativeAnalyticsDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange, extractPostIdWithFallback]);
+  }, [accessToken, selectedAccountId, dateRange, enhancedSmartGrouping]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
@@ -841,17 +755,13 @@ const CreativeAnalyticsDashboard = () => {
 
   // Handle toggling between real and mock data
   const handleToggleDataSource = () => {
-    // Since we don't have access to shouldUseMockData or notifyMockDataChange,
-    // we'll just toggle the isRealData state and refresh the data
     setIsRealData(!isRealData);
     
-    // Let other components know about this change
     const event = new CustomEvent('dataSourceChanged', { 
       detail: { isRealData: !isRealData }
     });
     window.dispatchEvent(event);
     
-    // Force refresh
     setTimeout(() => {
       if (isConnected && selectedAccountId && accessToken) {
         loadPerformanceData();
@@ -869,7 +779,6 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults({});
     
     try {
-      // Test 1: Verify token validity
       const results = {
         tokenTest: { status: 'pending', message: 'Testing token validity...' }
       };
@@ -971,7 +880,6 @@ const CreativeAnalyticsDashboard = () => {
           status: account.account_status === 1 ? 'Active' : 'Inactive'
         }));
         
-        // Store for diagnostic tool
         setDiagnosticSelectedAccount(accountsList[0].id);
         
         results.accountsTest = { 
@@ -1005,10 +913,8 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults(updatedResults);
     
     try {
-      // Format account ID to ensure it starts with "act_"
       const accountId = diagnosticSelectedAccount.replace('act_', '');
       
-      // Attempt to fetch basic account insights
       const today = new Date();
       const thirtyDaysAgo = new Date(today);
       thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -1072,10 +978,8 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults(updatedResults);
     
     try {
-      // Format account ID to ensure it starts with "act_"
       const accountId = diagnosticSelectedAccount.replace('act_', '');
       
-      // Attempt to fetch campaigns
       const campaignsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/campaigns`,
         {
@@ -1128,10 +1032,8 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults(updatedResults);
     
     try {
-      // Format account ID to ensure it starts with "act_"
       const accountId = diagnosticSelectedAccount.replace('act_', '');
       
-      // Attempt to fetch ad creatives
       const adsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/ads`,
         {
@@ -1156,7 +1058,6 @@ const CreativeAnalyticsDashboard = () => {
           data: adsResponse.data
         };
       } else {
-        // Extract creatives from ads response
         const ads = adsResponse.data.data;
         const creatives = ads
           .filter(ad => ad.creative)
@@ -1204,10 +1105,10 @@ const CreativeAnalyticsDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Meta Ads Creative Analytics</h1>
-                <p className="mt-2 text-sm text-gray-600">Analyze your creative performance and optimize ad campaigns</p>
+                <p className="mt-2 text-sm text-gray-600">Analyze your creative performance with adaptive pattern recognition</p>
               </div>
               
-              {/* Data Source Indicator - Moved to header */}
+              {/* Data Source Indicator */}
               {isConnected && (
                 <div className="flex items-center space-x-4">
                   <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${isRealData ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
@@ -1553,5 +1454,3 @@ const CreativeAnalyticsDashboard = () => {
     </div>
   );
 };
-
-export default CreativeAnalyticsDashboard;
