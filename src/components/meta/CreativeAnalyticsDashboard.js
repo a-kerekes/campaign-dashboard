@@ -465,9 +465,6 @@ const CreativeAnalyticsDashboard = () => {
       }
       
       // 1. Fetch account insights
-      console.log('🔍 BEFORE INSIGHTS AXIOS CALL:');
-      console.log('🔍 About to fetch insights with limit 500');
-      
       const insightsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
         {
@@ -479,37 +476,31 @@ const CreativeAnalyticsDashboard = () => {
             }),
             fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
             level: 'account',
-            limit: parseInt('500')  // Force clean number
+            limit: 500
           }
         }
       );
       
       // 2. Fetch campaigns
-      console.log('🔍 BEFORE CAMPAIGNS AXIOS CALL:');
-      console.log('🔍 About to fetch campaigns with limit 500');
-      
       const campaignsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/campaigns`,
         {
           params: {
             access_token: accessToken,
             fields: 'name,status,objective',
-            limit: parseInt('500')  // Force clean number
+            limit: 500
           }
         }
       );
       
       // 3. Fetch ads with their creative info
-      console.log('🔍 BEFORE ADS AXIOS CALL:');
-      console.log('🔍 About to fetch ads with limit 500');
-      
       const adsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
         {
           params: {
             access_token: accessToken,
             fields: 'name,creative{id,image_url,thumbnail_url,object_story_spec,video_id},adset{name}',
-            limit: parseInt('500')  // Force clean number
+            limit: 500
           }
         }
       );
@@ -519,28 +510,13 @@ const CreativeAnalyticsDashboard = () => {
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
       // 3b. NEW: Fetch creative library for better video quality
-      console.log('🔍 BEFORE AXIOS CALL:');
-      console.log('🔍 META_API_VERSION:', META_API_VERSION);
-      console.log('🔍 formattedAccountId:', formattedAccountId);
-      console.log('🔍 accessToken length:', accessToken?.length);
-
-      const debugParams = {
-        access_token: accessToken,
-        fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
-        limit: 250
-      };
-
-      console.log('🔍 EXACT PARAMS OBJECT:', debugParams);
-      console.log('🔍 LIMIT VALUE TYPE:', typeof debugParams.limit);
-      console.log('🔍 LIMIT VALUE:', debugParams.limit);
-
       const creativesResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
         {
           params: {
             access_token: accessToken,
             fields: 'id,image_url,video_id,thumbnail_url,object_story_spec,asset_feed_spec,image_crops,instagram_story_id',
-            limit: parseInt('250')  // Force clean number
+            limit: 250
           }
         }
       );
@@ -617,7 +593,7 @@ const CreativeAnalyticsDashboard = () => {
                       value: batchAdIds
                     }
                   ]),
-                  limit: parseInt(String(batchSize))  // Force clean number conversion
+                  limit: batchSize
                 }
               }
             );
