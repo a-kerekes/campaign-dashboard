@@ -1,4 +1,3 @@
-// src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download } from 'lucide-react';
 
@@ -32,6 +31,23 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [isEditingBenchmarks, setIsEditingBenchmarks] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
+
+  // Data cleaning functions
+  const cleanNumericValue = (value, defaultValue = 0) => {
+    if (value === null || value === undefined || value === '') {
+      return defaultValue;
+    }
+    const numericValue = parseFloat(String(value).replace(/^0+(?=\d)/, ''));
+    return isNaN(numericValue) || !isFinite(numericValue) ? defaultValue : numericValue;
+  };
+
+  const cleanIntegerValue = (value, defaultValue = 0) => {
+    if (value === null || value === undefined || value === '') {
+      return defaultValue;
+    }
+    const integerValue = parseInt(String(value).replace(/^0+(?=\d)/, ''), 10);
+    return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
+  };
 
   // Progressive pattern discovery - NEW FUNCTION
   const discoverProgressivePatterns = useCallback((adName, level) => {
@@ -118,7 +134,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   }, []);
 
   // Copy extraction function - ENHANCED
-  const extractAdCopy = (creative) => {
+  const extractAdCopy = useCallback((creative) => {
     let copyText = null;
     
     console.log('🔍 Extracting copy for:', creative.adName);
@@ -197,7 +213,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
     
     return formatCopyText(copyText);
-  };
+  }, [discoverProgressivePatterns]);
   
   // Helper function to format copy text
   const formatCopyText = (text) => {
@@ -242,23 +258,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
     
     return text;
-  };
-
-  // Data cleaning functions
-  const cleanNumericValue = (value, defaultValue = 0) => {
-    if (value === null || value === undefined || value === '') {
-      return defaultValue;
-    }
-    const numericValue = parseFloat(String(value).replace(/^0+(?=\d)/, ''));
-    return isNaN(numericValue) || !isFinite(numericValue) ? defaultValue : numericValue;
-  };
-
-  const cleanIntegerValue = (value, defaultValue = 0) => {
-    if (value === null || value === undefined || value === '') {
-      return defaultValue;
-    }
-    const integerValue = parseInt(String(value).replace(/^0+(?=\d)/, ''), 10);
-    return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
   // NEW: Progressive aggregation function
@@ -888,7 +887,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     objectFit: 'contain',
                     borderRadius: '6px',
                     display: 'block',
-                    imageRendering: 'auto',
                     imageRendering: '-webkit-optimize-contrast',
                     WebkitImageSmoothing: 'high',
                     msInterpolationMode: 'bicubic'
