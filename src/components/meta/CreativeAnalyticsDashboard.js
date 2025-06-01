@@ -370,24 +370,50 @@ const CreativeAnalyticsDashboard = () => {
       console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
-      // 3b. Fetch creative library for better video quality
-      let creativesResponse = { data: { data: [] } };
+      // 3b. Fetch creative library with better thumbnail handling
+let creativesResponse = { data: { data: [] } };
+try {
+  // Get all unique creative IDs from ads
+  const uniqueCreativeIds = [...new Set(ads.map(ad => ad.creative?.id).filter(Boolean))];
+  console.log(`🔍 Found ${uniqueCreativeIds.length} unique creative IDs to fetch`);
+  
+  if (uniqueCreativeIds.length > 0) {
+    // Fetch creatives in batches
+    const batchSize = 25;
+    const allCreatives = [];
+    
+    for (let i = 0; i < uniqueCreativeIds.length; i += batchSize) {
+      const batch = uniqueCreativeIds.slice(i, i + batchSize);
+      
       try {
-        creativesResponse = await axios.get(
-          `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+        const batchResponse = await axios.get(
+          `https://graph.facebook.com/${META_API_VERSION}/`,
           {
             params: {
               access_token: accessToken,
-              fields: 'image_url,thumbnail_url,video_id,object_story_spec',
-              limit: 50 // Reduced limit to avoid API issues
+              ids: batch.join(','),
+              fields: 'image_url,thumbnail_url,object_story_spec'
             }
           }
         );
-        console.log('✅ Creative library fetch successful');
-      } catch (creativesError) {
-        console.warn('⚠️ Creative library fetch failed, continuing without enhanced thumbnails:', creativesError.message);
-        // Continue without creative library data - this is not critical
+        
+        // Convert object response to array
+        Object.values(batchResponse.data).forEach(creative => {
+          if (creative.id) allCreatives.push(creative);
+        });
+        
+        console.log(`✅ Fetched batch ${Math.floor(i/batchSize) + 1}: ${Object.keys(batchResponse.data).length} creatives`);
+      } catch (batchError) {
+        console.warn(`⚠️ Batch ${Math.floor(i/batchSize) + 1} failed:`, batchError.message);
       }
+    }
+    
+    creativesResponse = { data: { data: allCreatives } };
+    console.log(`✅ Total creatives fetched: ${allCreatives.length}`);
+  }
+} catch (creativesError) {
+  console.warn('⚠️ Creative library fetch failed:', creativesError.message);
+}
 
       console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data?.data || 'No creative library data');
 
