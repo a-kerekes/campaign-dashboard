@@ -233,7 +233,7 @@ const CreativeAnalyticsDashboard = () => {
     return adInsightsResponse;
   };
 
-  // ENHANCED Process creative performance data with sharper images
+  // CONSERVATIVE Process creative performance data with reliable images
   const processCreativePerformance = (ads, adInsightsResponse, creativesMap) => {
     console.log('🖼️ PROCESSING CREATIVES:', {
       totalAds: ads.length,
@@ -246,56 +246,35 @@ const CreativeAnalyticsDashboard = () => {
       .map(ad => {
         const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
         
-        // ENHANCED thumbnail logic for SHARPER images
+        // CONSERVATIVE thumbnail logic - prioritize reliability over quality
         const creativeLibData = creativesMap[ad.creative.id];
         
         const thumbnailUrl = (() => {
-          // PRIORITY 1: Try to get full-resolution image URLs first
-          if (creativeLibData?.image_url) {
-            // Check if it's a high-res URL and not already a thumbnail
-            const imageUrl = creativeLibData.image_url;
-            if (!imageUrl.includes('_thumb') && !imageUrl.includes('thumbnail')) {
-              console.log('🔥 Using full-res image URL:', imageUrl);
-              return imageUrl;
-            }
+          // PRIORITY 1: Check creative library for full image URL (but validate it exists)
+          if (creativeLibData?.image_url && !creativeLibData.image_url.includes('_thumb')) {
+            console.log('🔥 Using creative library full-res image URL:', creativeLibData.image_url);
+            return creativeLibData.image_url;
           }
           
-          // PRIORITY 2: Try alternative high-res fields from creative library
-          if (creativeLibData?.object_story_spec?.page_id && creativeLibData?.object_story_spec?.link_data?.picture) {
-            const pictureUrl = creativeLibData.object_story_spec.link_data.picture;
-            if (!pictureUrl.includes('_thumb')) {
-              console.log('🔥 Using link_data picture URL:', pictureUrl);
-              return pictureUrl;
-            }
-          }
-          
-          // PRIORITY 3: Try to construct higher resolution from creative ID
-          if (ad.creative?.id) {
-            // Try multiple size variations - start with largest
-            const creativeId = ad.creative.id;
-            const highResUrl = `https://graph.facebook.com/v22.0/${creativeId}?fields=image_url&access_token=${accessToken}`;
-            console.log('🔥 Attempting high-res creative fetch:', highResUrl);
-            return highResUrl;
-          }
-          
-          // PRIORITY 4: Check ad creative data for non-thumbnail URLs
+          // PRIORITY 2: Check ad creative for image URL (but validate it exists)
           if (ad.creative?.image_url && !ad.creative.image_url.includes('_thumb')) {
             console.log('🔥 Using ad creative image URL:', ad.creative.image_url);
             return ad.creative.image_url;
           }
           
-          // PRIORITY 5: Fall back to standard thumbnail but log it
+          // PRIORITY 3: Use creative library thumbnail as reliable fallback
           if (creativeLibData?.thumbnail_url) {
-            console.log('📷 Falling back to thumbnail URL:', creativeLibData.thumbnail_url);
+            console.log('📷 Using creative library thumbnail URL:', creativeLibData.thumbnail_url);
             return creativeLibData.thumbnail_url;
           }
           
+          // PRIORITY 4: Use ad creative thumbnail as backup
           if (ad.creative?.thumbnail_url) {
             console.log('📷 Using ad creative thumbnail URL:', ad.creative.thumbnail_url);
             return ad.creative.thumbnail_url;
           }
           
-          // FINAL FALLBACK: Preview endpoint (may work for some creatives)
+          // PRIORITY 5: Try preview endpoint only as last resort
           if (ad.creative?.id) {
             const previewUrl = `https://graph.facebook.com/v22.0/${ad.creative.id}/preview?access_token=${accessToken}`;
             console.log('📷 Final fallback to preview URL:', previewUrl);
@@ -415,7 +394,7 @@ const CreativeAnalyticsDashboard = () => {
       // Extract ads from response BEFORE using it
       const ads = adsResponse.data.data;
 
-      // 3b. ENHANCED creative library fetch for HIGHER RESOLUTION images
+      // 3b. Enhanced creative library fetch for additional image options
       let creativesResponse = { data: { data: [] } };
       try {
         creativesResponse = await axios.get(
@@ -423,7 +402,6 @@ const CreativeAnalyticsDashboard = () => {
           {
             params: {
               access_token: accessToken,
-              // REQUEST MORE IMAGE FIELDS for higher resolution options
               fields: 'image_url,thumbnail_url,object_story_spec{page_id,link_data{picture,name,description},video_data{image_url,video_id}}',
               limit: 100
             }
@@ -742,7 +720,7 @@ const CreativeAnalyticsDashboard = () => {
         };
       } else {
         updatedResults.insightsTest = { 
-          status: 'success', 
+          status: 'success',
           message: 'Successfully retrieved insights data',
           data: insightsResponse.data.data
         };

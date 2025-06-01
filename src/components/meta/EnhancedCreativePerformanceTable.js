@@ -1,4 +1,4 @@
-// src/components/meta/EnhancedCreativePerformanceTable.js
+export default EnhancedCreativePerformanceTable;// src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download, Info, Brain } from 'lucide-react';
 
@@ -1136,7 +1136,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 <img 
                   src={creative.thumbnailUrl} 
                   alt="Creative"
-                  className="creative-thumbnail"
                   style={{
                     maxWidth: '100%',
                     maxHeight: '140px',
@@ -1146,48 +1145,40 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     objectFit: 'contain',
                     borderRadius: '6px',
                     display: 'block',
-                    // Enhanced image rendering for maximum sharpness
-                    imageRendering: '-webkit-optimize-contrast',
-                    imageRendering: 'crisp-edges',
-                    imageRendering: 'pixelated',
-                    transform: 'translateZ(0)',
-                    backfaceVisibility: 'hidden',
-                    willChange: 'transform'
+                    // Conservative image rendering for reliability
+                    imageRendering: 'auto'
                   }}
                   onLoad={(e) => {
                     const originalSrc = e.target.src;
                     
-                    // Enhanced image URL optimization for Facebook/Meta images
+                    // CONSERVATIVE IMAGE ENHANCEMENT - Only try for Facebook/Meta images
                     if (originalSrc.includes('facebook.com') || originalSrc.includes('fbcdn.net')) {
-                      const highResSrc = originalSrc
-                        .replace(/\/s\d+x\d+\//, '/s800x800/')  // Larger size
-                        .replace(/\/\d+x\d+\//, '/800x800/')
-                        .replace(/_s\.jpg/, '_n.jpg')
-                        .replace(/_t\.jpg/, '_n.jpg')
-                        .replace(/_m\.jpg/, '_n.jpg')         // Medium to large
-                        .replace(/quality=\d+/, 'quality=95') // Higher quality
-                        .replace(/&oh=[^&]*/, '')             // Remove hash that might limit quality
-                        .replace(/&oe=[^&]*/, '');            // Remove expiration that might limit quality
+                      // More conservative URL enhancement - only try simple quality improvements
+                      const enhancedSrc = originalSrc
+                        .replace(/quality=\d+/, 'quality=85')  // More conservative quality boost
+                        .replace(/_s\.jpg/, '_m.jpg')          // Only go from small to medium, not large
+                        .replace(/_s\.png/, '_m.png');
                       
-                      if (highResSrc !== originalSrc) {
+                      // Only try enhancement if the URL actually changed and looks valid
+                      if (enhancedSrc !== originalSrc && enhancedSrc.length < originalSrc.length + 50) {
                         const testImg = new Image();
                         testImg.onload = () => {
-                          e.target.src = highResSrc;
-                          // Apply sharpening filter after loading high-res image
-                          e.target.style.filter = 'contrast(1.08) saturate(1.05) brightness(1.01) unsharp-mask(1px 1px 1px)';
+                          e.target.src = enhancedSrc;
+                          // Apply moderate sharpening only after successful load
+                          e.target.style.filter = 'contrast(1.05) saturate(1.03) brightness(1.01)';
                         };
                         testImg.onerror = () => {
-                          // Fallback sharpening if high-res fails
-                          e.target.style.filter = 'contrast(1.12) saturate(1.08) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                          // If enhancement fails, just apply light sharpening to original
+                          e.target.style.filter = 'contrast(1.05) saturate(1.03) brightness(1.01)';
                         };
-                        testImg.src = highResSrc;
+                        testImg.src = enhancedSrc;
                       } else {
-                        // Apply sharpening to original image
-                        e.target.style.filter = 'contrast(1.12) saturate(1.08) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                        // Apply light sharpening to original image
+                        e.target.style.filter = 'contrast(1.05) saturate(1.03) brightness(1.01)';
                       }
                     } else {
-                      // Non-Facebook images - apply general sharpening
-                      e.target.style.filter = 'contrast(1.12) saturate(1.08) brightness(1.02) unsharp-mask(1px 1px 1px)';
+                      // For non-Facebook images, just apply very light sharpening
+                      e.target.style.filter = 'contrast(1.03) saturate(1.02) brightness(1.005)';
                     }
                   }}
                   onError={(e) => {
@@ -1324,30 +1315,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           </p>
         )}
       </div>
-      
-      {/* CSS for enhanced image rendering */}
-      <style jsx>{`
-        .creative-thumbnail {
-          image-rendering: -webkit-optimize-contrast;
-          image-rendering: crisp-edges;
-          image-rendering: pixelated;
-          object-fit: cover;
-          object-position: center;
-          transform: translateZ(0);
-          backface-visibility: hidden;
-          will-change: transform;
-          max-width: 100%;
-          height: auto;
-        }
-        
-        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-          .creative-thumbnail {
-            image-rendering: -webkit-optimize-contrast;
-          }
-        }
-      `}</style>
     </div>
   );
 };
-
-export default EnhancedCreativePerformanceTable;
