@@ -89,7 +89,7 @@ const CreativeAnalyticsDashboard = () => {
   };
 
   // Fetch breakdown data for all demographic segments
-  const fetchBreakdownData = async () => {
+  const fetchBreakdownData = useCallback(async () => {
     try {
       // Fetch and enhance age breakdown
       let ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
@@ -111,10 +111,10 @@ const CreativeAnalyticsDashboard = () => {
     } catch (breakdownError) {
       console.error('Error loading breakdown data:', breakdownError);
     }
-  };
+  }, [dateRange, selectedAccountId, accessToken]);
 
   // Calculate date range for API calls
-  const calculateDateRange = () => {
+  const calculateDateRange = useCallback(() => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
@@ -137,10 +137,10 @@ const CreativeAnalyticsDashboard = () => {
     
     console.log(`Date range: ${dateRange}, from ${since} to ${until}`);
     return { since, until };
-  };
+  }, [dateRange]);
 
   // Fetch time series data
-  const fetchTimeSeriesData = async () => {
+  const fetchTimeSeriesData = useCallback(async () => {
     try {
       console.log(`Fetching daily metrics for account ID: ${selectedAccountId}, date range: ${dateRange}`);
       const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId, accessToken);
@@ -153,10 +153,10 @@ const CreativeAnalyticsDashboard = () => {
     } catch (timeSeriesError) {
       console.error('Error loading time series data:', timeSeriesError);
     }
-  };
+  }, [selectedAccountId, dateRange, accessToken]);
 
   // Fetch ad insights with batching
-  const fetchAdInsights = async (ads, since, until) => {
+  const fetchAdInsights = useCallback(async (ads, since, until) => {
     console.log('🔍 Fetching ad insights with batching...');
     let adInsightsResponse = { data: { data: [] } };
 
@@ -231,10 +231,10 @@ const CreativeAnalyticsDashboard = () => {
     }
 
     return adInsightsResponse;
-  };
+  }, [selectedAccountId, accessToken]);
 
   // CONSERVATIVE Process creative performance data with reliable images
-  const processCreativePerformance = (ads, adInsightsResponse, creativesMap) => {
+  const processCreativePerformance = useCallback((ads, adInsightsResponse, creativesMap) => {
     console.log('🖼️ PROCESSING CREATIVES:', {
       totalAds: ads.length,
       creativesMapSize: Object.keys(creativesMap).length,
@@ -320,7 +320,7 @@ const CreativeAnalyticsDashboard = () => {
           revenue: purchaseValue
         };
       });
-  };
+  }, [selectedAccountId, accessToken]);
 
   // Main data loading function
   const loadPerformanceData = useCallback(async () => {
@@ -506,7 +506,7 @@ const CreativeAnalyticsDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange]);
+  }, [accessToken, selectedAccountId, dateRange, calculateDateRange, fetchTimeSeriesData, fetchBreakdownData, fetchAdInsights, processCreativePerformance]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
@@ -685,8 +685,6 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults(updatedResults);
     
     try {
-      const accountId = diagnosticSelectedAccount.replace('act_', '');
-      
       const today = new Date();
       const thirtyDaysAgo = new Date(today);
       thirtyDaysAgo.setDate(today.getDate() - 30);
@@ -695,7 +693,7 @@ const CreativeAnalyticsDashboard = () => {
       const until = today.toISOString().split('T')[0];
       
       const insightsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/insights`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${diagnosticSelectedAccount.replace('act_', '')}/insights`,
         {
           params: {
             access_token: accessToken,
@@ -747,10 +745,8 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults(updatedResults);
     
     try {
-      const accountId = diagnosticSelectedAccount.replace('act_', '');
-      
       const campaignsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/campaigns`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${diagnosticSelectedAccount.replace('act_', '')}/campaigns`,
         {
           params: {
             access_token: accessToken,
@@ -801,8 +797,6 @@ const CreativeAnalyticsDashboard = () => {
     setTestResults(updatedResults);
     
     try {
-      const accountId = diagnosticSelectedAccount.replace('act_', '');
-      
       const adsResponse = await axios.get(
         `https://graph.facebook.com/${META_API_VERSION}/act_${selectedAccountId.toString().replace('act_', '')}/ads`,
         {

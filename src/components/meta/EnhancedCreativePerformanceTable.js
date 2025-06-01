@@ -1,6 +1,6 @@
-export default EnhancedCreativePerformanceTable;// src/components/meta/EnhancedCreativePerformanceTable.js
+// src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Info, Brain } from 'lucide-react';
+import { Download, Brain } from 'lucide-react';
 
 // Aggregation modes - NOW WITH 3 MODES INCLUDING ADAPTIVE
 const AGGREGATION_MODES = {
@@ -32,8 +32,27 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [tempBenchmarks, setTempBenchmarks] = useState({});
   const [patternInsights, setPatternInsights] = useState(null); // 🆕 Pattern discovery insights
 
+  // 🆕 NEW: Calculate confidence in pattern detection
+  const calculatePatternConfidence = useCallback((componentAnalysis, levelCounts, totalAds) => {
+    if (!componentAnalysis || Object.keys(componentAnalysis).length === 0) return 0;
+    
+    const mostCommonLevelCount = Math.max(...Object.values(levelCounts));
+    const levelConsistency = mostCommonLevelCount / totalAds;
+    
+    const earlyLevelStability = Object.keys(componentAnalysis)
+      .slice(0, 3)
+      .reduce((acc, level) => {
+        const analysis = componentAnalysis[level];
+        return acc + (analysis ? analysis.stabilityScore : 0);
+      }, 0) / Math.min(3, Object.keys(componentAnalysis).length);
+    
+    const confidence = (levelConsistency * 0.4 + earlyLevelStability * 0.6) * 100;
+    
+    return Math.min(95, Math.max(10, confidence));
+  }, []);
+
   // 🆕 NEW: Auto-detect separator used in ad names
-  const detectSeparator = (adNames) => {
+  const detectSeparator = useCallback((adNames) => {
     const separatorCandidates = ['|', ' | ', '_', '-', '  ', ' '];
     const separatorCounts = {};
     
@@ -58,10 +77,10 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     });
     
     return separator;
-  };
+  }, []);
 
   // 🆕 NEW: Discover account-specific naming patterns
-  const discoverAccountPatterns = (adNames) => {
+  const discoverAccountPatterns = useCallback((adNames) => {
     if (!adNames || adNames.length === 0) return null;
     
     const separator = detectSeparator(adNames);
@@ -117,29 +136,10 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     
     console.log('🧠 PATTERN DISCOVERY:', patterns);
     return patterns;
-  };
-
-  // 🆕 NEW: Calculate confidence in pattern detection
-  const calculatePatternConfidence = (componentAnalysis, levelCounts, totalAds) => {
-    if (!componentAnalysis || Object.keys(componentAnalysis).length === 0) return 0;
-    
-    const mostCommonLevelCount = Math.max(...Object.values(levelCounts));
-    const levelConsistency = mostCommonLevelCount / totalAds;
-    
-    const earlyLevelStability = Object.keys(componentAnalysis)
-      .slice(0, 3)
-      .reduce((acc, level) => {
-        const analysis = componentAnalysis[level];
-        return acc + (analysis ? analysis.stabilityScore : 0);
-      }, 0) / Math.min(3, Object.keys(componentAnalysis).length);
-    
-    const confidence = (levelConsistency * 0.4 + earlyLevelStability * 0.6) * 100;
-    
-    return Math.min(95, Math.max(10, confidence));
-  };
+  }, [detectSeparator, calculatePatternConfidence]);
 
   // 🆕 NEW: Build progressive hierarchy for an ad name
-  const buildProgressiveHierarchy = (adName, patterns) => {
+  const buildProgressiveHierarchy = useCallback((adName, patterns) => {
     if (!adName || !patterns) {
       return { key: `fallback_${adName}`, level: 0, confidence: 'low' };
     }
@@ -172,10 +172,32 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       groupingParts: hierarchyParts,
       remainingParts: parts.slice(bestLevel + 1)
     };
-  };
+  }, []);
+
+  // EXISTING: Extract Post ID from ad name (UNCHANGED)
+  const extractPostId = useCallback((adName) => {
+    if (!adName) return null;
+    
+    const patterns = [
+      /\|\s*(\d{10,})\s*$/,
+      /\|\s*[\w\-_]+\s*\|\s*(\d{10,})\s*$/,
+      /(\d{13,})/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = adName.match(pattern);
+      if (match && match[1]) {
+        console.log(`🆔 Extracted Post ID "${match[1]}" from "${adName}"`);
+        return match[1];
+      }
+    }
+    
+    console.log(`❌ No Post ID found in "${adName}"`);
+    return null;
+  }, []);
 
   // 🆕 NEW: Smart pattern-based creative grouping
-  const detectCreativeGroup = (adName, allAdNames, patterns) => {
+  const detectCreativeGroup = useCallback((adName, allAdNames, patterns) => {
     const postId = extractPostId(adName);
     if (postId) {
       return { 
@@ -208,32 +230,55 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       confidence: 'low',
       displayName: cleanAdName
     };
-  };
+  }, [extractPostId, buildProgressiveHierarchy]);
 
-  // EXISTING: Extract Post ID from ad name (UNCHANGED)
-  const extractPostId = (adName) => {
-    if (!adName) return null;
+  // EXISTING: Helper function to format copy text (UNCHANGED)
+  const formatCopyText = useCallback((text) => {
+    if (!text) return 'No copy available';
     
-    const patterns = [
-      /\|\s*(\d{10,})\s*$/,
-      /\|\s*[\w\-_]+\s*\|\s*(\d{10,})\s*$/,
-      /(\d{13,})/
-    ];
+    text = text.trim();
     
-    for (const pattern of patterns) {
-      const match = adName.match(pattern);
-      if (match && match[1]) {
-        console.log(`🆔 Extracted Post ID "${match[1]}" from "${adName}"`);
-        return match[1];
-      }
+    const existingLines = text.split(/[\n\r]+/).filter(line => line.trim());
+    if (existingLines.length >= 2) {
+      return existingLines.slice(0, 3).join('\n');
     }
     
-    console.log(`❌ No Post ID found in "${adName}"`);
-    return null;
-  };
+    if (text.length > 120) {
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim());
+      if (sentences.length >= 2) {
+        let result = sentences[0].trim();
+        if (sentences[1] && (result + sentences[1]).length < 150) {
+          result += '. ' + sentences[1].trim();
+        }
+        if (sentences[2] && (result + sentences[2]).length < 200) {
+          result += '. ' + sentences[2].trim();
+        }
+        return result.endsWith('.') ? result : result + '.';
+      }
+      
+      const words = text.split(' ');
+      let lines = ['', '', ''];
+      let currentLine = 0;
+      
+      for (const word of words) {
+        if (currentLine >= 3) break;
+        
+        if (lines[currentLine].length + word.length + 1 > 50 && lines[currentLine].length > 0) {
+          currentLine++;
+          if (currentLine >= 3) break;
+        }
+        
+        lines[currentLine] += (lines[currentLine] ? ' ' : '') + word;
+      }
+      
+      return lines.filter(line => line.trim()).join('\n');
+    }
+    
+    return text;
+  }, []);
 
   // EXISTING: Copy extraction function (UNCHANGED)
-  const extractAdCopy = (creative) => {
+  const extractAdCopy = useCallback((creative) => {
     let copyText = null;
     
     console.log('🔍 Extracting copy for:', creative.adName);
@@ -426,69 +471,24 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     const formatted = formatCopyText(copyText);
     console.log('🔍 Final formatted copy:', formatted);
     return formatted;
-  };
-  
-  // EXISTING: Helper function to format copy text (UNCHANGED)
-  const formatCopyText = (text) => {
-    if (!text) return 'No copy available';
-    
-    text = text.trim();
-    
-    const existingLines = text.split(/[\n\r]+/).filter(line => line.trim());
-    if (existingLines.length >= 2) {
-      return existingLines.slice(0, 3).join('\n');
-    }
-    
-    if (text.length > 120) {
-      const sentences = text.split(/[.!?]+/).filter(s => s.trim());
-      if (sentences.length >= 2) {
-        let result = sentences[0].trim();
-        if (sentences[1] && (result + sentences[1]).length < 150) {
-          result += '. ' + sentences[1].trim();
-        }
-        if (sentences[2] && (result + sentences[2]).length < 200) {
-          result += '. ' + sentences[2].trim();
-        }
-        return result.endsWith('.') ? result : result + '.';
-      }
-      
-      const words = text.split(' ');
-      let lines = ['', '', ''];
-      let currentLine = 0;
-      
-      for (const word of words) {
-        if (currentLine >= 3) break;
-        
-        if (lines[currentLine].length + word.length + 1 > 50 && lines[currentLine].length > 0) {
-          currentLine++;
-          if (currentLine >= 3) break;
-        }
-        
-        lines[currentLine] += (lines[currentLine] ? ' ' : '') + word;
-      }
-      
-      return lines.filter(line => line.trim()).join('\n');
-    }
-    
-    return text;
-  };
+  }, [formatCopyText]);
 
   // EXISTING: Data cleaning functions (UNCHANGED)
-  const cleanNumericValue = (value, defaultValue = 0) => {
+  const cleanNumericValue = useCallback((value, defaultValue = 0) => {
     if (value === null || value === undefined || value === '') {
       return defaultValue;
     }
     const numericValue = parseFloat(String(value).replace(/^0+(?=\d)/, ''));
     return isNaN(numericValue) || !isFinite(numericValue) ? defaultValue : numericValue;
-  };
+  }, []);
 
-  const cleanIntegerValue = (value, defaultValue = 0) => {
+  const cleanIntegerValue = useCallback((value, defaultValue = 0) => {
     if (value === null || value === undefined || value === '') {
       return defaultValue;
     }
     const integerValue = parseInt(String(value).replace(/^0+(?=\d)/, ''), 10);
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
-  };
+  }, []);
 
   // 🆕 ENHANCED: Aggregation function with ADAPTIVE mode support
   const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
@@ -659,7 +659,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     console.log(`🔧 AGGREGATION SUMMARY: ${creativePerformanceData.length} ads → ${aggregatedCreatives.length} unique ${mode}s`);
     
     return aggregatedCreatives;
-  }, []);
+  }, [discoverAccountPatterns, extractPostId, detectCreativeGroup, extractAdCopy, cleanIntegerValue, cleanNumericValue]);
 
   useEffect(() => {
     if (analyticsData && analyticsData.creativePerformance) {
@@ -889,15 +889,18 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 transition: 'all 0.2s',
                 backgroundColor: aggregationMode === mode ? 'white' : 'transparent',
                 color: aggregationMode === mode ? '#2563eb' : '#6b7280',
-                boxShadow: aggregationMode === mode ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                boxShadow: aggregationMode === mode ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
             >
               {key === 'POST' ? '📌 By Post' : 
- key === 'COPY' ? '📝 By Copy' : 
- <>
-   <Brain size={14} />
-   Adaptive
- </>}
+               key === 'COPY' ? '📝 By Copy' : 
+               <>
+                 <Brain size={14} />
+                 Adaptive
+               </>}
             </button>
           ))}
         </div>
@@ -1012,16 +1015,35 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         </div>
         
         {statusMessage && (
-          <div className="p-2 bg-blue-50 text-blue-600 text-sm text-center mb-4 rounded">
+          <div style={{
+            padding: '8px',
+            backgroundColor: '#dbeafe',
+            color: '#1e40af',
+            fontSize: '14px',
+            textAlign: 'center',
+            marginBottom: '16px',
+            borderRadius: '4px'
+          }}>
             {statusMessage}
           </div>
         )}
       </div>
 
       {isEditingBenchmarks && (
-        <div className="mb-6 p-4 bg-gray-50 border rounded-lg">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="font-medium text-gray-800">Performance Benchmarks</h4>
+        <div style={{
+          marginBottom: '24px',
+          padding: '16px',
+          backgroundColor: '#f9fafb',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <h4 style={{ fontWeight: 'medium', color: '#1f2937' }}>Performance Benchmarks</h4>
             <button 
               onClick={async () => {
                 try {
@@ -1042,23 +1064,41 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                   setTimeout(() => setStatusMessage(''), 3000);
                 }
               }}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                fontSize: '14px',
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
             >
               Save Benchmarks
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px'
+          }}>
             {metricsConfig.map(metric => (
               <div key={metric.id}>
-                <div className="font-medium text-sm mb-2">{metric.name}</div>
-                <div className="space-y-2">
+                <div style={{ fontWeight: 'medium', fontSize: '14px', marginBottom: '8px' }}>{metric.name}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div>
-                    <label className="block text-xs text-gray-500">Low</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280' }}>Low</label>
                     <input
                       type="number"
                       step="0.1"
-                      className="w-full p-1 text-sm border rounded"
+                      style={{
+                        width: '100%',
+                        padding: '4px',
+                        fontSize: '14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px'
+                      }}
                       value={tempBenchmarks[metric.id]?.low ?? ''}
                       onChange={(e) => setTempBenchmarks(prev => ({
                         ...prev,
@@ -1070,11 +1110,17 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500">Good</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#6b7280' }}>Good</label>
                     <input
                       type="number"
                       step="0.1"
-                      className="w-full p-1 text-sm border rounded"
+                      style={{
+                        width: '100%',
+                        padding: '4px',
+                        fontSize: '14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px'
+                      }}
                       value={tempBenchmarks[metric.id]?.medium ?? ''}
                       onChange={(e) => setTempBenchmarks(prev => ({
                         ...prev,
@@ -1104,7 +1150,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             style={{
               backgroundColor: 'white',
               borderRadius: '8px',
-              border: '1px solid #e5e7eb',
+              border: selectedCreativeId === creative.creativeId ? '2px solid #2563eb' : '1px solid #e5e7eb',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
               padding: '8px',
               cursor: 'pointer',
@@ -1114,13 +1160,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}
-            className={selectedCreativeId === creative.creativeId ? 'ring-2 ring-blue-500' : ''}
             onClick={() => handleCreativeSelect(creative.creativeId)}
             onMouseEnter={(e) => {
-              e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
             }}
             onMouseLeave={(e) => {
-              e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
             {creative.thumbnailUrl && (
@@ -1145,7 +1190,6 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                     objectFit: 'contain',
                     borderRadius: '6px',
                     display: 'block',
-                    // Conservative image rendering for reliability
                     imageRendering: 'auto'
                   }}
                   onLoad={(e) => {
@@ -1305,10 +1349,15 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         )}
       </div>
       
-      <div className="mt-6 text-xs text-gray-500 text-center">
+      <div style={{
+        marginTop: '24px',
+        fontSize: '12px',
+        color: '#6b7280',
+        textAlign: 'center'
+      }}>
         <p>Performance data aggregated by {aggregationMode}. Colors indicate benchmark performance.</p>
         {aggregationMode === AGGREGATION_MODES.ADAPTIVE && patternInsights && (
-          <p className="mt-1">
+          <p style={{ marginTop: '4px' }}>
             🧠 Adaptive grouping with {patternInsights.confidence.toFixed(0)}% confidence 
             • Separator: "{patternInsights.separator}" 
             • {Object.keys(patternInsights.componentAnalysis || {}).length} levels detected
@@ -1318,3 +1367,5 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     </div>
   );
 };
+
+export default EnhancedCreativePerformanceTable;
