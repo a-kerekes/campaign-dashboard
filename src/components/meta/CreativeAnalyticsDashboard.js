@@ -64,191 +64,7 @@ const CreativeAnalyticsDashboard = () => {
     }
   }, [isConnected, selectedAccountId, fetchBenchmarks]);
 
-  // Enhanced smart grouping with improved pattern recognition
-  const enhancedSmartGrouping = useCallback((adName) => {
-    if (!adName) return { groupKey: 'unknown', method: 'fallback' };
-    
-    console.log(`🔍 ENHANCED SMART GROUPING: Analyzing "${adName}"`);
-    
-    // STRATEGY 1: Try to extract Post ID (original logic)
-    const tryExtractPostId = (adName) => {
-      const patterns = [
-        /\|\s*(\d{10,})\s*\|?\s*$/,
-        /\|\s*[\w-_]+\s*\|\s*(\d{10,})\s*\|?\s*$/,
-        /(\d{13,})/,
-        /post[_-]?id[_-]?:?\s*(\d{10,})/i,
-        /creative[_-]?id[_-]?:?\s*(\d{10,})/i
-      ];
-      
-      for (const pattern of patterns) {
-        const match = adName.match(pattern);
-        if (match && match[1]) {
-          return match[1];
-        }
-      }
-      return null;
-    };
-
-    // Helper Functions for pattern recognition
-    const isPartTechnical = (part) => {
-      const technicalPatterns = [
-        /^\d+_/, // Starts with number_
-        /^(24_|25_)/, // Date prefixes
-        /LP\s*\|?\s*$/, // Landing page suffix
-        /Homepage/, // Technical indicators
-        /Copy\s*\|?\s*$/, // Copy suffix
-        /^(Do|Try)\//, // Action prefixes
-        /^\d{10,}$/, // Long numbers
-        /^act_\d+$/, // Account IDs
-        /^\d+x\d+$/, // Dimensions
-      ];
-      
-      return technicalPatterns.some(pattern => pattern.test(part));
-    };
-
-    const isPartProductName = (part) => {
-      return part.length > 2 && 
-             part.length < 50 && 
-             !isPartTechnical(part) &&
-             !/^\d+$/.test(part) && 
-             !/^[A-Z]{2,}$/.test(part);
-    };
-
-    const isPartVisualTheme = (part) => {
-      const visualThemes = [
-        'white', 'black', 'blue', 'red', 'green', 'orange', 'purple', 'yellow',
-        'award', 'total', 'premium', 'classic', 'modern', 'clean', 'bold',
-        'bright', 'dark', 'light', 'minimal', 'vibrant'
-      ];
-      
-      return visualThemes.some(theme => 
-        part.toLowerCase().includes(theme.toLowerCase())
-      );
-    };
-
-    const isPartVariation = (part) => {
-      const variationPatterns = [
-        /v\d+/i, // v1, v2, etc.
-        /version/i,
-        /test/i,
-        /variant/i,
-        /copy/i,
-        /creative/i
-      ];
-      
-      return variationPatterns.some(pattern => pattern.test(part)) ||
-             isPartVisualTheme(part);
-    };
-
-    const findCreativeType = (parts) => {
-      const typeIndicators = ['IMG', 'VID', 'GIF', 'VIDEO', 'IMAGE', 'CAROUSEL', 'COLLECTION'];
-      return parts.find(part => 
-        typeIndicators.some(type => part.toUpperCase().includes(type))
-      );
-    };
-
-    const findProductName = (parts) => {
-      return parts.find(part => 
-        isPartProductName(part) && !isPartTechnical(part)
-      );
-    };
-
-    const findVariation = (parts) => {
-      const variationIndicators = [
-        'white', 'black', 'blue', 'red', 'green', 'orange', 'award', 'total', 'premium',
-        'v1', 'v2', 'v3', 'version', 'test', 'variant', 'copy', 'creative',
-        'bloat', 'testimonial', 'support', 'clinic'
-      ];
-      
-      return parts.find(part =>
-        variationIndicators.some(indicator => 
-          part.toLowerCase().includes(indicator.toLowerCase())
-        )
-      );
-    };
-
-    // Auto-detect separator
-    const detectSeparator = (name) => {
-      const separators = ['|', ' | ', '_', '-', '  ', ' '];
-      for (const sep of separators) {
-        if (name.includes(sep)) {
-          return sep;
-        }
-      }
-      return null;
-    };
-
-    // Main grouping logic
-    const postId = tryExtractPostId(adName);
-    if (postId) {
-      console.log(`✅ Strategy 1 SUCCESS: Found Post ID "${postId}"`);
-      return { groupKey: `post_${postId}`, method: 'post_id', postId };
-    }
-    
-    // Progressive pattern discovery
-    const separator = detectSeparator(adName);
-    let parts = [];
-    
-    if (separator) {
-      parts = adName.split(separator).map(s => s.trim()).filter(s => s.length > 0);
-    } else {
-      if (/[a-z][A-Z]/.test(adName)) {
-        parts = adName.split(/(?=[A-Z])/).filter(s => s.length > 0);
-      } else {
-        parts = [adName];
-      }
-    }
-
-    console.log(`🔧 Detected separator: "${separator}", Parts:`, parts);
-
-    // STRATEGY 2: Creative Type + Product grouping
-    const creativeType = findCreativeType(parts);
-    const productName = findProductName(parts);
-    const variation = findVariation(parts);
-    
-    if (creativeType && productName) {
-      let groupKey = `${creativeType}_${productName}`;
-      if (variation) {
-        groupKey += `_${variation}`;
-      }
-      const cleanKey = groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-      console.log(`✅ Strategy 2 SUCCESS: Creative grouping "${cleanKey}"`);
-      return { groupKey: cleanKey, method: 'creative_type' };
-    }
-    
-    // STRATEGY 3: Product/Campaign name grouping
-    for (let i = 0; i < Math.min(3, parts.length); i++) {
-      const part = parts[i];
-      
-      if (isPartTechnical(part)) continue;
-      
-      if (isPartProductName(part)) {
-        const variationPart = parts.slice(i + 1).find(p => isPartVariation(p));
-        let groupKey = `product_${part}`;
-        if (variationPart) {
-          groupKey += `_${variationPart}`;
-        }
-        const cleanKey = groupKey.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        console.log(`✅ Strategy 3 SUCCESS: Product grouping "${cleanKey}"`);
-        return { groupKey: cleanKey, method: 'product_name' };
-      }
-    }
-    
-    // STRATEGY 4: Brand/Campaign fallback
-    const firstPart = parts[0];
-    if (firstPart && !isPartTechnical(firstPart)) {
-      const cleanKey = `brand_${firstPart.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
-      console.log(`✅ Strategy 4 SUCCESS: Brand grouping "${cleanKey}"`);
-      return { groupKey: cleanKey, method: 'brand_group' };
-    }
-    
-    // FINAL FALLBACK
-    const fallbackGroup = `name_${adName.split(/[|_-]/)[0]?.trim() || 'unknown'}`;
-    console.log(`⚠️ Using final fallback: "${fallbackGroup}"`);
-    return { groupKey: fallbackGroup, method: 'fallback' };
-  }, []);
-
-  // Function to load performance data wrapped in useCallback
+  // 🧹 CLEANED: Simplified data loading without old pattern recognition
   const loadPerformanceData = useCallback(async () => {
     if (!accessToken || !selectedAccountId) return;
     
@@ -548,7 +364,7 @@ const CreativeAnalyticsDashboard = () => {
         adInsightsResponse = { data: { data: [] } };
       }
 
-      // 5. Map insights to ads with creatives - ENHANCED WITH SMART GROUPING
+      // 🧹 CLEANED: Simple creative performance mapping without old pattern recognition
       const creativePerformance = ads
         .filter(ad => ad.creative)
         .map(ad => {
@@ -608,10 +424,7 @@ const CreativeAnalyticsDashboard = () => {
             roas: roas.toFixed(2)
           });
           
-          // Apply enhanced smart grouping for this creative
-          const groupingResult = enhancedSmartGrouping(ad.name);
-          console.log(`🏷️ Enhanced smart grouping for "${ad.name}": ${groupingResult.groupKey} (method: ${groupingResult.method})`);
-          
+          // 🧹 CLEANED: Just return the raw creative data - let the table handle pattern recognition
           return {
             adId: ad.id,
             adName: ad.name,
@@ -635,11 +448,8 @@ const CreativeAnalyticsDashboard = () => {
               parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
             // ROAS calculation
             roas: roas,
-            revenue: purchaseValue,
-            // Enhanced smart grouping info
-            smartGroupKey: groupingResult.groupKey,
-            groupingMethod: groupingResult.method,
-            postId: groupingResult.postId || null
+            revenue: purchaseValue
+            // 🧹 REMOVED: Old smart grouping fields - let the new ADAPTIVE mode handle everything
           };
         });
 
@@ -655,13 +465,7 @@ const CreativeAnalyticsDashboard = () => {
         }))
       });
 
-      // Log enhanced smart grouping statistics
-      const groupingStats = {};
-      creativePerformance.forEach(creative => {
-        const method = creative.groupingMethod;
-        groupingStats[method] = (groupingStats[method] || 0) + 1;
-      });
-      console.log('📊 ENHANCED SMART GROUPING STATISTICS:', groupingStats);
+      console.log('🧹 CLEANED CREATIVE DATA: Ready for ADAPTIVE pattern recognition in table');
       
       // Prepare summary metrics from account insights
       const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
@@ -720,13 +524,13 @@ const CreativeAnalyticsDashboard = () => {
         summary,
         funnel,
         advancedMetrics,
-        creativePerformance,
+        creativePerformance, // 🧹 CLEANED: Raw data for ADAPTIVE pattern recognition
         topCreatives,
         campaigns: campaignsResponse.data.data,
         accountInsights: insightsResponse.data.data
       });
       
-      console.log('Performance data and time series data loaded successfully');
+      console.log('✅ Performance data loaded successfully - ready for ADAPTIVE processing');
       
     } catch (error) {
       console.error('Error loading performance data:', error);
@@ -734,7 +538,7 @@ const CreativeAnalyticsDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange, enhancedSmartGrouping]);
+  }, [accessToken, selectedAccountId, dateRange]); // 🧹 CLEANED: Removed enhancedSmartGrouping dependency
 
   // Load performance data when account or date range changes
   useEffect(() => {
@@ -858,29 +662,6 @@ const CreativeAnalyticsDashboard = () => {
       });
       
       if (accountsResponse.data.error) {
-        results.accountsTest = { 
-          status: 'failed', 
-          message: `Failed to fetch ad accounts: ${accountsResponse.data.error.message}`,
-          data: accountsResponse.data.error
-        };
-        setTestResults({...results});
-      } else if (!accountsResponse.data.data || accountsResponse.data.data.length === 0) {
-        results.accountsTest = { 
-          status: 'warning', 
-          message: 'No ad accounts found for this user',
-          data: accountsResponse.data
-        };
-        setTestResults({...results});
-      } else {
-        const accountsList = accountsResponse.data.data.map(account => ({
-          id: account.id,
-          name: account.name,
-          accountId: account.account_id,
-          status: account.account_status === 1 ? 'Active' : 'Inactive'
-        }));
-        
-        setDiagnosticSelectedAccount(accountsList[0].id);
-        
         results.accountsTest = { 
           status: 'success', 
           message: `Found ${accountsList.length} ad accounts`,
@@ -1305,7 +1086,7 @@ const CreativeAnalyticsDashboard = () => {
                   />
                 </div>
                             
-                {/* Creative Performance Table Section */}
+                {/* 🧹 CLEANED: Creative Performance Table with raw data for ADAPTIVE processing */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <EnhancedCreativePerformanceTable 
                     analyticsData={analyticsData}
@@ -1453,5 +1234,3 @@ const CreativeAnalyticsDashboard = () => {
     </div>
   );
 };
-
-export default CreativeAnalyticsDashboard;
