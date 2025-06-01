@@ -343,40 +343,58 @@ const CreativeAnalyticsDashboard = () => {
       );
       
       // 3. Fetch ads with their creative info
-      const adsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
-        {
-          params: {
-            access_token: accessToken,
-            fields: 'name,creative{id},adset{name}',
-            limit: 500
+      let adsResponse;
+      try {
+        adsResponse = await axios.get(
+          `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
+          {
+            params: {
+              access_token: accessToken,
+              fields: 'name,creative{id,thumbnail_url,object_story_spec},adset{name}',
+              limit: 500
+            }
           }
-        }
-      );
+        );
+        console.log('✅ Ads fetch successful:', adsResponse.data.data?.length || 0, 'ads found');
+      } catch (adsError) {
+        console.error('❌ Failed to fetch ads:', adsError.message);
+        // Fallback to basic insights only
+        adsResponse = { data: { data: [] } };
+      }
 
       console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
       // 3b. Fetch creative library for better video quality
-      const creativesResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
-        {
-          params: {
-            access_token: accessToken,
-            fields: 'image_url,thumbnail_url,video_id,object_story_spec',
-            limit: 250
+      let creativesResponse = { data: { data: [] } };
+      try {
+        creativesResponse = await axios.get(
+          `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+          {
+            params: {
+              access_token: accessToken,
+              fields: 'image_url,thumbnail_url,video_id,object_story_spec',
+              limit: 50 // Reduced limit to avoid API issues
+            }
           }
-        }
-      );
+        );
+        console.log('✅ Creative library fetch successful');
+      } catch (creativesError) {
+        console.warn('⚠️ Creative library fetch failed, continuing without enhanced thumbnails:', creativesError.message);
+        // Continue without creative library data - this is not critical
+      }
 
-      console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
+      console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data?.data || 'No creative library data');
 
       // Create a lookup map for creative library data
       const creativesMap = {};
-      if (creativesResponse.data.data) {
+      if (creativesResponse.data?.data) {
         creativesResponse.data.data.forEach(creative => {
           creativesMap[creative.id] = creative;
         });
+        console.log(`📚 Built creative library map with ${Object.keys(creativesMap).length} entries`);
+      } else {
+        console.log('📚 No creative library data available, using basic thumbnails');
       }
 
       // Extract ads from response
