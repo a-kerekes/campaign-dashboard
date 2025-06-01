@@ -419,7 +419,7 @@ if (creativesResponse.data?.data) {
       const adInsightsResponse = await fetchAdInsights(ads, since, until);
 
       // Process creative performance data
-      const creativePerformance = processCreativePerformance(ads, adInsightsResponse, creativesMap);
+      const processedCreativePerformance = processCreativePerformance(ads, adInsightsResponse, creativesMap);
 
       console.log('🧹 CLEANED CREATIVE DATA: Ready for ADAPTIVE pattern recognition in table');
       
@@ -468,19 +468,19 @@ if (creativesResponse.data?.data) {
         linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
       };
       
-      const topCreatives = [...creativePerformance]
-        .sort((a, b) => b.spend - a.spend)
-        .slice(0, 5);
+      const topCreatives = [...processedCreativePerformance]
+  .sort((a, b) => b.spend - a.spend)
+  .slice(0, 5);
       
-      setAnalyticsData({
-        summary,
-        funnel,
-        advancedMetrics,
-        creativePerformance,
-        topCreatives,
-        campaigns: campaignsResponse.data.data,
-        accountInsights: insightsResponse.data.data
-      });
+  setAnalyticsData({
+    summary,
+    funnel,
+    advancedMetrics,
+    creativePerformance: processedCreativePerformance,  // ← Change this
+    topCreatives,
+    campaigns: campaignsResponse.data.data,
+    accountInsights: insightsResponse.data.data
+  });
       
       console.log('✅ Performance data loaded successfully - ready for ADAPTIVE processing');
       
