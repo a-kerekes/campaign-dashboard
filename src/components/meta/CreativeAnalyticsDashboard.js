@@ -804,12 +804,12 @@ try {
       const accountId = diagnosticSelectedAccount.replace('act_', '');
       
       const adsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}/ads`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
         {
           params: {
             access_token: accessToken,
-            fields: 'name,creative{id,thumbnail_url,object_story_spec}',
-            limit: 50
+            fields: 'name,creative{id,thumbnail_url},adset{name}', // Add thumbnail_url
+            limit: 500
           }
         }
       );
