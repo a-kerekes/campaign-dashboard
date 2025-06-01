@@ -21,7 +21,7 @@ const CreativeAnalyticsDashboard = () => {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [timeSeriesData, setTimeSeriesData] = useState(null);
   const [error, setError] = useState(null);
-  const [isRealData, setIsRealData] = useState(true); // Assume true by default
+  const [isRealData, setIsRealData] = useState(true);
   
   // Breakdown data state
   const [ageBreakdown, setAgeBreakdown] = useState(null);
@@ -39,7 +39,6 @@ const CreativeAnalyticsDashboard = () => {
 
   // Initialize Facebook SDK on component mount
   useEffect(() => {
-    // We don't need to initialize the SDK here since MetaAuthButton handles it
     console.log("Using MetaAuthButton for SDK initialization");
   }, []);
 
@@ -64,7 +63,240 @@ const CreativeAnalyticsDashboard = () => {
     }
   }, [isConnected, selectedAccountId, fetchBenchmarks]);
 
-  // 🧹 CLEANED: Simplified data loading without old pattern recognition
+  // Enhanced breakdown data processing helper
+  const enhanceBreakdownData = (data) => {
+    return data.map(item => {
+      const impressions = parseInt(item.impressions || 0);
+      const clicks = parseInt(item.clicks || 0);
+      let ctr = item.ctr || 0;
+      
+      if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
+        ctr = (clicks / impressions) * 100;
+      } else if (ctr > 0 && ctr < 1) {
+        ctr = ctr * 100;
+      }
+      
+      return {
+        ...item,
+        ctr: ctr,
+        cpc: parseFloat(item.cpc || 0),
+        cpm: parseFloat(item.cpm || 0),
+        purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
+        landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
+        addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
+      };
+    });
+  };
+
+  // Fetch breakdown data for all demographic segments
+  const fetchBreakdownData = async () => {
+    try {
+      // Fetch and enhance age breakdown
+      let ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
+      setAgeBreakdown(enhanceBreakdownData(ageData));
+      
+      // Fetch and enhance gender breakdown
+      let genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId, accessToken);
+      setGenderBreakdown(enhanceBreakdownData(genderData));
+      
+      // Fetch and enhance platform breakdown
+      let platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId, accessToken);
+      setPlatformBreakdown(enhanceBreakdownData(platformData));
+      
+      // Fetch and enhance placement breakdown
+      let placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId, accessToken);
+      setPlacementBreakdown(enhanceBreakdownData(placementData));
+      
+      console.log('Successfully loaded and enhanced all breakdown data');
+    } catch (breakdownError) {
+      console.error('Error loading breakdown data:', breakdownError);
+    }
+  };
+
+  // Calculate date range for API calls
+  const calculateDateRange = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    let daysAgo = 30;
+    
+    if (dateRange === 'Last 7 Days') {
+      daysAgo = 7;
+    } else if (dateRange === 'Last 60 Days') {
+      daysAgo = 60;
+    } else if (dateRange === 'Last 90 Days') {
+      daysAgo = 90;
+    }
+    
+    const startDate = new Date(yesterday);
+    startDate.setDate(yesterday.getDate() - (daysAgo - 1));
+    
+    const since = startDate.toISOString().split('T')[0];
+    const until = yesterday.toISOString().split('T')[0];
+    
+    console.log(`Date range: ${dateRange}, from ${since} to ${until}`);
+    return { since, until };
+  };
+
+  // Fetch time series data
+  const fetchTimeSeriesData = async () => {
+    try {
+      console.log(`Fetching daily metrics for account ID: ${selectedAccountId}, date range: ${dateRange}`);
+      const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId, accessToken);
+      
+      const isMockData = dailyData && dailyData.some(item => item._isMock === true || item.source === 'mock');
+      setIsRealData(!isMockData);
+      
+      console.log(`Received ${dailyData.length} days of time series data (${isMockData ? 'MOCK' : 'REAL'} data)`);
+      setTimeSeriesData(dailyData);
+    } catch (timeSeriesError) {
+      console.error('Error loading time series data:', timeSeriesError);
+    }
+  };
+
+  // Fetch ad insights with batching
+  const fetchAdInsights = async (ads, since, until) => {
+    console.log('🔍 Fetching ad insights with batching...');
+    let adInsightsResponse = { data: { data: [] } };
+
+    try {
+      const allAdIds = ads.map(ad => ad.id);
+      console.log(`📊 Need insights for ${allAdIds.length} ads`);
+      
+      const batchSize = 50;
+      const batches = [];
+      
+      for (let i = 0; i < allAdIds.length; i += batchSize) {
+        const batchAdIds = allAdIds.slice(i, i + batchSize);
+        batches.push(batchAdIds);
+      }
+      
+      console.log(`📦 Split into ${batches.length} batches of ~${batchSize} ads each`);
+      
+      const allInsightsData = [];
+      
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batchAdIds = batches[batchIndex];
+        
+        try {
+          console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
+          
+          const batchResponse = await axios.get(
+            `https://graph.facebook.com/${META_API_VERSION}/act_${selectedAccountId.toString().replace('act_', '')}/insights`,
+            {
+              params: {
+                access_token: accessToken,
+                time_range: JSON.stringify({ since, until }),
+                fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
+                level: 'ad',
+                filtering: JSON.stringify([
+                  {
+                    field: 'ad.id',
+                    operator: 'IN',
+                    value: batchAdIds
+                  }
+                ]),
+                limit: batchSize
+              }
+            }
+          );
+          
+          if (batchResponse.data && batchResponse.data.data) {
+            allInsightsData.push(...batchResponse.data.data);
+            console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
+          }
+          
+          if (batchIndex < batches.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+        } catch (batchError) {
+          console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
+        }
+      }
+      
+      adInsightsResponse = {
+        data: {
+          data: allInsightsData
+        }
+      };
+      
+      console.log(`🎉 Successfully fetched insights for ${allInsightsData.length} ads total`);
+      
+    } catch (insightsError) {
+      console.error('❌ Error fetching ad insights:', insightsError);
+      console.log('⚠️  Continuing without individual ad insights - will use aggregated data');
+      adInsightsResponse = { data: { data: [] } };
+    }
+
+    return adInsightsResponse;
+  };
+
+  // Process creative performance data
+  const processCreativePerformance = (ads, adInsightsResponse, creativesMap) => {
+    return ads
+      .filter(ad => ad.creative)
+      .map(ad => {
+        const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
+        
+        // Enhanced thumbnail logic
+        const creativeLibData = creativesMap[ad.creative.id];
+        
+        const thumbnailUrl = (() => {
+          const candidates = [
+            creativeLibData?.image_url,
+            ad.creative.image_url,
+            creativeLibData?.thumbnail_url,
+            ad.creative.thumbnail_url,
+            creativeLibData?.object_story_spec?.video_data?.image_url,
+            ad.creative.object_story_spec?.video_data?.image_url,
+            ad.creative.object_story_spec?.link_data?.picture,
+            creativeLibData?.object_story_spec?.link_data?.picture
+          ];
+          
+          return candidates.find(url => url && url.length > 0) || null;
+        })();
+        
+        // Calculate ROAS for this specific creative
+        const spend = insight ? parseFloat(insight.spend || 0) : 0;
+        const purchases = insight && insight.actions ? 
+          parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+        
+        const purchaseValue = insight && insight.action_values ? 
+          parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
+        
+        const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
+        
+        return {
+          adId: ad.id,
+          adName: ad.name,
+          adsetName: ad.adset ? ad.adset.name : 'Unknown',
+          creativeId: ad.creative.id,
+          thumbnailUrl: thumbnailUrl,
+          objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
+          accountId: selectedAccountId,
+          // Performance metrics
+          impressions: insight ? parseInt(insight.impressions || 0) : 0,
+          clicks: insight ? parseInt(insight.clicks || 0) : 0,
+          spend: spend,
+          ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
+          cpm: insight ? parseFloat(insight.cpm || 0) : 0,
+          cpc: insight ? parseFloat(insight.cpc || 0) : 0,
+          // Add conversion metrics
+          purchases: purchases,
+          landingPageViews: insight && insight.actions ? 
+            parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
+          addToCarts: insight && insight.actions ? 
+            parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+          // ROAS calculation
+          roas: roas,
+          revenue: purchaseValue
+        };
+      });
+  };
+
+  // Main data loading function
   const loadPerformanceData = useCallback(async () => {
     if (!accessToken || !selectedAccountId) return;
     
@@ -76,137 +308,13 @@ const CreativeAnalyticsDashboard = () => {
       const formattedAccountId = selectedAccountId.toString().replace('act_', '');
       
       // Calculate date range
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      
-      let daysAgo = 30;
-      
-      if (dateRange === 'Last 7 Days') {
-        daysAgo = 7;
-      } else if (dateRange === 'Last 60 Days') {
-        daysAgo = 60;
-      } else if (dateRange === 'Last 90 Days') {
-        daysAgo = 90;
-      }
-      
-      const startDate = new Date(yesterday);
-      startDate.setDate(yesterday.getDate() - (daysAgo - 1));
-      
-      const since = startDate.toISOString().split('T')[0];
-      const until = yesterday.toISOString().split('T')[0];
-      
-      console.log(`Date range: ${dateRange}, from ${since} to ${until}`);
+      const { since, until } = calculateDateRange();
       
       // FETCH DAILY TIME SERIES DATA
-      try {
-        console.log(`Fetching daily metrics for account ID: ${selectedAccountId}, date range: ${dateRange}`);
-        const dailyData = await metaAPI.fetchDailyMetrics(dateRange, selectedAccountId, accessToken);
-        
-        const isMockData = dailyData && dailyData.some(item => item._isMock === true || item.source === 'mock');
-        setIsRealData(!isMockData);
-        
-        console.log(`Received ${dailyData.length} days of time series data (${isMockData ? 'MOCK' : 'REAL'} data)`);
-        setTimeSeriesData(dailyData);
-      } catch (timeSeriesError) {
-        console.error('Error loading time series data:', timeSeriesError);
-      }
+      await fetchTimeSeriesData();
       
       // FETCH BREAKDOWN DATA
-      try {
-        // Fetch and enhance breakdown data
-        let ageData = await metaAPI.fetchBreakdownMetrics('age', dateRange, selectedAccountId, accessToken);
-        ageData = ageData.map(item => {
-          const impressions = parseInt(item.impressions || 0);
-          const clicks = parseInt(item.clicks || 0);
-          let ctr = item.ctr || 0;
-          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-            ctr = (clicks / impressions) * 100;
-          } else if (ctr > 0 && ctr < 1) {
-            ctr = ctr * 100;
-          }
-          return {
-            ...item,
-            ctr: ctr,
-            cpc: parseFloat(item.cpc || 0),
-            cpm: parseFloat(item.cpm || 0),
-            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-          };
-        });
-        setAgeBreakdown(ageData);
-        
-        let genderData = await metaAPI.fetchBreakdownMetrics('gender', dateRange, selectedAccountId, accessToken);
-        genderData = genderData.map(item => {
-          const impressions = parseInt(item.impressions || 0);
-          const clicks = parseInt(item.clicks || 0);
-          let ctr = item.ctr || 0;
-          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-            ctr = (clicks / impressions) * 100;
-          } else if (ctr > 0 && ctr < 1) {
-            ctr = ctr * 100;
-          }
-          return {
-            ...item,
-            ctr: ctr,
-            cpc: parseFloat(item.cpc || 0),
-            cpm: parseFloat(item.cpm || 0),
-            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-          };
-        });
-        setGenderBreakdown(genderData);
-        
-        let platformData = await metaAPI.fetchBreakdownMetrics('publisher_platform', dateRange, selectedAccountId, accessToken);
-        platformData = platformData.map(item => {
-          const impressions = parseInt(item.impressions || 0);
-          const clicks = parseInt(item.clicks || 0);
-          let ctr = item.ctr || 0;
-          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-            ctr = (clicks / impressions) * 100;
-          } else if (ctr > 0 && ctr < 1) {
-            ctr = ctr * 100;
-          }
-          return {
-            ...item,
-            ctr: ctr,
-            cpc: parseFloat(item.cpc || 0),
-            cpm: parseFloat(item.cpm || 0),
-            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-          };
-        });
-        setPlatformBreakdown(platformData);
-        
-        let placementData = await metaAPI.fetchBreakdownMetrics('platform_position', dateRange, selectedAccountId, accessToken);
-        placementData = placementData.map(item => {
-          const impressions = parseInt(item.impressions || 0);
-          const clicks = parseInt(item.clicks || 0);
-          let ctr = item.ctr || 0;
-          if (clicks > 0 && impressions > 0 && (!ctr || ctr === 0)) {
-            ctr = (clicks / impressions) * 100;
-          } else if (ctr > 0 && ctr < 1) {
-            ctr = ctr * 100;
-          }
-          return {
-            ...item,
-            ctr: ctr,
-            cpc: parseFloat(item.cpc || 0),
-            cpm: parseFloat(item.cpm || 0),
-            purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
-            landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-            addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
-          };
-        });
-        setPlacementBreakdown(placementData);
-        
-        console.log('Successfully loaded and enhanced all breakdown data');
-      } catch (breakdownError) {
-        console.error('Error loading breakdown data:', breakdownError);
-      }
+      await fetchBreakdownData();
       
       // 1. Fetch account insights
       const insightsResponse = await axios.get(
@@ -214,10 +322,7 @@ const CreativeAnalyticsDashboard = () => {
         {
           params: {
             access_token: accessToken,
-            time_range: JSON.stringify({
-              since,
-              until
-            }),
+            time_range: JSON.stringify({ since, until }),
             fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
             level: 'account',
             limit: 500
@@ -265,22 +370,12 @@ const CreativeAnalyticsDashboard = () => {
       );
 
       console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data.data);
-      console.log('🔍 CREATIVE WITH IMAGE_URL:', creativesResponse.data.data.find(c => c.image_url));
-      console.log('🔍 CREATIVE WITH THUMBNAIL:', creativesResponse.data.data.find(c => c.thumbnail_url));
 
       // Create a lookup map for creative library data
       const creativesMap = {};
       if (creativesResponse.data.data) {
         creativesResponse.data.data.forEach(creative => {
           creativesMap[creative.id] = creative;
-          
-          console.log(`🔍 CREATIVE ${creative.id}:`, {
-            image_url: creative.image_url,
-            thumbnail_url: creative.thumbnail_url,
-            video_id: creative.video_id,
-            has_object_story_spec: !!creative.object_story_spec,
-            object_story_spec_keys: creative.object_story_spec ? Object.keys(creative.object_story_spec) : []
-          });
         });
       }
 
@@ -288,182 +383,10 @@ const CreativeAnalyticsDashboard = () => {
       const ads = adsResponse.data.data;
 
       // 4. Fetch ad insights for performance data - WITH BATCHING
-      console.log('🔍 Fetching ad insights with batching...');
-      let adInsightsResponse = { data: { data: [] } };
+      const adInsightsResponse = await fetchAdInsights(ads, since, until);
 
-      try {
-        const allAdIds = ads.map(ad => ad.id);
-        console.log(`📊 Need insights for ${allAdIds.length} ads`);
-        
-        const batchSize = 50;
-        const batches = [];
-        
-        for (let i = 0; i < allAdIds.length; i += batchSize) {
-          const batchAdIds = allAdIds.slice(i, i + batchSize);
-          batches.push(batchAdIds);
-        }
-        
-        console.log(`📦 Split into ${batches.length} batches of ~${batchSize} ads each`);
-        
-        const allInsightsData = [];
-        
-        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-          const batchAdIds = batches[batchIndex];
-          
-          try {
-            console.log(`🔄 Processing batch ${batchIndex + 1}/${batches.length} (${batchAdIds.length} ads)`);
-            
-            const batchResponse = await axios.get(
-              `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
-              {
-                params: {
-                  access_token: accessToken,
-                  time_range: JSON.stringify({
-                    since,
-                    until
-                  }),
-                  fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm,ad_id',
-                  level: 'ad',
-                  filtering: JSON.stringify([
-                    {
-                      field: 'ad.id',
-                      operator: 'IN',
-                      value: batchAdIds
-                    }
-                  ]),
-                  limit: batchSize
-                }
-              }
-            );
-            
-            if (batchResponse.data && batchResponse.data.data) {
-              allInsightsData.push(...batchResponse.data.data);
-              console.log(`✅ Batch ${batchIndex + 1} completed: ${batchResponse.data.data.length} insights received`);
-            }
-            
-            if (batchIndex < batches.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-          } catch (batchError) {
-            console.error(`❌ Error in batch ${batchIndex + 1}:`, batchError.message);
-          }
-        }
-        
-        adInsightsResponse = {
-          data: {
-            data: allInsightsData
-          }
-        };
-        
-        console.log(`🎉 Successfully fetched insights for ${allInsightsData.length} ads total`);
-        
-      } catch (insightsError) {
-        console.error('❌ Error fetching ad insights:', insightsError);
-        console.log('⚠️  Continuing without individual ad insights - will use aggregated data');
-        adInsightsResponse = { data: { data: [] } };
-      }
-
-      // 🧹 CLEANED: Simple creative performance mapping without old pattern recognition
-      const creativePerformance = ads
-        .filter(ad => ad.creative)
-        .map(ad => {
-          const insight = adInsightsResponse.data.data && adInsightsResponse.data.data.find(i => i.ad_id === ad.id);
-          
-          // Enhanced thumbnail logic with detailed logging
-          const creativeLibData = creativesMap[ad.creative.id];
-          
-          console.log(`🔍 PROCESSING AD ${ad.id}:`, {
-            adName: ad.name,
-            creativeId: ad.creative.id,
-            adsAPI_image_url: ad.creative.image_url,
-            adsAPI_thumbnail_url: ad.creative.thumbnail_url,
-            adsAPI_has_object_story_spec: !!ad.creative.object_story_spec,
-            creativeLib_image_url: creativeLibData?.image_url,
-            creativeLib_thumbnail_url: creativeLibData?.thumbnail_url,
-            creativeLib_video_id: creativeLibData?.video_id
-          });
-          
-          // Enhanced thumbnail logic
-          const thumbnailUrl = (() => {
-            const candidates = [
-              creativeLibData?.image_url,
-              ad.creative.image_url,
-              creativeLibData?.thumbnail_url,
-              ad.creative.thumbnail_url,
-              creativeLibData?.object_story_spec?.video_data?.image_url,
-              ad.creative.object_story_spec?.video_data?.image_url,
-              ad.creative.object_story_spec?.link_data?.picture,
-              creativeLibData?.object_story_spec?.link_data?.picture
-            ];
-            
-            const finalUrl = candidates.find(url => url && url.length > 0);
-            
-            console.log(`🔍 THUMBNAIL SELECTION for ${ad.creative.id}:`, {
-              candidates: candidates.map((url, i) => ({ index: i, url: url || 'null' })),
-              selected: finalUrl || 'NONE FOUND'
-            });
-            
-            return finalUrl || null;
-          })();
-          
-          // Calculate ROAS for this specific creative
-          const spend = insight ? parseFloat(insight.spend || 0) : 0;
-          const purchases = insight && insight.actions ? 
-            parseInt(insight.actions.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-          
-          const purchaseValue = insight && insight.action_values ? 
-            parseFloat(insight.action_values.find(a => a.action_type === 'purchase')?.value || 0) : 0;
-          
-          const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
-          
-          console.log(`💰 ROAS CALCULATION for ${ad.id}:`, {
-            spend,
-            purchases,
-            purchaseValue,
-            roas: roas.toFixed(2)
-          });
-          
-          // 🧹 CLEANED: Just return the raw creative data - let the table handle pattern recognition
-          return {
-            adId: ad.id,
-            adName: ad.name,
-            adsetName: ad.adset ? ad.adset.name : 'Unknown',
-            creativeId: ad.creative.id,
-            thumbnailUrl: thumbnailUrl,
-            objectStorySpec: ad.creative.object_story_spec || creativeLibData?.object_story_spec || null,
-            accountId: selectedAccountId,
-            // Performance metrics
-            impressions: insight ? parseInt(insight.impressions || 0) : 0,
-            clicks: insight ? parseInt(insight.clicks || 0) : 0,
-            spend: spend,
-            ctr: insight ? parseFloat(insight.ctr || 0) * 100 : 0,
-            cpm: insight ? parseFloat(insight.cpm || 0) : 0,
-            cpc: insight ? parseFloat(insight.cpc || 0) : 0,
-            // Add conversion metrics
-            purchases: purchases,
-            landingPageViews: insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
-            addToCarts: insight && insight.actions ? 
-              parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
-            // ROAS calculation
-            roas: roas,
-            revenue: purchaseValue
-            // 🧹 REMOVED: Old smart grouping fields - let the new ADAPTIVE mode handle everything
-          };
-        });
-
-      // Final summary
-      const creativesWithThumbnails = creativePerformance.filter(c => c.thumbnailUrl);
-      console.log('🔍 FINAL THUMBNAIL SUMMARY:', {
-        totalCreatives: creativePerformance.length,
-        creativesWithThumbnails: creativesWithThumbnails.length,
-        sampleThumbnails: creativesWithThumbnails.slice(0, 3).map(c => ({
-          creativeId: c.creativeId,
-          adName: c.adName,
-          thumbnailUrl: c.thumbnailUrl
-        }))
-      });
+      // Process creative performance data
+      const creativePerformance = processCreativePerformance(ads, adInsightsResponse, creativesMap);
 
       console.log('🧹 CLEANED CREATIVE DATA: Ready for ADAPTIVE pattern recognition in table');
       
@@ -483,7 +406,7 @@ const CreativeAnalyticsDashboard = () => {
         activeCreatives: ads.filter(ad => ad.creative).length
       };
       
-      // Calculate estimated funnel data if conversions aren't directly available
+      // Calculate estimated funnel data
       const purchaseAction = accountInsights.actions?.find(a => a.action_type === 'purchase');
       const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1);
       
@@ -493,7 +416,6 @@ const CreativeAnalyticsDashboard = () => {
       const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
       const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3);
 
-      // Add funnel data to analytics
       const funnel = {
         impressions: summary.totalImpressions,
         clicks: summary.totalClicks,
@@ -502,11 +424,9 @@ const CreativeAnalyticsDashboard = () => {
         purchases: estimatedPurchases
       };
 
-      // Add revenue data if available
       const purchaseValueAction = accountInsights.action_values?.find(a => a.action_type === 'purchase');
       const revenue = purchaseValueAction ? parseFloat(purchaseValueAction.value) : 0;
 
-      // Add more advanced metrics
       const advancedMetrics = {
         cpm: summary.avgCpm,
         cpc: summary.avgCpc,
@@ -515,7 +435,6 @@ const CreativeAnalyticsDashboard = () => {
         linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
       };
       
-      // Find top performing creatives by spend
       const topCreatives = [...creativePerformance]
         .sort((a, b) => b.spend - a.spend)
         .slice(0, 5);
@@ -524,7 +443,7 @@ const CreativeAnalyticsDashboard = () => {
         summary,
         funnel,
         advancedMetrics,
-        creativePerformance, // 🧹 CLEANED: Raw data for ADAPTIVE pattern recognition
+        creativePerformance,
         topCreatives,
         campaigns: campaignsResponse.data.data,
         accountInsights: insightsResponse.data.data
@@ -538,7 +457,7 @@ const CreativeAnalyticsDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, selectedAccountId, dateRange]); // 🧹 CLEANED: Removed enhancedSmartGrouping dependency
+  }, [accessToken, selectedAccountId, dateRange]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
@@ -547,6 +466,7 @@ const CreativeAnalyticsDashboard = () => {
     }
   }, [isConnected, selectedAccountId, dateRange, accessToken, loadPerformanceData]);
 
+  // Event handlers
   const handleAccountChange = (e) => {
     const accountId = e.target.value;
     setSelectedAccountId(accountId);
@@ -556,7 +476,6 @@ const CreativeAnalyticsDashboard = () => {
     setShowDiagnostic(!showDiagnostic);
   };
 
-  // Handle toggling between real and mock data
   const handleToggleDataSource = () => {
     setIsRealData(!isRealData);
     
@@ -572,6 +491,7 @@ const CreativeAnalyticsDashboard = () => {
     }, 100);
   };
 
+  // Diagnostic functions
   const runDiagnostics = async (token = accessToken) => {
     if (!token) {
       setError('Please connect with Facebook first to generate an access token');
@@ -663,6 +583,29 @@ const CreativeAnalyticsDashboard = () => {
       
       if (accountsResponse.data.error) {
         results.accountsTest = { 
+          status: 'failed', 
+          message: `Failed to fetch ad accounts: ${accountsResponse.data.error.message}`,
+          data: accountsResponse.data.error
+        };
+        setTestResults({...results});
+      } else if (!accountsResponse.data.data || accountsResponse.data.data.length === 0) {
+        results.accountsTest = { 
+          status: 'warning', 
+          message: 'No ad accounts found for this user',
+          data: accountsResponse.data
+        };
+        setTestResults({...results});
+      } else {
+        const accountsList = accountsResponse.data.data.map(account => ({
+          id: account.id,
+          name: account.name,
+          accountId: account.account_id,
+          status: account.account_status === 1 ? 'Active' : 'Inactive'
+        }));
+        
+        setDiagnosticSelectedAccount(accountsList[0].id);
+        
+        results.accountsTest = { 
           status: 'success', 
           message: `Found ${accountsList.length} ad accounts`,
           data: accountsList
@@ -707,10 +650,7 @@ const CreativeAnalyticsDashboard = () => {
         {
           params: {
             access_token: accessToken,
-            time_range: JSON.stringify({
-              since,
-              until
-            }),
+            time_range: JSON.stringify({ since, until }),
             fields: 'impressions,clicks,spend',
             limit: 100
           }
@@ -876,6 +816,40 @@ const CreativeAnalyticsDashboard = () => {
     }
   };
 
+  // Handle authentication success
+  const handleAuthSuccess = (token) => {
+    console.log("Auth success callback with token:", token);
+    setAccessToken(token);
+    
+    // Fetch accounts after successful login
+    axios.get(
+      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`,
+      {
+        params: {
+          access_token: token,
+          fields: 'id,name,account_id,account_status',
+          limit: 50
+        }
+      }
+    )
+    .then(response => {
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        setAccounts(response.data.data);
+        setSelectedAccountId(response.data.data[0].id);
+        setIsConnected(true);
+        
+        // Automatically run diagnostics after login
+        runDiagnostics(token);
+      } else {
+        setError('No ad accounts found for this user.');
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching accounts:', error);
+      setError('Error fetching accounts: ' + error.message);
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Section */}
@@ -919,40 +893,7 @@ const CreativeAnalyticsDashboard = () => {
               </div>
               
               <div className="px-6 py-6 text-center">
-                <MetaAuthButton 
-                  onAuthSuccess={(token) => {
-                    console.log("Auth success callback with token:", token);
-                    setAccessToken(token);
-                    
-                    // Fetch accounts after successful login
-                    axios.get(
-                      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts`,
-                      {
-                        params: {
-                          access_token: token,
-                          fields: 'id,name,account_id,account_status',
-                          limit: 50
-                        }
-                      }
-                    )
-                    .then(response => {
-                      if (response.data && response.data.data && response.data.data.length > 0) {
-                        setAccounts(response.data.data);
-                        setSelectedAccountId(response.data.data[0].id);
-                        setIsConnected(true);
-                        
-                        // Automatically run diagnostics after login
-                        runDiagnostics(token);
-                      } else {
-                        setError('No ad accounts found for this user.');
-                      }
-                    })
-                    .catch(error => {
-                      console.error('Error fetching accounts:', error);
-                      setError('Error fetching accounts: ' + error.message);
-                    });
-                  }} 
-                />
+                <MetaAuthButton onAuthSuccess={handleAuthSuccess} />
                 
                 {error && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1086,7 +1027,7 @@ const CreativeAnalyticsDashboard = () => {
                   />
                 </div>
                             
-                {/* 🧹 CLEANED: Creative Performance Table with raw data for ADAPTIVE processing */}
+                {/* Creative Performance Table */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <EnhancedCreativePerformanceTable 
                     analyticsData={analyticsData}
@@ -1234,3 +1175,5 @@ const CreativeAnalyticsDashboard = () => {
     </div>
   );
 };
+
+export default CreativeAnalyticsDashboard;
