@@ -235,6 +235,14 @@ const CreativeAnalyticsDashboard = () => {
 
   // Process creative performance data
   const processCreativePerformance = (ads, adInsightsResponse, creativesMap) => {
+  
+    // ADD THIS DEBUG LOG RIGHT HERE:
+    console.log('🖼️ PROCESSING CREATIVES:', {
+      totalAds: ads.length,
+      creativesMapSize: Object.keys(creativesMap).length,
+      firstAdWithCreative: ads.find(ad => ad.creative)
+    });
+    
     return ads
       .filter(ad => ad.creative)
       .map(ad => {
@@ -416,14 +424,19 @@ try {
 
       // Create a lookup map for creative library data
       const creativesMap = {};
-      if (creativesResponse.data?.data) {
-        creativesResponse.data.data.forEach(creative => {
-          creativesMap[creative.id] = creative;
-        });
-        console.log(`📚 Built creative library map with ${Object.keys(creativesMap).length} entries`);
-      } else {
-        console.log('📚 No creative library data available, using basic thumbnails');
-      }
+if (creativesResponse.data?.data) {
+  creativesResponse.data.data.forEach(creative => {
+    creativesMap[creative.id] = creative;
+  });
+  console.log(`📚 Built creative library map with ${Object.keys(creativesMap).length} entries`);
+  
+  // ADD THESE DEBUG LOGS HERE:
+  console.log('🖼️ CREATIVE LIBRARY SAMPLE:', Object.values(creativesMap).slice(0, 3));
+  console.log('🖼️ FIRST AD WITH CREATIVE:', ads.find(ad => ad.creative));
+  
+} else {
+  console.log('📚 No creative library data available, using basic thumbnails');
+}
 
       // Extract ads from response
       const ads = adsResponse.data.data;
