@@ -804,7 +804,7 @@ try {
       const accountId = diagnosticSelectedAccount.replace('act_', '');
       
       const adsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
+        `https://graph.facebook.com/${META_API_VERSION}/act_${selectedAccountId.toString().replace('act_', '')}/ads`,
         {
           params: {
             access_token: accessToken,
