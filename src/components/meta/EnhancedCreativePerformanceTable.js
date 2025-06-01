@@ -1,6 +1,6 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Info } from 'lucide-react';
+import { Download, Info, Brain } from 'lucide-react';
 
 // Aggregation modes - NOW WITH 3 MODES INCLUDING ADAPTIVE
 const AGGREGATION_MODES = {
@@ -20,7 +20,7 @@ const metricsConfig = [
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
-  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.POST);
+  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.ADAPTIVE);
   const [sortColumn, setSortColumn] = useState('spend');
   const [sortDirection, setSortDirection] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -892,9 +892,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                 boxShadow: aggregationMode === mode ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
               }}
             >
-              {key === 'POST' ? 'By Post' : 
-               key === 'COPY' ? 'By Copy' : 
-               '🧠 Adaptive'}
+              {key === 'POST' ? '📌 By Post' : 
+ key === 'COPY' ? '📝 By Copy' : 
+ <>
+   <Brain size={14} />
+   Adaptive
+ </>}
             </button>
           ))}
         </div>
@@ -912,7 +915,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
             alignItems: 'center',
             gap: '8px'
           }}>
-            <Info size={16} style={{ 
+            <Brain size={16} style={{ 
               color: patternInsights.confidence > 70 ? '#059669' : 
                      patternInsights.confidence > 50 ? '#d97706' : '#dc2626'
             }} />

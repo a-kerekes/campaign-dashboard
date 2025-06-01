@@ -1051,7 +1051,7 @@ const CreativeAnalyticsDashboard = () => {
                     analyticsData={analyticsData}
                     selectedAccountId={selectedAccountId}
                     benchmarks={benchmarks}
-                    isRealData={isRealData}
+                    isRealData={isRealData}  // ← ADD THIS LINE
                     dateRange={dateRange}
                     onCreativeSelect={(creative) => {
                       console.log("Selected creative:", creative);
