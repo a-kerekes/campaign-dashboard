@@ -1,11 +1,12 @@
 // src/components/meta/EnhancedCreativePerformanceTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Info } from 'lucide-react';
 
-// Aggregation modes - SIMPLIFIED TO 2 TABS
+// Aggregation modes - NOW WITH 3 MODES INCLUDING ADAPTIVE
 const AGGREGATION_MODES = {
   POST: 'post',      // Group by Post ID (extracted from ad names)
-  COPY: 'copy'       // Group by extracted copy text
+  COPY: 'copy',      // Group by extracted copy text
+  ADAPTIVE: 'adaptive' // 🆕 Smart pattern recognition with progressive grouping
 };
 
 // Metrics configuration
@@ -19,7 +20,7 @@ const metricsConfig = [
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
-  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.POST); // Default to POST mode
+  const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.POST);
   const [sortColumn, setSortColumn] = useState('spend');
   const [sortDirection, setSortDirection] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,22 +30,193 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
   const [isEditingBenchmarks, setIsEditingBenchmarks] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [tempBenchmarks, setTempBenchmarks] = useState({});
+  const [patternInsights, setPatternInsights] = useState(null); // 🆕 Pattern discovery insights
 
-  // Extract Post ID from ad name - NEW FUNCTION
+  // 🆕 NEW: Auto-detect separator used in ad names
+  const detectSeparator = (adNames) => {
+    const separatorCandidates = ['|', ' | ', '_', '-', '  ', ' '];
+    const separatorCounts = {};
+    
+    separatorCandidates.forEach(sep => {
+      separatorCounts[sep] = 0;
+      adNames.forEach(name => {
+        if (name && name.includes(sep)) {
+          separatorCounts[sep]++;
+        }
+      });
+    });
+    
+    const mostCommonSeparator = Object.entries(separatorCounts)
+      .sort(([,a], [,b]) => b - a)[0];
+    
+    const separator = mostCommonSeparator && mostCommonSeparator[1] > 0 ? mostCommonSeparator[0] : '|';
+    
+    console.log('🔍 SEPARATOR DETECTION:', {
+      separatorCounts,
+      detectedSeparator: separator,
+      confidence: separatorCounts[separator] / adNames.length
+    });
+    
+    return separator;
+  };
+
+  // 🆕 NEW: Discover account-specific naming patterns
+  const discoverAccountPatterns = (adNames) => {
+    if (!adNames || adNames.length === 0) return null;
+    
+    const separator = detectSeparator(adNames);
+    const componentAnalysis = {};
+    const levelCounts = {};
+    
+    adNames.forEach(name => {
+      if (!name) return;
+      
+      const parts = name.split(separator).map(p => p.trim()).filter(p => p.length > 0);
+      levelCounts[parts.length] = (levelCounts[parts.length] || 0) + 1;
+      
+      parts.forEach((part, index) => {
+        if (!componentAnalysis[index]) {
+          componentAnalysis[index] = { values: new Set(), isStable: true, examples: [] };
+        }
+        componentAnalysis[index].values.add(part);
+        if (componentAnalysis[index].examples.length < 3) {
+          componentAnalysis[index].examples.push(part);
+        }
+      });
+    });
+    
+    Object.keys(componentAnalysis).forEach(level => {
+      const analysis = componentAnalysis[level];
+      const uniqueValues = analysis.values.size;
+      const totalAds = adNames.length;
+      
+      analysis.isStable = uniqueValues <= Math.max(3, totalAds * 0.3);
+      analysis.uniqueCount = uniqueValues;
+      analysis.stabilityScore = 1 - (uniqueValues / totalAds);
+    });
+    
+    const maxLevels = Math.max(...Object.keys(componentAnalysis).map(Number));
+    let optimalLevel = 0;
+    
+    for (let i = 0; i <= maxLevels; i++) {
+      const analysis = componentAnalysis[i];
+      if (analysis && analysis.stabilityScore > 0.3 && analysis.stabilityScore < 0.9) {
+        optimalLevel = i;
+      }
+    }
+    
+    const patterns = {
+      separator,
+      componentAnalysis,
+      levelCounts,
+      optimalLevel,
+      maxLevels,
+      confidence: calculatePatternConfidence(componentAnalysis, levelCounts, adNames.length),
+      totalAds: adNames.length
+    };
+    
+    console.log('🧠 PATTERN DISCOVERY:', patterns);
+    return patterns;
+  };
+
+  // 🆕 NEW: Calculate confidence in pattern detection
+  const calculatePatternConfidence = (componentAnalysis, levelCounts, totalAds) => {
+    if (!componentAnalysis || Object.keys(componentAnalysis).length === 0) return 0;
+    
+    const mostCommonLevelCount = Math.max(...Object.values(levelCounts));
+    const levelConsistency = mostCommonLevelCount / totalAds;
+    
+    const earlyLevelStability = Object.keys(componentAnalysis)
+      .slice(0, 3)
+      .reduce((acc, level) => {
+        const analysis = componentAnalysis[level];
+        return acc + (analysis ? analysis.stabilityScore : 0);
+      }, 0) / Math.min(3, Object.keys(componentAnalysis).length);
+    
+    const confidence = (levelConsistency * 0.4 + earlyLevelStability * 0.6) * 100;
+    
+    return Math.min(95, Math.max(10, confidence));
+  };
+
+  // 🆕 NEW: Build progressive hierarchy for an ad name
+  const buildProgressiveHierarchy = (adName, patterns) => {
+    if (!adName || !patterns) {
+      return { key: `fallback_${adName}`, level: 0, confidence: 'low' };
+    }
+    
+    const { separator, optimalLevel, componentAnalysis } = patterns;
+    const parts = adName.split(separator).map(p => p.trim()).filter(p => p.length > 0);
+    
+    if (parts.length === 0) {
+      return { key: `fallback_${adName}`, level: 0, confidence: 'low' };
+    }
+    
+    let bestLevel = Math.min(optimalLevel, parts.length - 1);
+    
+    if (bestLevel < 0) {
+      bestLevel = Math.max(0, parts.length - 2);
+    }
+    
+    const hierarchyParts = parts.slice(0, bestLevel + 1);
+    const key = hierarchyParts.join(separator);
+    
+    const confidence = componentAnalysis[bestLevel] ? 
+      (componentAnalysis[bestLevel].stabilityScore > 0.5 ? 'high' : 
+       componentAnalysis[bestLevel].stabilityScore > 0.3 ? 'medium' : 'low') : 'low';
+    
+    return {
+      key: `adaptive_${key}`,
+      level: bestLevel,
+      confidence,
+      fullHierarchy: parts,
+      groupingParts: hierarchyParts,
+      remainingParts: parts.slice(bestLevel + 1)
+    };
+  };
+
+  // 🆕 NEW: Smart pattern-based creative grouping
+  const detectCreativeGroup = (adName, allAdNames, patterns) => {
+    const postId = extractPostId(adName);
+    if (postId) {
+      return { 
+        key: `post_${postId}`, 
+        method: 'post_id', 
+        confidence: 'high',
+        postId,
+        displayName: adName
+      };
+    }
+    
+    if (patterns && patterns.confidence > 50) {
+      const hierarchy = buildProgressiveHierarchy(adName, patterns);
+      return {
+        key: hierarchy.key,
+        method: 'adaptive',
+        confidence: hierarchy.confidence,
+        level: hierarchy.level,
+        displayName: hierarchy.groupingParts ? hierarchy.groupingParts.join(patterns.separator) : adName,
+        fullHierarchy: hierarchy.fullHierarchy,
+        groupingParts: hierarchy.groupingParts,
+        remainingParts: hierarchy.remainingParts
+      };
+    }
+    
+    const cleanAdName = adName?.split(/[|_-]/)[0]?.trim() || `unknown-${Math.random()}`;
+    return {
+      key: `name_${cleanAdName}`,
+      method: 'fallback',
+      confidence: 'low',
+      displayName: cleanAdName
+    };
+  };
+
+  // EXISTING: Extract Post ID from ad name (UNCHANGED)
   const extractPostId = (adName) => {
     if (!adName) return null;
     
-    // Look for patterns like:
-    // "Ad Name | Homepage | 1053140566829277" 
-    // "Ad Name | VID | tof17-rc-black-sweetflexx-features-slideshow | 630340219109316"
-    // "Ad Name | 25_SF_Ads_FB_April_Booty_Compare_RegularLeggings_R1 | 109532574927742"
-    
     const patterns = [
-      // Pattern 1: Number at the very end after |
       /\|\s*(\d{10,})\s*$/,
-      // Pattern 2: Number after technical suffix
       /\|\s*[\w\-_]+\s*\|\s*(\d{10,})\s*$/,
-      // Pattern 3: Long number anywhere in the string
       /(\d{13,})/
     ];
     
@@ -60,236 +232,214 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return null;
   };
 
-  // Copy extraction function - ENHANCED with more patterns
-const extractAdCopy = (creative) => {
-  let copyText = null;
-  
-  console.log('🔍 Extracting copy for:', creative.adName);
-  console.log('🔍 objectStorySpec:', creative.objectStorySpec);
-  
-  // PRIORITY 1: Real ad copy from object_story_spec
-  if (creative.objectStorySpec) {
-    const spec = creative.objectStorySpec;
+  // EXISTING: Copy extraction function (UNCHANGED)
+  const extractAdCopy = (creative) => {
+    let copyText = null;
     
-    // Try all possible message fields
-    copyText = 
-      spec.page_post?.message ||
-      spec.link_data?.message ||
-      spec.link_data?.description ||
-      spec.link_data?.call_to_action?.value?.text ||
-      spec.video_data?.message ||
-      spec.video_data?.description ||
-      spec.photo_data?.message ||
-      spec.text_data?.message ||
-      spec.template_data?.message ||
-      spec.call_to_action?.value?.text;
+    console.log('🔍 Extracting copy for:', creative.adName);
+    console.log('🔍 objectStorySpec:', creative.objectStorySpec);
+    
+    if (creative.objectStorySpec) {
+      const spec = creative.objectStorySpec;
       
-    console.log('🔍 Found objectStorySpec copy:', copyText);
-  }
-  
-  // PRIORITY 2: Extract testimonials and reviews from ad name
-  if (!copyText && creative.adName) {
-    const adName = creative.adName;
-    
-    // Pattern 1: Extract star ratings with quotes
-    const starQuoteMatch = adName.match(/⭐+\s*"([^"]+)"/);
-    if (starQuoteMatch && starQuoteMatch[1].length > 15) {
-      copyText = starQuoteMatch[1];
-      console.log('🔍 Found star quote pattern:', copyText);
+      copyText = 
+        spec.page_post?.message ||
+        spec.link_data?.message ||
+        spec.link_data?.description ||
+        spec.link_data?.call_to_action?.value?.text ||
+        spec.video_data?.message ||
+        spec.video_data?.description ||
+        spec.photo_data?.message ||
+        spec.text_data?.message ||
+        spec.template_data?.message ||
+        spec.call_to_action?.value?.text;
+        
+      console.log('🔍 Found objectStorySpec copy:', copyText);
     }
     
-    // Pattern 2: Extract customer review content  
-    if (!copyText) {
-      const reviewMatch = adName.match(/customer review\s+(.+?)(?:\s*\|\s*Homepage|$)/i);
-      if (reviewMatch && reviewMatch[1].length > 15) {
-        copyText = reviewMatch[1];
-        console.log('🔍 Found review pattern:', copyText);
-      }
-    }
-    
-    // Pattern 3: Extract quoted testimonials
-    if (!copyText) {
-      const quoteMatch = adName.match(/"([^"]{20,})"/);
-      if (quoteMatch && quoteMatch[1]) {
-        copyText = quoteMatch[1];
-        console.log('🔍 Found quote pattern:', copyText);
-      }
-    }
-    
-    // Pattern 4: Look for testimonial indicators and extract full context
-    if (!copyText) {
-      const testimonialPatterns = [
-        { pattern: /I was shocked/i, extract: /I was shocked[^|]+/ },
-        { pattern: /Not only do these/i, extract: /Not only do these[^|]+/ },
-        { pattern: /These leggings/i, extract: /These leggings[^|]+/ },
-        { pattern: /Pushing my daughter/i, extract: /Pushing my daughter[^|]+/ },
-        { pattern: /Did you know/i, extract: /Did you know[^|]+/ },
-        { pattern: /I absolutely love/i, extract: /I absolutely love[^|]+/ },
-        { pattern: /One of the other moms/i, extract: /One of the other moms[^|]+/ },
-        { pattern: /I'm a mother/i, extract: /I'm a mother[^|]+/ },
-        { pattern: /That's right/i, extract: /That's right[^|]+/ },
-        { pattern: /Tested at the prestigious/i, extract: /Tested at the prestigious[^|]+/ },
-        { pattern: /Meet the Sweetflexx/i, extract: /Meet the Sweetflexx[^|]+/ },
-        { pattern: /Yale-tested/i, extract: /Yale-tested[^|]+/ },
-        { pattern: /resistance technology/i, extract: /[^|]*resistance technology[^|]*/ },
-        { pattern: /game changer/i, extract: /[^|]*game changer[^|]*/ },
-        { pattern: /built-in resistance/i, extract: /[^|]*built-in resistance[^|]*/ },
-        { pattern: /burn up to \d+/i, extract: /[^|]*burn up to \d+[^|]*/ },
-        { pattern: /255 more calories/i, extract: /[^|]*255 more calories[^|]*/ },
-        { pattern: /firmed up/i, extract: /[^|]*firmed up[^|]*/ },
-        { pattern: /changing nothing else/i, extract: /[^|]*changing nothing else[^|]*/ },
-        { pattern: /sneak in a workout/i, extract: /[^|]*sneak in a workout[^|]*/ },
-        { pattern: /easy way to/i, extract: /[^|]*easy way to[^|]*/ },
-        { pattern: /amazing quality/i, extract: /[^|]*amazing quality[^|]*/ },
-        { pattern: /helped shape my legs/i, extract: /[^|]*helped shape my legs[^|]*/ },
-        { pattern: /skeptical at first/i, extract: /[^|]*skeptical at first[^|]*/ },
-        { pattern: /worth it/i, extract: /[^|]*worth it[^|]*/ },
-        { pattern: /GAME CHANGER/i, extract: /[^|]*GAME CHANGER[^|]*/ },
-        // NEW PATTERNS ADDED:
-        { pattern: /transformed my/i, extract: /[^|]*transformed my[^|]*/ },
-        { pattern: /never felt better/i, extract: /[^|]*never felt better[^|]*/ },
-        { pattern: /best investment/i, extract: /[^|]*best investment[^|]*/ },
-        { pattern: /couldn't believe/i, extract: /[^|]*couldn't believe[^|]*/ },
-        { pattern: /results speak for themselves/i, extract: /[^|]*results speak for themselves[^|]*/ },
-        { pattern: /highly recommend/i, extract: /[^|]*highly recommend[^|]*/ },
-        { pattern: /life-changing/i, extract: /[^|]*life-changing[^|]*/ },
-        { pattern: /exceeded my expectations/i, extract: /[^|]*exceeded my expectations[^|]*/ },
-        { pattern: /finally found/i, extract: /[^|]*finally found[^|]*/ },
-        { pattern: /wish I had found/i, extract: /[^|]*wish I had found[^|]*/ },
-        { pattern: /incredible results/i, extract: /[^|]*incredible results[^|]*/ },
-        { pattern: /confidence boost/i, extract: /[^|]*confidence boost[^|]*/ },
-        { pattern: /feel like a new person/i, extract: /[^|]*feel like a new person[^|]*/ },
-        { pattern: /before and after/i, extract: /[^|]*before and after[^|]*/ },
-        { pattern: /doctor recommended/i, extract: /[^|]*doctor recommended[^|]*/ },
-        { pattern: /clinical study/i, extract: /[^|]*clinical study[^|]*/ },
-        { pattern: /scientifically proven/i, extract: /[^|]*scientifically proven[^|]*/ },
-        { pattern: /money back guarantee/i, extract: /[^|]*money back guarantee[^|]*/ },
-        { pattern: /limited time/i, extract: /[^|]*limited time[^|]*/ },
-        { pattern: /special offer/i, extract: /[^|]*special offer[^|]*/ },
-        { pattern: /act now/i, extract: /[^|]*act now[^|]*/ },
-        { pattern: /don't wait/i, extract: /[^|]*don't wait[^|]*/ },
-        { pattern: /join thousands/i, extract: /[^|]*join thousands[^|]*/ },
-        { pattern: /community of/i, extract: /[^|]*community of[^|]*/ },
-        { pattern: /success stories/i, extract: /[^|]*success stories[^|]*/ }
-      ];
+    if (!copyText && creative.adName) {
+      const adName = creative.adName;
       
-      for (const { pattern, extract } of testimonialPatterns) {
-        if (pattern.test(adName)) {
-          const extractMatch = adName.match(extract);
-          if (extractMatch && extractMatch[0].length > 20) {
-            copyText = extractMatch[0].trim();
-            console.log('🔍 Found testimonial pattern:', copyText);
-            break;
+      const starQuoteMatch = adName.match(/⭐+\s*"([^"]+)"/);
+      if (starQuoteMatch && starQuoteMatch[1].length > 15) {
+        copyText = starQuoteMatch[1];
+        console.log('🔍 Found star quote pattern:', copyText);
+      }
+      
+      if (!copyText) {
+        const reviewMatch = adName.match(/customer review\s+(.+?)(?:\s*\|\s*Homepage|$)/i);
+        if (reviewMatch && reviewMatch[1].length > 15) {
+          copyText = reviewMatch[1];
+          console.log('🔍 Found review pattern:', copyText);
+        }
+      }
+      
+      if (!copyText) {
+        const quoteMatch = adName.match(/"([^"]{20,})"/);
+        if (quoteMatch && quoteMatch[1]) {
+          copyText = quoteMatch[1];
+          console.log('🔍 Found quote pattern:', copyText);
+        }
+      }
+      
+      if (!copyText) {
+        const testimonialPatterns = [
+          { pattern: /I was shocked/i, extract: /I was shocked[^|]+/ },
+          { pattern: /Not only do these/i, extract: /Not only do these[^|]+/ },
+          { pattern: /These leggings/i, extract: /These leggings[^|]+/ },
+          { pattern: /Pushing my daughter/i, extract: /Pushing my daughter[^|]+/ },
+          { pattern: /Did you know/i, extract: /Did you know[^|]+/ },
+          { pattern: /I absolutely love/i, extract: /I absolutely love[^|]+/ },
+          { pattern: /One of the other moms/i, extract: /One of the other moms[^|]+/ },
+          { pattern: /I'm a mother/i, extract: /I'm a mother[^|]+/ },
+          { pattern: /That's right/i, extract: /That's right[^|]+/ },
+          { pattern: /Tested at the prestigious/i, extract: /Tested at the prestigious[^|]+/ },
+          { pattern: /Meet the Sweetflexx/i, extract: /Meet the Sweetflexx[^|]+/ },
+          { pattern: /Yale-tested/i, extract: /Yale-tested[^|]+/ },
+          { pattern: /resistance technology/i, extract: /[^|]*resistance technology[^|]*/ },
+          { pattern: /game changer/i, extract: /[^|]*game changer[^|]*/ },
+          { pattern: /built-in resistance/i, extract: /[^|]*built-in resistance[^|]*/ },
+          { pattern: /burn up to \d+/i, extract: /[^|]*burn up to \d+[^|]*/ },
+          { pattern: /255 more calories/i, extract: /[^|]*255 more calories[^|]*/ },
+          { pattern: /firmed up/i, extract: /[^|]*firmed up[^|]*/ },
+          { pattern: /changing nothing else/i, extract: /[^|]*changing nothing else[^|]*/ },
+          { pattern: /sneak in a workout/i, extract: /[^|]*sneak in a workout[^|]*/ },
+          { pattern: /easy way to/i, extract: /[^|]*easy way to[^|]*/ },
+          { pattern: /amazing quality/i, extract: /[^|]*amazing quality[^|]*/ },
+          { pattern: /helped shape my legs/i, extract: /[^|]*helped shape my legs[^|]*/ },
+          { pattern: /skeptical at first/i, extract: /[^|]*skeptical at first[^|]*/ },
+          { pattern: /worth it/i, extract: /[^|]*worth it[^|]*/ },
+          { pattern: /GAME CHANGER/i, extract: /[^|]*GAME CHANGER[^|]*/ },
+          { pattern: /transformed my/i, extract: /[^|]*transformed my[^|]*/ },
+          { pattern: /never felt better/i, extract: /[^|]*never felt better[^|]*/ },
+          { pattern: /best investment/i, extract: /[^|]*best investment[^|]*/ },
+          { pattern: /couldn't believe/i, extract: /[^|]*couldn't believe[^|]*/ },
+          { pattern: /results speak for themselves/i, extract: /[^|]*results speak for themselves[^|]*/ },
+          { pattern: /highly recommend/i, extract: /[^|]*highly recommend[^|]*/ },
+          { pattern: /life-changing/i, extract: /[^|]*life-changing[^|]*/ },
+          { pattern: /exceeded my expectations/i, extract: /[^|]*exceeded my expectations[^|]*/ },
+          { pattern: /finally found/i, extract: /[^|]*finally found[^|]*/ },
+          { pattern: /wish I had found/i, extract: /[^|]*wish I had found[^|]*/ },
+          { pattern: /incredible results/i, extract: /[^|]*incredible results[^|]*/ },
+          { pattern: /confidence boost/i, extract: /[^|]*confidence boost[^|]*/ },
+          { pattern: /feel like a new person/i, extract: /[^|]*feel like a new person[^|]*/ },
+          { pattern: /before and after/i, extract: /[^|]*before and after[^|]*/ },
+          { pattern: /doctor recommended/i, extract: /[^|]*doctor recommended[^|]*/ },
+          { pattern: /clinical study/i, extract: /[^|]*clinical study[^|]*/ },
+          { pattern: /scientifically proven/i, extract: /[^|]*scientifically proven[^|]*/ },
+          { pattern: /money back guarantee/i, extract: /[^|]*money back guarantee[^|]*/ },
+          { pattern: /limited time/i, extract: /[^|]*limited time[^|]*/ },
+          { pattern: /special offer/i, extract: /[^|]*special offer[^|]*/ },
+          { pattern: /act now/i, extract: /[^|]*act now[^|]*/ },
+          { pattern: /don't wait/i, extract: /[^|]*don't wait[^|]*/ },
+          { pattern: /join thousands/i, extract: /[^|]*join thousands[^|]*/ },
+          { pattern: /community of/i, extract: /[^|]*community of[^|]*/ },
+          { pattern: /success stories/i, extract: /[^|]*success stories[^|]*/ }
+        ];
+        
+        for (const { pattern, extract } of testimonialPatterns) {
+          if (pattern.test(adName)) {
+            const extractMatch = adName.match(extract);
+            if (extractMatch && extractMatch[0].length > 20) {
+              copyText = extractMatch[0].trim();
+              console.log('🔍 Found testimonial pattern:', copyText);
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!copyText) {
+        const sentences = adName.split(/[.!?]+/).filter(s => s.trim().length > 10);
+        if (sentences.length >= 2) {
+          const meaningfulSentences = sentences.filter(s => 
+            s.toLowerCase().includes('leggings') ||
+            s.toLowerCase().includes('amazing') ||
+            s.toLowerCase().includes('love') ||
+            s.toLowerCase().includes('workout') ||
+            s.toLowerCase().includes('resistance') ||
+            s.toLowerCase().includes('quality') ||
+            s.toLowerCase().includes('helped') ||
+            s.toLowerCase().includes('transformed') ||
+            s.toLowerCase().includes('results') ||
+            s.toLowerCase().includes('recommend') ||
+            s.toLowerCase().includes('confidence') ||
+            s.toLowerCase().includes('incredible')
+          );
+          
+          if (meaningfulSentences.length > 0) {
+            copyText = meaningfulSentences.slice(0, 2).join('. ').trim() + '.';
+            console.log('🔍 Found multi-sentence testimonial:', copyText);
+          }
+        }
+      }
+      
+      if (!copyText) {
+        const testimonialKeywords = [
+          'amazing quality', 'helped shape', 'worth it', 'love them', 'transformed', 
+          'skeptical', 'resistance', 'workout', 'calories', 'firmed up', 'easy way',
+          'sneak in', 'game changer', 'built-in', 'yale-tested', 'prestigious',
+          'incredible results', 'confidence boost', 'life-changing', 'highly recommend',
+          'best investment', 'never felt better', 'exceeded expectations', 'finally found'
+        ];
+        
+        const hasTestimonialKeyword = testimonialKeywords.some(keyword => 
+          adName.toLowerCase().includes(keyword)
+        );
+        
+        if (hasTestimonialKeyword) {
+          let meaningfulPart = adName
+            .split(/\s*\|\s*(VID|IMG|GIF|24_|25_|Homepage)/)[0]
+            .replace(/^.*?(⭐+.*|".*|I was.*|Not only.*|These.*|Pushing.*|One of.*|That's.*|Meet.*|Amazing.*|Incredible.*|Transform.*)/i, '$1')
+            .trim();
+            
+          if (meaningfulPart.length > 15) {
+            copyText = meaningfulPart;
+            console.log('🔍 Found testimonial keyword extraction:', copyText);
           }
         }
       }
     }
     
-    // Pattern 5: Extract multi-sentence testimonials
-    if (!copyText) {
-      // Look for sentences that span across the ad name
-      const sentences = adName.split(/[.!?]+/).filter(s => s.trim().length > 10);
-      if (sentences.length >= 2) {
-        const meaningfulSentences = sentences.filter(s => 
-          s.toLowerCase().includes('leggings') ||
-          s.toLowerCase().includes('amazing') ||
-          s.toLowerCase().includes('love') ||
-          s.toLowerCase().includes('workout') ||
-          s.toLowerCase().includes('resistance') ||
-          s.toLowerCase().includes('quality') ||
-          s.toLowerCase().includes('helped') ||
-          s.toLowerCase().includes('transformed') ||
-          s.toLowerCase().includes('results') ||
-          s.toLowerCase().includes('recommend') ||
-          s.toLowerCase().includes('confidence') ||
-          s.toLowerCase().includes('incredible')
-        );
-        
-        if (meaningfulSentences.length > 0) {
-          copyText = meaningfulSentences.slice(0, 2).join('. ').trim() + '.';
-          console.log('🔍 Found multi-sentence testimonial:', copyText);
+    if (!copyText && creative.adName) {
+      const adName = creative.adName;
+      const productName = adName.split('|')[0].trim();
+      if (productName.length > 5 && !productName.includes('24_') && !productName.includes('25_')) {
+        if (productName.toLowerCase().includes('pockets high rise')) {
+          copyText = "High-rise leggings with built-in pockets for the ultimate workout experience. Perfect fit, maximum comfort.";
+        } else if (productName.toLowerCase().includes('leggings')) {
+          copyText = `Discover the amazing ${productName.toLowerCase()} that everyone is talking about. Premium quality you can feel.`;
+        } else if (productName.toLowerCase().includes('resistance')) {
+          copyText = `Experience the revolutionary ${productName.toLowerCase()} technology. Transform your workouts effortlessly.`;
+        } else {
+          copyText = `Premium ${productName.toLowerCase()} that delivers incredible results. Join thousands of satisfied customers.`;
         }
+        console.log('🔍 Created engaging copy from product name:', copyText);
       }
     }
     
-    // Pattern 6: If contains common testimonial keywords, extract the meaningful part
-    if (!copyText) {
-      const testimonialKeywords = [
-        'amazing quality', 'helped shape', 'worth it', 'love them', 'transformed', 
-        'skeptical', 'resistance', 'workout', 'calories', 'firmed up', 'easy way',
-        'sneak in', 'game changer', 'built-in', 'yale-tested', 'prestigious',
-        'incredible results', 'confidence boost', 'life-changing', 'highly recommend',
-        'best investment', 'never felt better', 'exceeded expectations', 'finally found'
-      ];
-      
-      const hasTestimonialKeyword = testimonialKeywords.some(keyword => 
-        adName.toLowerCase().includes(keyword)
-      );
-      
-      if (hasTestimonialKeyword) {
-        // Extract everything before the first | or technical marker
-        let meaningfulPart = adName
-          .split(/\s*\|\s*(VID|IMG|GIF|24_|25_|Homepage)/)[0]
-          .replace(/^.*?(⭐+.*|".*|I was.*|Not only.*|These.*|Pushing.*|One of.*|That's.*|Meet.*|Amazing.*|Incredible.*|Transform.*)/i, '$1')
-          .trim();
-          
-        if (meaningfulPart.length > 15) {
-          copyText = meaningfulPart;
-          console.log('🔍 Found testimonial keyword extraction:', copyText);
-        }
-      }
+    if (!copyText || copyText.length < 10) {
+      copyText = creative.adName?.split('|')[0]?.trim() || 'Premium quality product that delivers amazing results';
+      console.log('🔍 Using enhanced fallback:', copyText);
     }
-  }
-  
-  // PRIORITY 3: Create engaging copy from product name
-  if (!copyText && creative.adName) {
-    const adName = creative.adName;
     
-    // Extract clean product name and make it engaging
-    const productName = adName.split('|')[0].trim();
-    if (productName.length > 5 && !productName.includes('24_') && !productName.includes('25_')) {
-      // Create engaging copy from product name
-      if (productName.toLowerCase().includes('pockets high rise')) {
-        copyText = "High-rise leggings with built-in pockets for the ultimate workout experience. Perfect fit, maximum comfort.";
-      } else if (productName.toLowerCase().includes('leggings')) {
-        copyText = `Discover the amazing ${productName.toLowerCase()} that everyone is talking about. Premium quality you can feel.`;
-      } else if (productName.toLowerCase().includes('resistance')) {
-        copyText = `Experience the revolutionary ${productName.toLowerCase()} technology. Transform your workouts effortlessly.`;
-      } else {
-        copyText = `Premium ${productName.toLowerCase()} that delivers incredible results. Join thousands of satisfied customers.`;
-      }
-      console.log('🔍 Created engaging copy from product name:', copyText);
-    }
-  }
+    const formatted = formatCopyText(copyText);
+    console.log('🔍 Final formatted copy:', formatted);
+    return formatted;
+  };
   
-  // FALLBACK
-  if (!copyText || copyText.length < 10) {
-    copyText = creative.adName?.split('|')[0]?.trim() || 'Premium quality product that delivers amazing results';
-    console.log('🔍 Using enhanced fallback:', copyText);
-  }
-  
-  // Format the final copy
-  const formatted = formatCopyText(copyText);
-  console.log('🔍 Final formatted copy:', formatted);
-  return formatted;
-};
-  
-  // Helper function to format copy text into 3 lines
+  // EXISTING: Helper function to format copy text (UNCHANGED)
   const formatCopyText = (text) => {
     if (!text) return 'No copy available';
     
-    // Clean up the text
     text = text.trim();
     
-    // If text has line breaks, use them
     const existingLines = text.split(/[\n\r]+/).filter(line => line.trim());
     if (existingLines.length >= 2) {
       return existingLines.slice(0, 3).join('\n');
     }
     
-    // If single line is very long, break it intelligently
     if (text.length > 120) {
-      // Try to break at sentence boundaries first
       const sentences = text.split(/[.!?]+/).filter(s => s.trim());
       if (sentences.length >= 2) {
         let result = sentences[0].trim();
@@ -302,7 +452,6 @@ const extractAdCopy = (creative) => {
         return result.endsWith('.') ? result : result + '.';
       }
       
-      // Break at word boundaries, roughly 40-50 chars per line
       const words = text.split(' ');
       let lines = ['', '', ''];
       let currentLine = 0;
@@ -321,11 +470,10 @@ const extractAdCopy = (creative) => {
       return lines.filter(line => line.trim()).join('\n');
     }
     
-    // For shorter text, return as is
     return text;
   };
 
-  // Data cleaning functions
+  // EXISTING: Data cleaning functions (UNCHANGED)
   const cleanNumericValue = (value, defaultValue = 0) => {
     if (value === null || value === undefined || value === '') {
       return defaultValue;
@@ -342,7 +490,7 @@ const extractAdCopy = (creative) => {
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   };
 
-  // Aggregation function with POST ID-based grouping - COMPLETELY REWRITTEN
+  // 🆕 ENHANCED: Aggregation function with ADAPTIVE mode support
   const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
@@ -350,20 +498,25 @@ const extractAdCopy = (creative) => {
 
     console.log(`🔧 AGGREGATION: Starting ${mode} aggregation with`, creativePerformanceData.length, 'total ads');
 
+    let patterns = null;
+    if (mode === AGGREGATION_MODES.ADAPTIVE) {
+      const allAdNames = creativePerformanceData.map(c => c.adName).filter(Boolean);
+      patterns = discoverAccountPatterns(allAdNames);
+      setPatternInsights(patterns);
+    }
+
     const groupedCreatives = {};
 
     creativePerformanceData.forEach((creative, index) => {
       let groupKey;
+      let groupingInfo = null;
       
-      // Determine group key based on aggregation mode
       switch (mode) {
         case AGGREGATION_MODES.POST:
-          // Extract Post ID from ad name
           const postId = extractPostId(creative.adName);
           if (postId) {
             groupKey = `post_${postId}`;
           } else {
-            // Fallback: use cleaned ad name if no Post ID found
             const cleanAdName = creative.adName?.split('|')[0]?.trim() || `unknown-${index}`;
             groupKey = `name_${cleanAdName}`;
           }
@@ -373,6 +526,13 @@ const extractAdCopy = (creative) => {
         case AGGREGATION_MODES.COPY:
           groupKey = extractAdCopy(creative);
           console.log(`📝 Copy grouping: "${creative.adName}" → "${groupKey.substring(0, 50)}..."`);
+          break;
+          
+        case AGGREGATION_MODES.ADAPTIVE:
+          const allAdNames = creativePerformanceData.map(c => c.adName).filter(Boolean);
+          groupingInfo = detectCreativeGroup(creative.adName, allAdNames, patterns);
+          groupKey = groupingInfo.key;
+          console.log(`🧠 Adaptive grouping: "${creative.adName}" → "${groupKey}" (${groupingInfo.method}, ${groupingInfo.confidence})`);
           break;
           
         default:
@@ -385,15 +545,16 @@ const extractAdCopy = (creative) => {
           groupKey,
           adsetCount: 0,
           adIds: [],
-          adNames: [], // Track all ad names in this group
+          adNames: [],
           creativeIds: new Set(),
-          thumbnailUrls: new Set(), // Track all thumbnails
+          thumbnailUrls: new Set(),
           totalImpressions: 0,
           totalClicks: 0,
           totalSpend: 0,
           totalPurchases: 0,
           totalRevenue: 0,
-          extractedCopy: mode === AGGREGATION_MODES.COPY ? groupKey : extractAdCopy(creative)
+          extractedCopy: mode === AGGREGATION_MODES.COPY ? groupKey : extractAdCopy(creative),
+          groupingInfo: mode === AGGREGATION_MODES.ADAPTIVE ? groupingInfo : null
         };
         console.log(`✨ Created new group: "${groupKey}"`);
       } else {
@@ -402,7 +563,6 @@ const extractAdCopy = (creative) => {
 
       const group = groupedCreatives[groupKey];
       
-      // Add to counters and tracking
       group.adsetCount += 1;
       group.adIds.push(creative.adId);
       group.adNames.push(creative.adName);
@@ -413,7 +573,6 @@ const extractAdCopy = (creative) => {
         group.thumbnailUrls.add(creative.thumbnailUrl);
       }
       
-      // Clean and aggregate data
       const cleanImpressions = cleanIntegerValue(creative.impressions);
       const cleanClicks = cleanIntegerValue(creative.clicks);
       const cleanSpend = cleanNumericValue(creative.spend);
@@ -429,7 +588,6 @@ const extractAdCopy = (creative) => {
       console.log(`📈 Group "${groupKey}" now has ${group.adsetCount} ads, $${group.totalSpend.toFixed(2)} total spend`);
     });
 
-    // Convert to array and calculate metrics
     const aggregatedCreatives = Object.values(groupedCreatives).map((group, index) => {
       const impressions = group.totalImpressions;
       const clicks = group.totalClicks;
@@ -437,7 +595,6 @@ const extractAdCopy = (creative) => {
       const purchases = group.totalPurchases;
       const revenue = group.totalRevenue;
 
-      // Calculate rates
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpc = clicks > 0 ? spend / clicks : 0;
       const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
@@ -452,35 +609,34 @@ const extractAdCopy = (creative) => {
         }
       }
 
-      // Generate realistic engagement metrics (placeholders)
       const seeMoreRate = impressions > 0 ? Math.random() * 3 + 0.5 : 0;
       const thumbstopRate = impressions > 0 ? Math.random() * 5 + 1 : 0;
 
-      // Select best thumbnail (prefer the first one that exists)
       const bestThumbnail = Array.from(group.thumbnailUrls)[0] || group.thumbnailUrl;
       
-      // Create display name (use the full ad name, don't truncate)
-      const displayName = group.adNames[0]; // Use the first (and representative) full ad name
+      let displayName = group.adNames[0];
+      
+      if (mode === AGGREGATION_MODES.ADAPTIVE && group.groupingInfo) {
+        displayName = group.groupingInfo.displayName || group.adNames[0];
+      }
 
       console.log(`🏁 Final group "${group.groupKey}": ${group.adsetCount} ads → "${displayName}"`);
 
       return {
-        id: `${group.groupKey}-${index}`, // Unique ID for React keys
+        id: `${group.groupKey}-${index}`,
         adId: group.adIds[0],
-        adName: displayName, // Use full ad name for display
+        adName: displayName,
         adsetName: group.adsetName,
         creativeId: group.creativeId,
-        thumbnailUrl: bestThumbnail, // Use best available thumbnail
+        thumbnailUrl: bestThumbnail,
         objectStorySpec: group.objectStorySpec,
         accountId: group.accountId,
         
-        // Aggregated data
         adsetCount: group.adsetCount,
         creativeCount: group.creativeIds.size || 1,
         adIds: group.adIds,
-        adNames: group.adNames, // All original ad names
+        adNames: group.adNames,
         
-        // Metrics
         impressions,
         clicks,
         spend,
@@ -495,8 +651,8 @@ const extractAdCopy = (creative) => {
         thumbstopRate,
         conversionRate: clicks > 0 && purchases > 0 ? (purchases / clicks) * 100 : 0,
         
-        // Copy for display
-        extractedCopy: group.extractedCopy
+        extractedCopy: group.extractedCopy,
+        groupingInfo: group.groupingInfo
       };
     });
 
@@ -505,7 +661,6 @@ const extractAdCopy = (creative) => {
     return aggregatedCreatives;
   }, []);
 
-  // Initialize creatives from props - effect runs when mode changes
   useEffect(() => {
     if (analyticsData && analyticsData.creativePerformance) {
       console.log('🔄 Re-aggregating data for mode:', aggregationMode);
@@ -515,7 +670,6 @@ const extractAdCopy = (creative) => {
     }
   }, [analyticsData, aggregationMode, aggregateCreatives]);
 
-  // Initialize benchmarks
   useEffect(() => {
     if (selectedAccountId) {
       const storageKey = `benchmarks_${selectedAccountId}`;
@@ -548,7 +702,6 @@ const extractAdCopy = (creative) => {
     }
   }, [propBenchmarks, selectedAccountId]);
 
-  // Apply filters and sort
   useEffect(() => {
     let results = [...creatives];
     
@@ -578,7 +731,6 @@ const extractAdCopy = (creative) => {
     setFilteredCreatives(results);
   }, [creatives, searchQuery, sortColumn, sortDirection]);
 
-  // Handle creative selection
   const handleCreativeSelect = (creativeId) => {
     const creative = creatives.find(c => c.creativeId === creativeId);
     setSelectedCreativeId(creativeId);
@@ -587,10 +739,9 @@ const extractAdCopy = (creative) => {
     }
   };
 
-  // Get benchmark color
   const getBenchmarkColor = (metric, value) => {
     if (!benchmarks || !benchmarks[metric] || value === null || value === undefined) {
-      return '#6b7280'; // gray
+      return '#6b7280';
     }
     
     const { low, medium } = benchmarks[metric];
@@ -600,29 +751,29 @@ const extractAdCopy = (creative) => {
     const higherIsBetter = ['ctr', 'roas', 'seeMoreRate', 'thumbstopRate'].includes(metric);
     
     if (higherIsBetter) {
-      if (numericValue >= medium) return '#059669'; // green
-      if (numericValue >= low) return '#d97706'; // yellow
-      return '#dc2626'; // red
+      if (numericValue >= medium) return '#059669';
+      if (numericValue >= low) return '#d97706';
+      return '#dc2626';
     } else {
-      if (numericValue <= medium) return '#059669'; // green
-      if (numericValue <= low) return '#d97706'; // yellow
-      return '#dc2626'; // red
+      if (numericValue <= medium) return '#059669';
+      if (numericValue <= low) return '#d97706';
+      return '#dc2626';
     }
   };
 
-  // Get metrics for current mode - UPDATED FOR 2 MODES
   const getMetricsForMode = (mode) => {
     switch (mode) {
       case AGGREGATION_MODES.POST:
         return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
       case AGGREGATION_MODES.COPY:
         return ['roas', 'revenue', 'cpc', 'ctr', 'seeMoreRate', 'spend', 'purchases', 'creativeCount'];
+      case AGGREGATION_MODES.ADAPTIVE:
+        return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
       default:
         return ['roas', 'revenue', 'cpm', 'ctr', 'spend', 'purchases'];
     }
   };
 
-  // Format metric value
   const formatMetricValue = (metric, value) => {
     if (value === null || value === undefined) return 'N/A';
     
@@ -648,7 +799,6 @@ const extractAdCopy = (creative) => {
     }
   };
 
-  // Export to CSV
   const exportToCSV = () => {
     if (!filteredCreatives || filteredCreatives.length === 0) {
       setStatusMessage('No data to export');
@@ -703,7 +853,6 @@ const extractAdCopy = (creative) => {
       margin: '0 auto', 
       padding: '24px'
     }}>
-      {/* Header Section */}
       <div style={{ marginBottom: '24px' }}>
         <h3 style={{ 
           fontSize: '18px', 
@@ -714,7 +863,6 @@ const extractAdCopy = (creative) => {
           Creative Performance Analysis
         </h3>
         
-        {/* Aggregation Mode Tabs - UPDATED FOR 2 MODES */}
         <div style={{
           display: 'flex',
           gap: '4px',
@@ -744,12 +892,40 @@ const extractAdCopy = (creative) => {
                 boxShadow: aggregationMode === mode ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
               }}
             >
-              {key === 'POST' ? 'By Post' : 'By Copy'}
+              {key === 'POST' ? 'By Post' : 
+               key === 'COPY' ? 'By Copy' : 
+               '🧠 Adaptive'}
             </button>
           ))}
         </div>
         
-        {/* Controls */}
+        {aggregationMode === AGGREGATION_MODES.ADAPTIVE && patternInsights && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            backgroundColor: patternInsights.confidence > 70 ? '#f0fdf4' : 
+                           patternInsights.confidence > 50 ? '#fffbeb' : '#fef2f2',
+            border: `1px solid ${patternInsights.confidence > 70 ? '#bbf7d0' : 
+                                 patternInsights.confidence > 50 ? '#fed7aa' : '#fecaca'}`,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Info size={16} style={{ 
+              color: patternInsights.confidence > 70 ? '#059669' : 
+                     patternInsights.confidence > 50 ? '#d97706' : '#dc2626'
+            }} />
+            <div style={{ fontSize: '14px' }}>
+              <strong>Pattern Discovery:</strong> {patternInsights.confidence.toFixed(0)}% confidence
+              {' • '}Detected separator: "{patternInsights.separator}"
+              {' • '}Grouped {patternInsights.totalAds} ads into patterns
+              {patternInsights.confidence > 70 && ' • ✅ High confidence grouping'}
+              {patternInsights.confidence <= 50 && ' • ⚠️ Mixed naming conventions detected'}
+            </div>
+          </div>
+        )}
+        
         <div style={{
           display: 'flex',
           flexDirection: window.innerWidth < 640 ? 'column' : 'row',
@@ -839,7 +1015,6 @@ const extractAdCopy = (creative) => {
         )}
       </div>
 
-      {/* Benchmark Settings */}
       {isEditingBenchmarks && (
         <div className="mb-6 p-4 bg-gray-50 border rounded-lg">
           <div className="flex justify-between items-center mb-4">
@@ -914,7 +1089,6 @@ const extractAdCopy = (creative) => {
         </div>
       )}
 
-      {/* Creative Cards Grid - 5 CARDS PER ROW */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
@@ -946,7 +1120,6 @@ const extractAdCopy = (creative) => {
               e.target.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
             }}
           >
-            {/* Creative Thumbnail - ALWAYS SHOW IN BOTH MODES */}
             {creative.thumbnailUrl && (
               <div style={{ 
                 marginBottom: '2px',
@@ -1013,17 +1186,16 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Ad Name Display - ALWAYS SHOW FULL NAME */}
             <div style={{ marginBottom: '4px' }}>
               <div style={{
-                fontSize: '11px', // Slightly smaller to fit long names
+                fontSize: '11px',
                 fontWeight: '500',
                 color: '#1f2937',
                 lineHeight: '1.2',
-                minHeight: '30px', // More space for longer names
+                minHeight: '30px',
                 overflow: 'hidden',
                 display: '-webkit-box',
-                WebkitLineClamp: 3, // Allow up to 3 lines
+                WebkitLineClamp: 3,
                 WebkitBoxOrient: 'vertical',
                 wordBreak: 'break-word'
               }}>
@@ -1031,7 +1203,6 @@ const extractAdCopy = (creative) => {
               </div>
             </div>
             
-            {/* Copy Text - ONLY SHOW IN COPY MODE */}
             {aggregationMode === AGGREGATION_MODES.COPY && (
               <div style={{ marginBottom: '4px', flex: '1' }}>
                 <div style={{
@@ -1048,7 +1219,6 @@ const extractAdCopy = (creative) => {
               </div>
             )}
             
-            {/* Metrics Grid - KEEP TEXT READABLE BUT REDUCE GAPS */}
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column', 
@@ -1129,9 +1299,15 @@ const extractAdCopy = (creative) => {
         )}
       </div>
       
-      {/* Footer */}
       <div className="mt-6 text-xs text-gray-500 text-center">
         <p>Performance data aggregated by {aggregationMode}. Colors indicate benchmark performance.</p>
+        {aggregationMode === AGGREGATION_MODES.ADAPTIVE && patternInsights && (
+          <p className="mt-1">
+            🧠 Adaptive grouping with {patternInsights.confidence.toFixed(0)}% confidence 
+            • Separator: "{patternInsights.separator}" 
+            • {Object.keys(patternInsights.componentAnalysis || {}).length} levels detected
+          </p>
+        )}
       </div>
     </div>
   );
