@@ -307,190 +307,190 @@ const CreativeAnalyticsDashboard = () => {
   };
 
   // Main data loading function
-  const loadPerformanceData = useCallback(async () => {
-    if (!accessToken || !selectedAccountId) return;
+const loadPerformanceData = useCallback(async () => {
+  if (!accessToken || !selectedAccountId) return;
+  
+  setIsLoading(true);
+  setError(null);
+  
+  try {
+    // Format account ID to ensure proper format
+    const formattedAccountId = selectedAccountId.toString().replace('act_', '');
     
-    setIsLoading(true);
-    setError(null);
+    // Calculate date range
+    const { since, until } = calculateDateRange();
     
+    // FETCH DAILY TIME SERIES DATA
+    await fetchTimeSeriesData();
+    
+    // FETCH BREAKDOWN DATA
+    await fetchBreakdownData();
+    
+    // 1. Fetch account insights
+    const insightsResponse = await axios.get(
+      `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
+      {
+        params: {
+          access_token: accessToken,
+          time_range: JSON.stringify({ since, until }),
+          fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
+          level: 'account',
+          limit: 500
+        }
+      }
+    );
+    
+    // 2. Fetch campaigns
+    const campaignsResponse = await axios.get(
+      `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/campaigns`,
+      {
+        params: {
+          access_token: accessToken,
+          fields: 'name,status,objective',
+          limit: 500
+        }
+      }
+    );
+    
+    // 3. Fetch ads with their creative info
+    let adsResponse;
     try {
-      // Format account ID to ensure proper format
-      const formattedAccountId = selectedAccountId.toString().replace('act_', '');
-      
-      // Calculate date range
-      const { since, until } = calculateDateRange();
-      
-      // FETCH DAILY TIME SERIES DATA
-      await fetchTimeSeriesData();
-      
-      // FETCH BREAKDOWN DATA
-      await fetchBreakdownData();
-      
-      // 1. Fetch account insights
-      const insightsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/insights`,
+      adsResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
         {
           params: {
             access_token: accessToken,
-            time_range: JSON.stringify({ since, until }),
-            fields: 'impressions,clicks,spend,actions,action_values,cpc,ctr,cpm',
-            level: 'account',
+            fields: 'name,creative{id,thumbnail_url},adset{name}', // Simplified fields
             limit: 500
           }
         }
       );
-      
-      // 2. Fetch campaigns
-      const campaignsResponse = await axios.get(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/campaigns`,
+      console.log('✅ Ads fetch successful:', adsResponse.data.data?.length || 0, 'ads found');
+    } catch (adsError) {
+      console.error('❌ Failed to fetch ads:', adsError.message);
+      // Fallback to basic insights only
+      adsResponse = { data: { data: [] } };
+    }
+
+    console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
+    console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
+
+    // Extract ads from response BEFORE using it
+    const ads = adsResponse.data.data;
+
+    // 3b. Fetch creative library for better video quality
+    let creativesResponse = { data: { data: [] } };
+    try {
+      creativesResponse = await axios.get(
+        `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
         {
           params: {
             access_token: accessToken,
-            fields: 'name,status,objective',
-            limit: 500
+            fields: 'image_url,thumbnail_url',  // Simplified fields
+            limit: 100
           }
         }
       );
-      
-      // 3. Fetch ads with their creative info
-      let adsResponse;
-      try {
-        adsResponse = await axios.get(
-          `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/ads`,
-          {
-            params: {
-              access_token: accessToken,
-              fields: 'name,creative{id,thumbnail_url},adset{name}', // Simplified fields
-              limit: 500
-            }
-          }
-        );
-        console.log('✅ Ads fetch successful:', adsResponse.data.data?.length || 0, 'ads found');
-      } catch (adsError) {
-        console.error('❌ Failed to fetch ads:', adsError.message);
-        // Fallback to basic insights only
-        adsResponse = { data: { data: [] } };
-      }
-
-      console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
-      console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
-
-      // 3b. Fetch creative library for better video quality
-let creativesResponse = { data: { data: [] } };
-try {
-  creativesResponse = await axios.get(
-    `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
-    {
-      params: {
-        access_token: accessToken,
-        fields: 'image_url,thumbnail_url',  // Simplified fields
-        limit: 100
-      }
+      console.log('✅ Creative library fetch successful');
+    } catch (creativesError) {
+      console.warn('⚠️ Creative library fetch failed:', creativesError.message);
+      creativesResponse = { data: { data: [] } }; // Ensure we have a fallback
     }
-  );
-  console.log('✅ Creative library fetch successful');
-} catch (creativesError) {
-  console.warn('⚠️ Creative library fetch failed:', creativesError.message);
-  creativesResponse = { data: { data: [] } }; // Ensure we have a fallback
-}
 
-      console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data?.data || 'No creative library data');
+    console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data?.data || 'No creative library data');
 
-      // Create a lookup map for creative library data
-      const creativesMap = {};
-if (creativesResponse.data?.data) {
-  creativesResponse.data.data.forEach(creative => {
-    creativesMap[creative.id] = creative;
-  });
-  console.log(`📚 Built creative library map with ${Object.keys(creativesMap).length} entries`);
-  
-  // ADD THESE DEBUG LOGS HERE:
-  console.log('🖼️ CREATIVE LIBRARY SAMPLE:', Object.values(creativesMap).slice(0, 3));
-  console.log('🖼️ FIRST AD WITH CREATIVE:', ads.find(ad => ad.creative));
-  
-} else {
-  console.log('📚 No creative library data available, using basic thumbnails');
-}
-
-      // Extract ads from response
-      const ads = adsResponse.data.data;
-
-      // 4. Fetch ad insights for performance data - WITH BATCHING
-      const adInsightsResponse = await fetchAdInsights(ads, since, until);
-
-      // Process creative performance data
-      const processedCreativePerformance = processCreativePerformance(ads, adInsightsResponse, creativesMap);
-
-      console.log('🧹 CLEANED CREATIVE DATA: Ready for ADAPTIVE pattern recognition in table');
+    // Create a lookup map for creative library data
+    const creativesMap = {};
+    if (creativesResponse.data?.data) {
+      creativesResponse.data.data.forEach(creative => {
+        creativesMap[creative.id] = creative;
+      });
+      console.log(`📚 Built creative library map with ${Object.keys(creativesMap).length} entries`);
       
-      // Prepare summary metrics from account insights
-      const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
-        ? insightsResponse.data.data[0] 
-        : {};
+      // ADD THESE DEBUG LOGS HERE:
+      console.log('🖼️ CREATIVE LIBRARY SAMPLE:', Object.values(creativesMap).slice(0, 3));
+      console.log('🖼️ FIRST AD WITH CREATIVE:', ads.find(ad => ad.creative));
       
-      const summary = {
-        totalImpressions: parseInt(accountInsights.impressions || 0),
-        totalClicks: parseInt(accountInsights.clicks || 0),
-        totalSpend: parseFloat(accountInsights.spend || 0),
-        avgCtr: accountInsights.ctr ? parseFloat(accountInsights.ctr) * 100 : 0,
-        avgCpc: parseFloat(accountInsights.cpc || 0),
-        avgCpm: parseFloat(accountInsights.cpm || 0),
-        campaigns: campaignsResponse.data.data.length,
-        activeCreatives: ads.filter(ad => ad.creative).length
-      };
-      
-      // Calculate estimated funnel data
-      const purchaseAction = accountInsights.actions?.find(a => a.action_type === 'purchase');
-      const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1);
-      
-      const landingPageViewAction = accountInsights.actions?.find(a => a.action_type === 'landing_page_view');
-      const estimatedLandingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value) : Math.round(summary.totalClicks * 0.8);
-      
-      const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
-      const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3);
-
-      const funnel = {
-        impressions: summary.totalImpressions,
-        clicks: summary.totalClicks,
-        landingPageViews: estimatedLandingPageViews,
-        addToCarts: estimatedAddToCarts,
-        purchases: estimatedPurchases
-      };
-
-      const purchaseValueAction = accountInsights.action_values?.find(a => a.action_type === 'purchase');
-      const revenue = purchaseValueAction ? parseFloat(purchaseValueAction.value) : 0;
-
-      const advancedMetrics = {
-        cpm: summary.avgCpm,
-        cpc: summary.avgCpc,
-        costPerPurchase: funnel.purchases > 0 ? summary.totalSpend / funnel.purchases : 0,
-        roas: revenue > 0 ? revenue / summary.totalSpend : 0,
-        linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
-      };
-      
-      const topCreatives = [...processedCreativePerformance]
-  .sort((a, b) => b.spend - a.spend)
-  .slice(0, 5);
-      
-  setAnalyticsData({
-    summary,
-    funnel,
-    advancedMetrics,
-    creativePerformance: processedCreativePerformance,  // ← Change this
-    topCreatives,
-    campaigns: campaignsResponse.data.data,
-    accountInsights: insightsResponse.data.data
-  });
-      
-      console.log('✅ Performance data loaded successfully - ready for ADAPTIVE processing');
-      
-    } catch (error) {
-      console.error('Error loading performance data:', error);
-      setError('Error loading data from Meta API. Please check console for details.');
-    } finally {
-      setIsLoading(false);
+    } else {
+      console.log('📚 No creative library data available, using basic thumbnails');
     }
-  }, [accessToken, selectedAccountId, dateRange]);
+
+    // 4. Fetch ad insights for performance data - WITH BATCHING
+    const adInsightsResponse = await fetchAdInsights(ads, since, until);
+
+    // Process creative performance data
+    const processedCreativePerformance = processCreativePerformance(ads, adInsightsResponse, creativesMap);
+
+    console.log('🧹 CLEANED CREATIVE DATA: Ready for ADAPTIVE pattern recognition in table');
+    
+    // Prepare summary metrics from account insights
+    const accountInsights = insightsResponse.data.data && insightsResponse.data.data.length > 0 
+      ? insightsResponse.data.data[0] 
+      : {};
+    
+    const summary = {
+      totalImpressions: parseInt(accountInsights.impressions || 0),
+      totalClicks: parseInt(accountInsights.clicks || 0),
+      totalSpend: parseFloat(accountInsights.spend || 0),
+      avgCtr: accountInsights.ctr ? parseFloat(accountInsights.ctr) * 100 : 0,
+      avgCpc: parseFloat(accountInsights.cpc || 0),
+      avgCpm: parseFloat(accountInsights.cpm || 0),
+      campaigns: campaignsResponse.data.data.length,
+      activeCreatives: ads.filter(ad => ad.creative).length
+    };
+    
+    // Calculate estimated funnel data
+    const purchaseAction = accountInsights.actions?.find(a => a.action_type === 'purchase');
+    const estimatedPurchases = purchaseAction ? parseInt(purchaseAction.value) : Math.round(summary.totalClicks * 0.1);
+    
+    const landingPageViewAction = accountInsights.actions?.find(a => a.action_type === 'landing_page_view');
+    const estimatedLandingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value) : Math.round(summary.totalClicks * 0.8);
+    
+    const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
+    const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3);
+
+    const funnel = {
+      impressions: summary.totalImpressions,
+      clicks: summary.totalClicks,
+      landingPageViews: estimatedLandingPageViews,
+      addToCarts: estimatedAddToCarts,
+      purchases: estimatedPurchases
+    };
+
+    const purchaseValueAction = accountInsights.action_values?.find(a => a.action_type === 'purchase');
+    const revenue = purchaseValueAction ? parseFloat(purchaseValueAction.value) : 0;
+
+    const advancedMetrics = {
+      cpm: summary.avgCpm,
+      cpc: summary.avgCpc,
+      costPerPurchase: funnel.purchases > 0 ? summary.totalSpend / funnel.purchases : 0,
+      roas: revenue > 0 ? revenue / summary.totalSpend : 0,
+      linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
+    };
+    
+    const topCreatives = [...processedCreativePerformance]
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 5);
+    
+    setAnalyticsData({
+      summary,
+      funnel,
+      advancedMetrics,
+      creativePerformance: processedCreativePerformance,  // ← Change this
+      topCreatives,
+      campaigns: campaignsResponse.data.data,
+      accountInsights: insightsResponse.data.data
+    });
+    
+    console.log('✅ Performance data loaded successfully - ready for ADAPTIVE processing');
+    
+  } catch (error) {
+    console.error('Error loading performance data:', error);
+    setError('Error loading data from Meta API. Please check console for details.');
+  } finally {
+    setIsLoading(false);
+  }
+}, [accessToken, selectedAccountId, dateRange]);
 
   // Load performance data when account or date range changes
   useEffect(() => {
