@@ -244,23 +244,20 @@ const CreativeAnalyticsDashboard = () => {
         const creativeLibData = creativesMap[ad.creative.id];
         
         const thumbnailUrl = (() => {
-          const candidates = [
-            creativeLibData?.image_url,
-            creativeLibData?.thumbnail_url,
-            creativeLibData?.object_story_spec?.video_data?.image_url,
-            creativeLibData?.object_story_spec?.link_data?.picture,
-            // Fallback: Generate thumbnail URL from creative ID
-            ad.creative?.id ? `https://graph.facebook.com/v22.0/${ad.creative.id}?fields=thumbnail_url&access_token=${accessToken}` : null
-          ];
+          // Check creative library first (this is working)
+          if (creativeLibData?.image_url) return creativeLibData.image_url;
+          if (creativeLibData?.thumbnail_url) return creativeLibData.thumbnail_url;
           
-          const validUrl = candidates.find(url => url && url.length > 0);
+          // Check ad creative data
+          if (ad.creative?.thumbnail_url) return ad.creative.thumbnail_url;
+          if (ad.creative?.image_url) return ad.creative.image_url;
           
-          // If no URL found, try to fetch directly from creative ID
-          if (!validUrl && ad.creative?.id) {
-            return `https://scontent.fxxx.fbcdn.net/v/creative_preview/${ad.creative.id}`;
+          // Fallback: try to construct from creative ID
+          if (ad.creative?.id) {
+            return `https://graph.facebook.com/v22.0/${ad.creative.id}/preview?access_token=${accessToken}`;
           }
           
-          return validUrl || null;
+          return null;
         })();
         
         // Calculate ROAS for this specific creative
