@@ -360,7 +360,7 @@ const CreativeAnalyticsDashboard = () => {
           {
             params: {
               access_token: accessToken,
-              fields: 'name,creative{id},adset{name}', // Simplified fields
+              fields: 'name,creative{id,thumbnail_url},adset{name}', // Simplified fields
               limit: 500
             }
           }
@@ -375,49 +375,23 @@ const CreativeAnalyticsDashboard = () => {
       console.log('🔍 RAW ADS RESPONSE:', adsResponse.data.data);
       console.log('🔍 FIRST AD WITH CREATIVE:', adsResponse.data.data.find(ad => ad.creative));
 
-      // 3b. Fetch creative library with better thumbnail handling
+      // 3b. Fetch creative library for better video quality
 let creativesResponse = { data: { data: [] } };
 try {
-  // Get all unique creative IDs from ads
-  const uniqueCreativeIds = [...new Set(ads.map(ad => ad.creative?.id).filter(Boolean))];
-  console.log(`🔍 Found ${uniqueCreativeIds.length} unique creative IDs to fetch`);
-  
-  if (uniqueCreativeIds.length > 0) {
-    // Fetch creatives in batches
-    const batchSize = 25;
-    const allCreatives = [];
-    
-    for (let i = 0; i < uniqueCreativeIds.length; i += batchSize) {
-      const batch = uniqueCreativeIds.slice(i, i + batchSize);
-      
-      try {
-        const batchResponse = await axios.get(
-          `https://graph.facebook.com/${META_API_VERSION}/`,
-          {
-            params: {
-              access_token: accessToken,
-              ids: batch.join(','),
-              fields: 'image_url,thumbnail_url,object_story_spec'
-            }
-          }
-        );
-        
-        // Convert object response to array
-        Object.values(batchResponse.data).forEach(creative => {
-          if (creative.id) allCreatives.push(creative);
-        });
-        
-        console.log(`✅ Fetched batch ${Math.floor(i/batchSize) + 1}: ${Object.keys(batchResponse.data).length} creatives`);
-      } catch (batchError) {
-        console.warn(`⚠️ Batch ${Math.floor(i/batchSize) + 1} failed:`, batchError.message);
+  creativesResponse = await axios.get(
+    `https://graph.facebook.com/${META_API_VERSION}/act_${formattedAccountId}/adcreatives`,
+    {
+      params: {
+        access_token: accessToken,
+        fields: 'image_url,thumbnail_url',  // Simplified fields
+        limit: 100
       }
     }
-    
-    creativesResponse = { data: { data: allCreatives } };
-    console.log(`✅ Total creatives fetched: ${allCreatives.length}`);
-  }
+  );
+  console.log('✅ Creative library fetch successful');
 } catch (creativesError) {
   console.warn('⚠️ Creative library fetch failed:', creativesError.message);
+  creativesResponse = { data: { data: [] } }; // Ensure we have a fallback
 }
 
       console.log('🔍 CREATIVE LIBRARY RESPONSE:', creativesResponse.data?.data || 'No creative library data');
