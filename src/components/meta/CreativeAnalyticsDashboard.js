@@ -246,16 +246,21 @@ const CreativeAnalyticsDashboard = () => {
         const thumbnailUrl = (() => {
           const candidates = [
             creativeLibData?.image_url,
-            ad.creative.image_url,
             creativeLibData?.thumbnail_url,
-            ad.creative.thumbnail_url,
             creativeLibData?.object_story_spec?.video_data?.image_url,
-            ad.creative.object_story_spec?.video_data?.image_url,
-            ad.creative.object_story_spec?.link_data?.picture,
-            creativeLibData?.object_story_spec?.link_data?.picture
+            creativeLibData?.object_story_spec?.link_data?.picture,
+            // Fallback: Generate thumbnail URL from creative ID
+            ad.creative?.id ? `https://graph.facebook.com/v22.0/${ad.creative.id}?fields=thumbnail_url&access_token=${accessToken}` : null
           ];
           
-          return candidates.find(url => url && url.length > 0) || null;
+          const validUrl = candidates.find(url => url && url.length > 0);
+          
+          // If no URL found, try to fetch directly from creative ID
+          if (!validUrl && ad.creative?.id) {
+            return `https://scontent.fxxx.fbcdn.net/v/creative_preview/${ad.creative.id}`;
+          }
+          
+          return validUrl || null;
         })();
         
         // Calculate ROAS for this specific creative
