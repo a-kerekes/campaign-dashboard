@@ -194,7 +194,8 @@ const BreakdownChart = ({
         ctr: ctr,
         cpc: parseFloat(processedItem.cpc || 0),
         cpm: parseFloat(processedItem.cpm || 0),
-        purchases: purchases
+        purchases: purchases,
+        leads: parseInt(processedItem.leads || 0)
       };
     });
     
@@ -208,14 +209,20 @@ const BreakdownChart = ({
     const categories = 4;
     
     for (let i = 1; i <= categories; i++) {
+      const impressions = Math.floor(Math.random() * 10000) + 5000;
+      const clicks = Math.floor(Math.random() * 2000) + 500;
+      const purchases = Math.floor(Math.random() * 100) + 10;
+      const leads = Math.floor(clicks * (0.08 + Math.random() * 0.12)); // 8-20% lead rate
+      
       mockData.push({
         category: `Category ${i}`,
-        impressions: Math.floor(Math.random() * 10000) + 5000,
-        clicks: Math.floor(Math.random() * 2000) + 500,
+        impressions: impressions,
+        clicks: clicks,
         spend: parseFloat((Math.random() * 100 + 20).toFixed(2)),
         ctr: parseFloat((Math.random() * 5 + 1).toFixed(2)),
         cpm: parseFloat((Math.random() * 15 + 5).toFixed(2)),
-        purchases: Math.floor(Math.random() * 100) + 10
+        purchases: purchases,
+        leads: leads
       });
     }
     
@@ -257,6 +264,7 @@ const BreakdownChart = ({
           {metric !== 'clicks' && <p style={{ margin: 0 }}>{`Clicks: ${dataPoint.clicks || 0}`}</p>}
           {metric !== 'ctr' && <p style={{ margin: 0 }}>{`CTR: ${((dataPoint.ctr || 0)).toFixed(2)}%`}</p>}
           {metric !== 'purchases' && <p style={{ margin: 0 }}>{`Purchases: ${dataPoint.purchases || 0}`}</p>}
+          {metric !== 'leads' && <p style={{ margin: 0 }}>{`Leads: ${dataPoint.leads || 0}`}</p>}
         </div>
       );
     }
@@ -443,6 +451,19 @@ const BreakdownChart = ({
           }}
         >
           Spend
+        </button>
+        <button
+          onClick={() => setMetric('leads')}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: metric === 'leads' ? '#e0e7ff' : '#f3f4f6',
+            color: metric === 'leads' ? '#4f46e5' : '#6b7280',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Leads
         </button>
         <button
           onClick={() => setMetric('purchases')}
