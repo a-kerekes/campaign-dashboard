@@ -586,7 +586,7 @@ const AdMetricsChart = ({
                 
                 {metrics.spend && (
                   <Line
-                    yAxisId="lowerFunnel"
+                    yAxisId="impressions" 
                     type="monotone"
                     dataKey="spend"
                     stroke={colors.spend}
