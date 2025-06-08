@@ -83,7 +83,8 @@ const CreativeAnalyticsDashboard = () => {
         cpm: parseFloat(item.cpm || 0),
         purchases: parseInt(item.purchases || Math.round(clicks * 0.05)),
         landingPageViews: parseInt(item.landing_page_views || Math.round(clicks * 0.8)),
-        addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2))
+        addToCarts: parseInt(item.add_to_cart || Math.round(clicks * 0.2)),
+        leads: parseInt(item.leads || Math.round(clicks * 0.1))
       };
     });
   };
@@ -294,6 +295,10 @@ const CreativeAnalyticsDashboard = () => {
         
         const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : 0;
         
+        // ✅ SAFE ADDITION: Extract leads data (same pattern as purchases)
+        const leads = insight && insight.actions ? 
+          parseInt(insight.actions.find(a => a.action_type === 'lead')?.value || 0) : 0;
+        
         return {
           adId: ad.id,
           adName: ad.name,
@@ -315,6 +320,8 @@ const CreativeAnalyticsDashboard = () => {
             parseInt(insight.actions.find(a => a.action_type === 'landing_page_view')?.value || 0) : 0,
           addToCarts: insight && insight.actions ? 
             parseInt(insight.actions.find(a => a.action_type === 'add_to_cart')?.value || 0) : 0,
+          // ✅ SAFE ADDITION: Include leads in return object
+          leads: leads,
           // ROAS calculation
           roas: roas,
           revenue: purchaseValue
@@ -465,12 +472,17 @@ const CreativeAnalyticsDashboard = () => {
       const addToCartAction = accountInsights.actions?.find(a => a.action_type === 'add_to_cart');
       const estimatedAddToCarts = addToCartAction ? parseInt(addToCartAction.value) : Math.round(summary.totalClicks * 0.3);
 
+      // ✅ SAFE ADDITION: Extract leads from account insights
+      const leadAction = accountInsights.actions?.find(a => a.action_type === 'lead');
+      const estimatedLeads = leadAction ? parseInt(leadAction.value) : Math.round(summary.totalClicks * 0.12);
+
       const funnel = {
         impressions: summary.totalImpressions,
         clicks: summary.totalClicks,
         landingPageViews: estimatedLandingPageViews,
         addToCarts: estimatedAddToCarts,
-        purchases: estimatedPurchases
+        purchases: estimatedPurchases,
+        leads: estimatedLeads
       };
 
       const purchaseValueAction = accountInsights.action_values?.find(a => a.action_type === 'purchase');
@@ -480,8 +492,10 @@ const CreativeAnalyticsDashboard = () => {
         cpm: summary.avgCpm,
         cpc: summary.avgCpc,
         costPerPurchase: funnel.purchases > 0 ? summary.totalSpend / funnel.purchases : 0,
+        costPerLead: funnel.leads > 0 ? summary.totalSpend / funnel.leads : 0,
         roas: revenue > 0 ? revenue / summary.totalSpend : 0,
-        linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0
+        linkClickToConversion: funnel.purchases > 0 ? (funnel.purchases / summary.totalClicks) * 100 : 0,
+        leadRate: summary.totalClicks > 0 ? (funnel.leads / summary.totalClicks) * 100 : 0
       };
       
       const topCreatives = [...processedCreativePerformance]

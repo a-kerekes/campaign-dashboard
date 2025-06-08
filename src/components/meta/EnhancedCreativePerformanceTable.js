@@ -9,18 +9,28 @@ const AGGREGATION_MODES = {
   ADAPTIVE: 'adaptive' // 🆕 Smart pattern recognition with progressive grouping
 };
 
-// Metrics configuration
+// ✅ SAFE ADDITION: Display modes for different business types
+const DISPLAY_MODES = {
+  ECOMMERCE: 'ecommerce',    // Focus on ROAS, Revenue, Purchases
+  LEAD_GEN: 'leadgen'        // Focus on Leads, CPL, Lead Rate
+};
+
+// Metrics configuration - ✅ SAFE ADDITION: Added lead metrics
 const metricsConfig = [
   { id: 'ctr', name: 'CTR', format: 'percentage', higherIsBetter: true, defaultLow: 1.0, defaultMedium: 1.5 },
   { id: 'cpc', name: 'CPC', format: 'currency', higherIsBetter: false, defaultLow: 2, defaultMedium: 1 },
   { id: 'cpm', name: 'CPM', format: 'currency', higherIsBetter: false, defaultLow: 30, defaultMedium: 20 },
   { id: 'roas', name: 'ROAS', format: 'decimal', higherIsBetter: true, defaultLow: 1, defaultMedium: 2 },
-  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 }
+  { id: 'costPerPurchase', name: 'Cost/Purchase', format: 'currency', higherIsBetter: false, defaultLow: 50, defaultMedium: 30 },
+  { id: 'costPerLead', name: 'Cost/Lead', format: 'currency', higherIsBetter: false, defaultLow: 15, defaultMedium: 8 },
+  { id: 'leadRate', name: 'Lead Rate', format: 'percentage', higherIsBetter: true, defaultLow: 2.0, defaultMedium: 5.0 }
 ];
 
 const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, benchmarks: propBenchmarks, onCreativeSelect, dateRange }) => {
   const [creatives, setCreatives] = useState([]);
   const [aggregationMode, setAggregationMode] = useState(AGGREGATION_MODES.ADAPTIVE);
+  // ✅ SAFE ADDITION: Display mode state
+  const [displayMode, setDisplayMode] = useState(DISPLAY_MODES.ECOMMERCE);
   const [sortColumn, setSortColumn] = useState('spend');
   const [sortDirection, setSortDirection] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -490,7 +500,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     return isNaN(integerValue) || !isFinite(integerValue) ? defaultValue : integerValue;
   }, []);
 
-  // 🆕 ENHANCED: Aggregation function with ADAPTIVE mode support
+  // 🆕 ENHANCED: Aggregation function with ADAPTIVE mode support (UNCHANGED EXCEPT FOR LEADS)
   const aggregateCreatives = useCallback((creativePerformanceData, mode) => {
     if (!creativePerformanceData || !Array.isArray(creativePerformanceData)) {
       return [];
@@ -553,6 +563,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           totalSpend: 0,
           totalPurchases: 0,
           totalRevenue: 0,
+          totalLeads: 0, // ✅ SAFE ADDITION: Lead tracking
           extractedCopy: mode === AGGREGATION_MODES.COPY ? groupKey : extractAdCopy(creative),
           groupingInfo: mode === AGGREGATION_MODES.ADAPTIVE ? groupingInfo : null
         };
@@ -578,12 +589,14 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const cleanSpend = cleanNumericValue(creative.spend);
       const cleanPurchases = cleanIntegerValue(creative.purchases);
       const cleanRevenue = cleanNumericValue(creative.revenue);
+      const cleanLeads = cleanIntegerValue(creative.leads); // ✅ SAFE ADDITION: Clean leads data
       
       group.totalImpressions += cleanImpressions;
       group.totalClicks += cleanClicks;
       group.totalSpend += cleanSpend;
       group.totalPurchases += cleanPurchases;
       group.totalRevenue += cleanRevenue;
+      group.totalLeads += cleanLeads; // ✅ SAFE ADDITION: Aggregate leads
       
       console.log(`📈 Group "${groupKey}" now has ${group.adsetCount} ads, ${group.totalSpend.toFixed(2)} total spend`);
     });
@@ -594,11 +607,13 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const spend = group.totalSpend;
       const purchases = group.totalPurchases;
       const revenue = group.totalRevenue;
+      const leads = group.totalLeads; // ✅ SAFE ADDITION: Use aggregated leads
 
       const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
       const cpc = clicks > 0 ? spend / clicks : 0;
       const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
       const costPerPurchase = purchases > 0 ? spend / purchases : 0;
+      const costPerLead = leads > 0 ? spend / leads : 0; // ✅ SAFE ADDITION: Calculate CPL
       
       let roas = 0;
       if (spend > 0 && revenue > 0) {
@@ -611,6 +626,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
 
       const seeMoreRate = impressions > 0 ? Math.random() * 3 + 0.5 : 0;
       const thumbstopRate = impressions > 0 ? Math.random() * 5 + 1 : 0;
+      const leadRate = clicks > 0 ? (leads / clicks) * 100 : 0; // ✅ SAFE ADDITION: Calculate lead rate
 
       const bestThumbnail = Array.from(group.thumbnailUrls)[0] || group.thumbnailUrl;
       
@@ -642,14 +658,17 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         spend,
         purchases,
         revenue,
+        leads, // ✅ SAFE ADDITION: Include leads in final object
         ctr,
         cpc,
         cpm,
         costPerPurchase,
+        costPerLead, // ✅ SAFE ADDITION: Include CPL
         roas,
         seeMoreRate,
         thumbstopRate,
         conversionRate: clicks > 0 && purchases > 0 ? (purchases / clicks) * 100 : 0,
+        leadRate, // ✅ SAFE ADDITION: Include lead rate
         
         extractedCopy: group.extractedCopy,
         groupingInfo: group.groupingInfo
@@ -748,7 +767,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     if (low === null || medium === null) return '#6b7280';
     
     const numericValue = parseFloat(value);
-    const higherIsBetter = ['ctr', 'roas', 'seeMoreRate', 'thumbstopRate'].includes(metric);
+    const higherIsBetter = ['ctr', 'roas', 'seeMoreRate', 'thumbstopRate', 'leadRate'].includes(metric);
     
     if (higherIsBetter) {
       if (numericValue >= medium) return '#059669';
@@ -761,16 +780,32 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  const getMetricsForMode = (mode) => {
-    switch (mode) {
-      case AGGREGATION_MODES.POST:
-        return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
-      case AGGREGATION_MODES.COPY:
-        return ['roas', 'revenue', 'cpc', 'ctr', 'seeMoreRate', 'spend', 'purchases', 'creativeCount'];
-      case AGGREGATION_MODES.ADAPTIVE:
-        return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
-      default:
-        return ['roas', 'revenue', 'cpm', 'ctr', 'spend', 'purchases'];
+  // ✅ SAFE ADDITION: Get metrics based on display mode and aggregation mode
+  const getMetricsForMode = (aggregationMode, displayMode) => {
+    if (displayMode === DISPLAY_MODES.LEAD_GEN) {
+      // Lead generation focused metrics
+      switch (aggregationMode) {
+        case AGGREGATION_MODES.POST:
+          return ['leads', 'costPerLead', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'leadRate', 'adsetCount'];
+        case AGGREGATION_MODES.COPY:
+          return ['leads', 'costPerLead', 'cpc', 'ctr', 'seeMoreRate', 'spend', 'leadRate', 'creativeCount'];
+        case AGGREGATION_MODES.ADAPTIVE:
+          return ['leads', 'costPerLead', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'leadRate', 'adsetCount'];
+        default:
+          return ['leads', 'costPerLead', 'cpm', 'ctr', 'spend', 'leadRate'];
+      }
+    } else {
+      // E-commerce focused metrics (original)
+      switch (aggregationMode) {
+        case AGGREGATION_MODES.POST:
+          return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
+        case AGGREGATION_MODES.COPY:
+          return ['roas', 'revenue', 'cpc', 'ctr', 'seeMoreRate', 'spend', 'purchases', 'creativeCount'];
+        case AGGREGATION_MODES.ADAPTIVE:
+          return ['roas', 'revenue', 'cpm', 'ctr', 'thumbstopRate', 'spend', 'purchases', 'adsetCount'];
+        default:
+          return ['roas', 'revenue', 'cpm', 'ctr', 'spend', 'purchases'];
+      }
     }
   };
 
@@ -785,10 +820,12 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       case 'cpc':
       case 'cpm':
       case 'costPerPurchase':
+      case 'costPerLead':
         return `${value.toFixed(2)}`;
       case 'ctr':
       case 'seeMoreRate':
       case 'thumbstopRate':
+      case 'leadRate':
         return `${value.toFixed(2)}%`;
       case 'adsetCount':
         return `${value} Ad Sets`;
@@ -807,7 +844,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
     
     try {
-      const metrics = getMetricsForMode(aggregationMode);
+      const metrics = getMetricsForMode(aggregationMode, displayMode);
       const headers = ['Name', 'Copy Preview', ...metrics.map(m => m.toUpperCase())];
       
       const rows = filteredCreatives.map(creative => [
@@ -830,7 +867,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `creative_performance_${aggregationMode}_${selectedAccountId || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `creative_performance_${aggregationMode}_${displayMode}_${selectedAccountId || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -844,7 +881,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
     }
   };
 
-  const currentMetrics = getMetricsForMode(aggregationMode);
+  const currentMetrics = getMetricsForMode(aggregationMode, displayMode);
 
   return (
     <div style={{ 
@@ -960,6 +997,50 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* ✅ SAFE ADDITION: Display Mode Toggle */}
+            <div style={{
+              display: 'flex',
+              gap: '2px',
+              backgroundColor: '#f3f4f6',
+              padding: '2px',
+              borderRadius: '6px'
+            }}>
+              <button
+                onClick={() => setDisplayMode(DISPLAY_MODES.ECOMMERCE)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  borderRadius: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  backgroundColor: displayMode === DISPLAY_MODES.ECOMMERCE ? 'white' : 'transparent',
+                  color: displayMode === DISPLAY_MODES.ECOMMERCE ? '#2563eb' : '#6b7280',
+                  boxShadow: displayMode === DISPLAY_MODES.ECOMMERCE ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                }}
+              >
+                🛒 E-commerce
+              </button>
+              <button
+                onClick={() => setDisplayMode(DISPLAY_MODES.LEAD_GEN)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  borderRadius: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  backgroundColor: displayMode === DISPLAY_MODES.LEAD_GEN ? 'white' : 'transparent',
+                  color: displayMode === DISPLAY_MODES.LEAD_GEN ? '#2563eb' : '#6b7280',
+                  boxShadow: displayMode === DISPLAY_MODES.LEAD_GEN ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none'
+                }}
+              >
+                🎯 Lead Gen
+              </button>
+            </div>
+            
             <input
               type="text"
               placeholder="Search..."
@@ -993,6 +1074,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
               <option value="roas-desc">ROAS (High to Low)</option>
               <option value="ctr-desc">CTR (High to Low)</option>
               <option value="impressions-desc">Impressions (High to Low)</option>
+              <option value="leads-desc">Leads (High to Low)</option>
+              <option value="costPerLead-asc">CPL (Low to High)</option>
               <option value="adName-asc">Name (A to Z)</option>
             </select>
             
@@ -1296,6 +1379,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                            metric === 'seeMoreRate' ? 'See More' :
                            metric === 'adsetCount' ? '# Ad Sets' :
                            metric === 'creativeCount' ? '# Creatives' :
+                           metric === 'costPerLead' ? 'CPL' :
+                           metric === 'leadRate' ? 'Lead Rate' :
                            metric.replace(/([A-Z])/g, ' $1').toUpperCase()}
                         </div>
                         <div style={{
@@ -1318,6 +1403,8 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
                              nextMetric === 'seeMoreRate' ? 'See More' :
                              nextMetric === 'adsetCount' ? '# Ad Sets' :
                              nextMetric === 'creativeCount' ? '# Creatives' :
+                             nextMetric === 'costPerLead' ? 'CPL' :
+                             nextMetric === 'leadRate' ? 'Lead Rate' :
                              nextMetric.replace(/([A-Z])/g, ' $1').toUpperCase()}
                           </div>
                           <div style={{
@@ -1355,7 +1442,7 @@ const EnhancedCreativePerformanceTable = ({ analyticsData, selectedAccountId, be
         color: '#6b7280',
         textAlign: 'center'
       }}>
-        <p>Performance data aggregated by {aggregationMode}. Colors indicate benchmark performance.</p>
+        <p>Performance data aggregated by {aggregationMode} • Showing {displayMode === DISPLAY_MODES.LEAD_GEN ? 'Lead Generation' : 'E-commerce'} metrics • Colors indicate benchmark performance.</p>
         {aggregationMode === AGGREGATION_MODES.ADAPTIVE && patternInsights && (
           <p style={{ marginTop: '4px' }}>
             🧠 Adaptive grouping with {patternInsights.confidence.toFixed(0)}% confidence 
