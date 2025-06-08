@@ -347,6 +347,7 @@ function generateMockTimeData(days) {
   const pageViewRate = 0.75;
   const addToCartRate = 0.25;
   const purchaseRate = 0.35;
+  const leadRate = 0.12; // Lead generation rate from landing page views
   
   // Small daily fluctuation
   const fluctuation = () => {
@@ -373,6 +374,8 @@ function generateMockTimeData(days) {
     const landingPageViews = Math.round(clicks * pageViewRate * (1 + fluctuation()));
     const addToCarts = Math.round(landingPageViews * addToCartRate * (1 + fluctuation()));
     const purchases = Math.round(addToCarts * purchaseRate * (1 + fluctuation()));
+    const leads = Math.round(landingPageViews * leadRate * (1 + fluctuation()));
+    const spend = parseFloat((impressions * 0.0008 * (1 + fluctuation() * 0.5)).toFixed(2));
     
     data.push({
       date: date.toISOString(),
@@ -380,7 +383,9 @@ function generateMockTimeData(days) {
       clicks,
       landingPageViews,
       addToCarts,
-      purchases
+      purchases,
+      leads,
+      spend
     });
   }
   
@@ -408,6 +413,7 @@ function generateMockBreakdownData(dimension, dateRange) {
     const landingPageViews = Math.round(clicks * (0.7 + Math.random() * 0.2));
     const addToCarts = Math.round(landingPageViews * (0.15 + Math.random() * 0.2));
     const purchases = Math.round(addToCarts * (0.2 + Math.random() * 0.3));
+    const leads = Math.round(landingPageViews * (0.08 + Math.random() * 0.15));
     const spend = (impressions * (0.00005 + Math.random() * 0.00003)).toFixed(2);
     const cpc = (spend / clicks).toFixed(2);
     const roas = (purchases * 40 / parseFloat(spend)).toFixed(2);
@@ -422,6 +428,7 @@ function generateMockBreakdownData(dimension, dateRange) {
       landingPageViews,
       addToCarts,
       purchases,
+      leads,
       roas: parseFloat(roas)
     };
   });
@@ -882,17 +889,20 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
         const landingPageViews = Math.floor(clicks * (0.8 + Math.random() * 0.15));
         const addToCarts = Math.floor(landingPageViews * (0.15 + Math.random() * 0.15));
         const purchases = Math.floor(addToCarts * (0.2 + Math.random() * 0.2));
+        const leads = Math.floor(landingPageViews * (0.1 + Math.random() * 0.1));
+        const spend = parseFloat((Math.random() * 200 + 20).toFixed(2));
         
         mockData.push({
           date: dateStr,
           impressions: impressions,
           clicks: clicks,
-          spend: parseFloat((Math.random() * 200 + 20).toFixed(2)),
+          spend: spend,
           ctr: parseFloat((clickRate * 100).toFixed(2)),
           cpc: parseFloat((Math.random() * 2 + 0.1).toFixed(2)),
           landingPageViews: landingPageViews,
           addToCarts: addToCarts,
-          purchases: purchases
+          purchases: purchases,
+          leads: leads
         });
         
         // Move to next day
@@ -956,6 +966,7 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       const landingPageViews = actions.find(a => a.action_type === 'landing_page_view')?.value || 0;
       const addToCarts = actions.find(a => a.action_type === 'add_to_cart')?.value || 0;
       const purchases = actions.find(a => a.action_type === 'purchase')?.value || 0;
+      const leads = actions.find(a => a.action_type === 'lead')?.value || 0;
       
       return {
         date: day.date_start,
@@ -966,7 +977,8 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
         cpc: parseFloat(day.cpc || 0),
         landingPageViews: parseInt(landingPageViews),
         addToCarts: parseInt(addToCarts),
-        purchases: parseInt(purchases)
+        purchases: parseInt(purchases),
+        leads: parseInt(leads)
       };
     });
     
@@ -1013,17 +1025,20 @@ const fetchDailyMetrics = async (dateRange, accountId, token) => {
       const landingPageViews = Math.floor(clicks * (0.8 + Math.random() * 0.15));
       const addToCarts = Math.floor(landingPageViews * (0.15 + Math.random() * 0.15));
       const purchases = Math.floor(addToCarts * (0.2 + Math.random() * 0.2));
+      const leads = Math.floor(landingPageViews * (0.1 + Math.random() * 0.1));
+      const spend = parseFloat((Math.random() * 200 + 20).toFixed(2));
       
       mockData.push({
         date: dateStr,
         impressions: impressions,
         clicks: clicks,
-        spend: parseFloat((Math.random() * 200 + 20).toFixed(2)),
+        spend: spend,
         ctr: parseFloat((clickRate * 100).toFixed(2)),
         cpc: parseFloat((Math.random() * 2 + 0.1).toFixed(2)),
         landingPageViews: landingPageViews,
         addToCarts: addToCarts,
-        purchases: purchases
+        purchases: purchases,
+        leads: leads
       });
       
       currentDate.setDate(currentDate.getDate() + 1);
@@ -1057,7 +1072,14 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
         { breakdown_value: 'instant_article', impressions: Math.floor(Math.random() * 1000) + 300, clicks: Math.floor(Math.random() * 50) + 15, spend: (Math.random() * 20 + 5).toFixed(2) },
         { breakdown_value: 'marketplace', impressions: Math.floor(Math.random() * 800) + 200, clicks: Math.floor(Math.random() * 40) + 10, spend: (Math.random() * 16 + 4).toFixed(2) }
       ];
-      return markAsMockData(mockPlatformData);
+      
+      // Add leads to each breakdown item
+      const mockPlatformDataWithLeads = mockPlatformData.map(item => ({
+        ...item,
+        leads: Math.floor(item.clicks * (0.08 + Math.random() * 0.12)) // 8-20% lead rate from clicks
+      }));
+      
+      return markAsMockData(mockPlatformDataWithLeads);
     }
     
     if (shouldUseMockData()) {
@@ -1095,6 +1117,12 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
           { breakdown_value: 'marketplace', impressions: Math.floor(Math.random() * 800) + 200, clicks: Math.floor(Math.random() * 40) + 10, spend: (Math.random() * 16 + 4).toFixed(2) }
         ];
       }
+      
+      // Add leads to each breakdown item
+      mockData = mockData.map(item => ({
+        ...item,
+        leads: Math.floor(item.clicks * (0.08 + Math.random() * 0.12)) // 8-20% lead rate from clicks
+      }));
       
       console.log(`Returning mock ${breakdownType} breakdown data with ${mockData.length} segments`);
       return markAsMockData(mockData);
@@ -1143,42 +1171,44 @@ const fetchBreakdownMetrics = async (breakdownType, dateRange, accountId, token)
     }
     
     // Format the response for our charts
-const formattedData = result.data.data.map(item => {
-  // Extract purchase actions if available
-  const actions = item.actions || [];
-  const purchases = actions.find(a => a.action_type === 'purchase')?.value || 0;
-  const landingPageViews = actions.find(a => a.action_type === 'landing_page_view')?.value || 0;
-  const addToCarts = actions.find(a => a.action_type === 'add_to_cart')?.value || 0;
-  
-  // Extract purchase values if available
-  const actionValues = item.action_values || [];
-  const purchaseValue = actionValues.find(a => a.action_type === 'purchase')?.value || 0;
-  
-  // Extract cost per purchase if available
-  const costPerActionType = item.cost_per_action_type || [];
-  const costPerPurchase = costPerActionType.find(c => c.action_type === 'purchase')?.value || 0;
-  
-  // Calculate CTR if not provided
-  let ctr = parseFloat(item.ctr || 0);
-  if (!ctr && item.impressions > 0) {
-    ctr = (item.clicks / item.impressions) * 100;
-  }
-  
-  return {
-    breakdown_value: item[breakdownType],
-    impressions: parseInt(item.impressions || 0),
-    clicks: parseInt(item.clicks || 0),
-    spend: parseFloat(item.spend || 0),
-    ctr: ctr,
-    cpc: parseFloat(item.cpc || 0),
-    cpm: parseFloat(item.cpm || 0),
-    purchases: parseInt(purchases),
-    purchaseValue: parseFloat(purchaseValue),
-    costPerPurchase: parseFloat(costPerPurchase),
-    landingPageViews: parseInt(landingPageViews),
-    addToCarts: parseInt(addToCarts)
-  };
-});
+    const formattedData = result.data.data.map(item => {
+      // Extract purchase actions if available
+      const actions = item.actions || [];
+      const purchases = actions.find(a => a.action_type === 'purchase')?.value || 0;
+      const landingPageViews = actions.find(a => a.action_type === 'landing_page_view')?.value || 0;
+      const addToCarts = actions.find(a => a.action_type === 'add_to_cart')?.value || 0;
+      const leads = actions.find(a => a.action_type === 'lead')?.value || 0;
+      
+      // Extract purchase values if available
+      const actionValues = item.action_values || [];
+      const purchaseValue = actionValues.find(a => a.action_type === 'purchase')?.value || 0;
+      
+      // Extract cost per purchase if available
+      const costPerActionType = item.cost_per_action_type || [];
+      const costPerPurchase = costPerActionType.find(c => c.action_type === 'purchase')?.value || 0;
+      
+      // Calculate CTR if not provided
+      let ctr = parseFloat(item.ctr || 0);
+      if (!ctr && item.impressions > 0) {
+        ctr = (item.clicks / item.impressions) * 100;
+      }
+      
+      return {
+        breakdown_value: item[breakdownType],
+        impressions: parseInt(item.impressions || 0),
+        clicks: parseInt(item.clicks || 0),
+        spend: parseFloat(item.spend || 0),
+        ctr: ctr,
+        cpc: parseFloat(item.cpc || 0),
+        cpm: parseFloat(item.cpm || 0),
+        purchases: parseInt(purchases),
+        purchaseValue: parseFloat(purchaseValue),
+        costPerPurchase: parseFloat(costPerPurchase),
+        landingPageViews: parseInt(landingPageViews),
+        addToCarts: parseInt(addToCarts),
+        leads: parseInt(leads)
+      };
+    });
     
     return formattedData;
     
@@ -1220,6 +1250,12 @@ const formattedData = result.data.data.map(item => {
       ];
     }
     
+    // Add leads to each breakdown item
+    mockData = mockData.map(item => ({
+      ...item,
+      leads: Math.floor(item.clicks * (0.08 + Math.random() * 0.12)) // 8-20% lead rate from clicks
+    }));
+    
     console.log(`Returning fallback mock ${breakdownType} breakdown data due to error`);
     return markAsMockData(mockData);
   }
@@ -1228,9 +1264,6 @@ const formattedData = result.data.data.map(item => {
 // Fetch benchmarks for performance comparison
 const fetchBenchmarks = async (accountId, token) => {
   try {
-    // Format account ID to ensure proper format
-    const formattedAccountId = accountId.toString().replace('act_', '');
-    
     // If we're in development mode with mock data
     if (shouldUseMockData()) {
       // Generate mock benchmark data
@@ -1285,7 +1318,6 @@ const fetchBenchmarks = async (accountId, token) => {
   }
 };
 
-// Save custom benchmarks for an account
 const saveBenchmarks = async (accountId, benchmarks, token) => {
   try {
     // Format account ID to ensure proper format

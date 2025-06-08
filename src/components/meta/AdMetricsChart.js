@@ -10,7 +10,6 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { getMetaMetricsByTenant } from './metaAPI';
 import { useAuth } from '../../context/AuthContext';
 
 const AdMetricsChart = ({ 
@@ -31,7 +30,9 @@ const AdMetricsChart = ({
     clicks: true,
     landingPageViews: true,
     addToCarts: true,
-    purchases: true
+    purchases: true,
+    leads: true,
+    spend: true
   });
 
   // Debug log to help identify what props are being received
@@ -259,7 +260,9 @@ const AdMetricsChart = ({
     clicks: '#83a6ed',
     landingPageViews: '#8dd1e1',
     addToCarts: '#82ca9d',
-    purchases: '#a4de6c'
+    purchases: '#a4de6c',
+    leads: '#ff7c7c',
+    spend: '#ffc658'
   };
 
   // Format funnel data
@@ -268,7 +271,9 @@ const AdMetricsChart = ({
     { name: 'Clicks', value: dataToUse.reduce((sum, item) => sum + (item.clicks || 0), 0), key: 'clicks' },
     { name: 'Landing Page Views', value: dataToUse.reduce((sum, item) => sum + (item.landingPageViews || 0), 0), key: 'landingPageViews' },
     { name: 'Add to Carts', value: dataToUse.reduce((sum, item) => sum + (item.addToCarts || 0), 0), key: 'addToCarts' },
-    { name: 'Purchases', value: dataToUse.reduce((sum, item) => sum + (item.purchases || 0), 0), key: 'purchases' }
+    { name: 'Purchases', value: dataToUse.reduce((sum, item) => sum + (item.purchases || 0), 0), key: 'purchases' },
+    { name: 'Leads', value: dataToUse.reduce((sum, item) => sum + (item.leads || 0), 0), key: 'leads' },
+    { name: 'Ad Spend', value: dataToUse.reduce((sum, item) => sum + (item.spend || 0), 0), key: 'spend' }
   ];
 
   return (
@@ -396,7 +401,11 @@ const AdMetricsChart = ({
                 <tr key={index} style={{borderBottom: '1px solid #eee'}}>
                   <td style={{padding: '10px 0', width: '180px'}}>
                     <div style={{fontWeight: 'bold'}}>{item.name}</div>
-                    <div style={{fontSize: '14px'}}>{item.value.toLocaleString()}</div>
+                    <div style={{fontSize: '14px'}}>
+                      {item.key === 'spend' 
+                        ? `$${item.value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` 
+                        : item.value.toLocaleString()}
+                    </div>
                   </td>
                   <td style={{padding: '10px 0'}}>
                     <div style={{width: '100%', height: '24px', backgroundColor: '#f3f4f6', borderRadius: '4px', position: 'relative'}}>
@@ -491,7 +500,7 @@ const AdMetricsChart = ({
                   yAxisId="lowerFunnel"
                   domain={[0, 'auto']}
                   orientation="right"
-                  hide={!(metrics.clicks || metrics.landingPageViews || metrics.addToCarts || metrics.purchases)}
+                  hide={!(metrics.clicks || metrics.landingPageViews || metrics.addToCarts || metrics.purchases || metrics.leads || metrics.spend)}
                 />
                 
                 <Tooltip />
@@ -559,6 +568,32 @@ const AdMetricsChart = ({
                     dot={{ r: 2 }}
                     activeDot={{ r: 6 }}
                     name="Purchases"
+                  />
+                )}
+                
+                {metrics.leads && (
+                  <Line
+                    yAxisId="lowerFunnel"
+                    type="monotone"
+                    dataKey="leads"
+                    stroke={colors.leads}
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 6 }}
+                    name="Leads"
+                  />
+                )}
+                
+                {metrics.spend && (
+                  <Line
+                    yAxisId="lowerFunnel"
+                    type="monotone"
+                    dataKey="spend"
+                    stroke={colors.spend}
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 6 }}
+                    name="Ad Spend"
                   />
                 )}
               </LineChart>
